@@ -1,0 +1,3 @@
+CREATE TABLE `setting` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL
+);

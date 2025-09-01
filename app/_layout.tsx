@@ -1,29 +1,32 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { Stack } from "expo-router";
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
+import "@/global.css";
+import { Suspense } from "react";
+import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
+import { Spinner } from "@/components/ui/spinner";
+import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
+import { drizzle } from "drizzle-orm/expo-sqlite";
+import migrations from "../drizzle/migrations";
+
+const dbname = "seabreeze";
+const expoDb = openDatabaseSync(dbname);
+const db = drizzle(expoDb);
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
-  }
+  useMigrations(db, migrations);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Suspense fallback={<Spinner size="large" color="grey" />}>
+      <SQLiteProvider
+        databaseName={dbname}
+        useSuspense={true}
+        options={{ enableChangeListener: true }}
+      >
+        <GluestackUIProvider>
+          <Stack />
+        </GluestackUIProvider>
+      </SQLiteProvider>
+    </Suspense>
   );
 }
