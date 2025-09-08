@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import migrations from "../drizzle/migrations";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 
 const dbname = "seabreeze";
 const expoDb = openDatabaseSync(dbname);
@@ -24,7 +25,9 @@ export default function RootLayout() {
         options={{ enableChangeListener: true }}
       >
         <GluestackUIProvider>
-          <Stack />
+          <KeyboardProvider>
+            <Stack />
+          </KeyboardProvider>
         </GluestackUIProvider>
       </SQLiteProvider>
     </Suspense>
