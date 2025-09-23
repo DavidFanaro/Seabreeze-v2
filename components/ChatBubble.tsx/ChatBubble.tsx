@@ -1,6 +1,7 @@
+import { DarkTheme } from "@react-navigation/native";
 import * as React from "react";
 import { View, Text } from "react-native";
-import Markdown from "react-native-marked";
+import Markdown, { MarkedStyles } from "react-native-marked";
 
 export type roles = "User" | "AI";
 
@@ -23,7 +24,11 @@ interface AiBubbleProps {
 }
 
 function AiBubble({ message }: AiBubbleProps) {
-  return <Markdown value={message} />;
+  return (
+    <View>
+      <Markdown value={message} />
+    </View>
+  );
 }
 
 interface UserBubbleProps {
@@ -33,7 +38,7 @@ interface UserBubbleProps {
 function UserBubble({ message }: UserBubbleProps) {
   return (
     <View className="flex-auto ">
-      <View className="self-end">
+      <View className="self-end max-w-[85%] my-1">
         <View className="bg-slate-700 rounded-lg px-3 py-2">
           <Text className="text-white">{message}</Text>
         </View>

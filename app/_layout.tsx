@@ -9,6 +9,8 @@ import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import migrations from "../drizzle/migrations";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { ThemeContext, DarkTheme } from "@react-navigation/native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 const dbname = "seabreeze";
 const expoDb = openDatabaseSync(dbname);
@@ -24,11 +26,15 @@ export default function RootLayout() {
         useSuspense={true}
         options={{ enableChangeListener: true }}
       >
-        <GluestackUIProvider>
-          <KeyboardProvider>
-            <Stack />
-          </KeyboardProvider>
-        </GluestackUIProvider>
+        <KeyboardProvider>
+          <GluestackUIProvider>
+            <ThemeContext value={DarkTheme}>
+              <SafeAreaProvider>
+                <Stack />
+              </SafeAreaProvider>
+            </ThemeContext>
+          </GluestackUIProvider>
+        </KeyboardProvider>
       </SQLiteProvider>
     </Suspense>
   );
