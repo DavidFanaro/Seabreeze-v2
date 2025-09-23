@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.davidfanaro.seabreeze"
+      "bundleIdentifier": "com.davidfanaro.seabreeze.v1"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.davidfanaro.seabreeze"
+      "package": "com.davidfanaro.seabreeze.v1"
     },
     "web": {
       "bundler": "metro",
