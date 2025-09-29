@@ -9,7 +9,7 @@ interface ChatBtnProps {
 
 const ChatBtn: React.FC<ChatBtnProps> = ({ onClick }) => {
   return (
-    <Pressable onPress={onClick}>
+    <Pressable onPress={() => onClick()}>
       {({ pressed }) =>
         pressed ? (
           <Icon

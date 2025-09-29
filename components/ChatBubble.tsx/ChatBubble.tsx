@@ -25,8 +25,8 @@ interface AiBubbleProps {
 
 function AiBubble({ message }: AiBubbleProps) {
   return (
-    <View>
-      <Markdown value={message} />
+    <View className="flex-grow">
+      <Markdown styles={{ em: { paddingHorizontal: 3 } }} value={message} />
     </View>
   );
 }
