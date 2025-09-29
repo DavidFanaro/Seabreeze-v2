@@ -15,60 +15,63 @@ import { apple } from "@react-native-ai/apple";
 
 export default function Index() {
   const [text, setText] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ModelMessage[]>([]);
 
-  const addAIMessage = async () => {
-    const mesUUID = uuid.v4();
-    const i: ModelMessage[] = messages.flatMap((e) => ({
-      role: e.role === "AI" ? "assistant" : "user",
-      content: [{ type: "text", text: e.message }],
-    }));
-    if (i.length !== 0) {
-      try {
-        const result = streamText({
-          model: apple(),
-          messages: i,
+  const sendMessage = async () => {
+    if (!text.trim()) return;
+
+    const userMessage: ModelMessage = {
+      role: "user",
+      content: text.trim(),
+    };
+
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setText("");
+
+    const messageIdx = updatedMessages.length;
+
+    setMessages([
+      ...updatedMessages,
+      {
+        role: "assistant",
+        content: "...",
+      },
+    ]);
+
+    let accumulatedContent = "";
+
+    try {
+      const result = streamText({
+        model: apple(),
+        messages: updatedMessages,
+      });
+
+      for await (const chunk of result.textStream) {
+        accumulatedContent += chunk;
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          newMessages[messageIdx] = {
+            role: "assistant",
+            content: accumulatedContent,
+          };
+          return newMessages;
         });
-        setMessages([
-          ...messages,
-          {
-            id: mesUUID,
-            role: "AI",
-            message: "",
-          },
-        ]);
-        const lastMesIdx = messages.length;
-        let buffer = "";
-        for await (const textPart of result.textStream) {
-          buffer += textPart;
-          setMessages((e) => {
-            const mes = [...e];
-            mes[lastMesIdx] = {
-              id: mesUUID,
-              role: "AI",
-              message: buffer,
-            };
-            return mes;
-          });
-        }
-      } catch (e) {
-        console.log(e);
       }
+    } catch (error) {
+      const errorMessage = `Error: ${error instanceof Error ? error.message : "Failed to generate response"}`;
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        newMessages[messageIdx] = {
+          role: "assistant",
+          content: errorMessage,
+        };
+        return newMessages;
+      });
     }
   };
 
-  const sendUserMessage = () => {
-    setMessages([
-      ...messages,
-      {
-        id: uuid.v4(),
-        role: "User",
-        message: text,
-      },
-    ]);
-    setText("");
-    addAIMessage();
-  };
   return (
     <KeyboardGestureArea
       interpolator="ios"
@@ -83,13 +86,12 @@ export default function Index() {
       >
         <FlatList
           keyboardDismissMode="interactive"
-          inverted
           data={messages}
           renderItem={(i) =>
-            i.item.role === "AI" ? (
-              <ChatBubble message={i.item.message} role="AI" />
+            i.item.role === "assistant" ? (
+              <ChatBubble message={i.item.content as string} role="AI" />
             ) : (
-              <ChatBubble message={i.item.message} role="User" />
+              <ChatBubble message={i.item.content as string} role="User" />
             )
           }
         />
@@ -102,7 +104,7 @@ export default function Index() {
               nativeID="composer"
             />
           </Input>
-          <ChatBtn onClick={sendUserMessage} />
+          <ChatBtn onClick={sendMessage} />
         </View>
       </KeyboardAvoidingView>
     </KeyboardGestureArea>
