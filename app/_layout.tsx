@@ -1,16 +1,13 @@
 import { Stack } from "expo-router";
+import { Text } from "react-native";
 
-import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
-import "@/global.css";
-import { Suspense } from "react";
-import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
-import { Spinner } from "@/components/ui/spinner";
-import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
+import { DarkTheme, ThemeContext } from "@react-navigation/native";
 import { drizzle } from "drizzle-orm/expo-sqlite";
-import migrations from "../drizzle/migrations";
+import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
+import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
+import { Suspense } from "react";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { ThemeContext, DarkTheme } from "@react-navigation/native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import migrations from "../drizzle/migrations";
 
 const dbname = "seabreeze";
 const expoDb = openDatabaseSync(dbname);
@@ -20,20 +17,16 @@ export default function RootLayout() {
   useMigrations(db, migrations);
 
   return (
-    <Suspense fallback={<Spinner size="large" color="grey" />}>
+    <Suspense fallback={<Text>Loading</Text>}>
       <SQLiteProvider
         databaseName={dbname}
         useSuspense={true}
         options={{ enableChangeListener: true }}
       >
         <KeyboardProvider>
-          <GluestackUIProvider>
-            <ThemeContext value={DarkTheme}>
-              <SafeAreaProvider>
-                <Stack />
-              </SafeAreaProvider>
-            </ThemeContext>
-          </GluestackUIProvider>
+          <ThemeContext value={DarkTheme}>
+            <Stack />
+          </ThemeContext>
         </KeyboardProvider>
       </SQLiteProvider>
     </Suspense>

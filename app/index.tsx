@@ -1,106 +1,92 @@
 import useChat from "@/hooks/useChat";
+import { GlassView } from "expo-glass-effect";
+import { Stack } from "expo-router";
+import React, { useEffect, useRef } from "react";
 import {
-  FlatList,
+  Button,
   Keyboard,
   ScrollView,
+  Text,
+  TextInput,
   View,
-  VirtualizedList,
 } from "react-native";
-import ChatBtn from "@/components/ChatButton/Chatbtn";
-import ChatBubble from "@/components/ChatBubble.tsx/ChatBubble";
-import { Input, InputField } from "@/components/ui/input";
-import {
-  KeyboardAvoidingView,
-  KeyboardGestureArea,
-} from "react-native-keyboard-controller";
-import { useEffect, useRef } from "react";
-import Animated from "react-native-reanimated";
-import { ModelMessage } from "ai";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { Markdown } from "react-native-remark";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Index() {
-  const { text, setText, messages, sendMessage } = useChat();
-  const listRef = useRef<ScrollView>(null);
+  const { text, setText, messages, sendMessage, reset } = useChat();
+  const listref = useRef<ScrollView>(null);
 
   useEffect(() => {
-    const keyboardWillShowListener = Keyboard.addListener(
-      "keyboardWillShow",
-      () => {
-        listRef.current?.scrollToEnd({ animated: true });
-      },
+    const keyboard = Keyboard.addListener("keyboardDidShow", () =>
+      listref.current?.scrollToEnd()
     );
     return () => {
-      keyboardWillShowListener.remove();
+      keyboard.remove();
     };
   }, []);
 
   return (
-    <Animated.View className="flex-1">
-      <KeyboardGestureArea
-        interpolator="ios"
-        offset={50}
-        textInputNativeID="composer"
-        style={{ flex: 1, backgroundColor: "gray" }}
+    <SafeAreaView style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={"padding"}
+        keyboardVerticalOffset={10}
+        style={{ flex: 1 }}
       >
-        <KeyboardAvoidingView
-          behavior="translate-with-padding"
-          keyboardVerticalOffset={100}
-          style={{ flex: 1, gap: 0 }}
+        <Stack.Screen
+          options={{
+            headerTitle: "Chat",
+            headerTransparent: true,
+            headerRight: () => <Button title="Reset" onPress={() => reset()} />,
+          }}
+        />
+        <ScrollView
+          style={{ flex: 1, paddingTop: 50 }}
+          ref={listref}
+          onContentSizeChange={() => {
+            listref.current?.scrollToEnd();
+          }}
         >
-          {/*<FlatList
-            data={messages}
-            keyboardDismissMode="interactive"
-            ref={listRef}
-            onContentSizeChange={() => {
-              if (listRef.current) {
-                listRef.current.scrollToEnd();
-              }
+          {messages.map((i, idx) =>
+            i.role === "user" ? (
+              <View key={idx} style={{ alignItems: "flex-end" }}>
+                <GlassView
+                  isInteractive
+                  style={{ margin: 5, borderRadius: 25 }}
+                >
+                  <Text selectable style={{ color: "white", padding: 12 }}>
+                    {i.content as string}
+                  </Text>
+                </GlassView>
+              </View>
+            ) : (
+              <Markdown key={idx} markdown={i.content as string} />
+            )
+          )}
+        </ScrollView>
+        <GlassView
+          isInteractive
+          style={{
+            flexDirection: "row",
+            marginHorizontal: 10,
+            padding: 10,
+            borderRadius: 25,
+            marginTop: 10,
+          }}
+        >
+          <TextInput
+            style={{
+              flexGrow: 1,
+              flexShrink: 1,
+              color: "white",
             }}
-            style={{ flex: 1 }}
-            renderItem={(i) => (
-              <ChatBubble
-                role={
-                  (i.item as ModelMessage).role === "assistant" ? "AI" : "User"
-                }
-                message={(i.item as ModelMessage).content as string}
-              />
-            )}
-          />*/}
-          <ScrollView
-            keyboardDismissMode="interactive"
-            ref={listRef}
-            onContentSizeChange={() => {
-              if (listRef.current) {
-                listRef.current.scrollToEnd();
-              }
-            }}
-            style={{ flex: 1 }}
-          >
-            {messages.map((mes, i) => (
-              <ChatBubble
-                key={i}
-                role={mes.role === "assistant" ? "AI" : "User"}
-                message={mes.content as string}
-              />
-            ))}
-          </ScrollView>
-
-          <View className="mx-5 mb-8 mt-3 flex-row gap-2">
-            <Input className="flex-grow flex-shrink">
-              <InputField
-                value={text}
-                onChangeText={setText}
-                nativeID="composer"
-              />
-            </Input>
-            <ChatBtn
-              onClick={() => {
-                Keyboard.dismiss();
-                sendMessage();
-              }}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </KeyboardGestureArea>
-    </Animated.View>
+            onChangeText={setText}
+            value={text}
+          />
+          <Button onPress={() => sendMessage()} title="Send" />
+        </GlassView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
