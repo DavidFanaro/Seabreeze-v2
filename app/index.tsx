@@ -1,92 +1,45 @@
-import useChat from "@/hooks/useChat";
-import { GlassView } from "expo-glass-effect";
-import { Stack } from "expo-router";
-import React, { useEffect, useRef } from "react";
-import {
-  Button,
-  Keyboard,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
-import { Markdown } from "react-native-remark";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Link, router, Stack } from "expo-router";
+import * as React from "react";
+import { Button, SafeAreaView, TouchableOpacity, View } from "react-native";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import EvilIcons from "@expo/vector-icons/EvilIcons";
 
-export default function Index() {
-  const { text, setText, messages, sendMessage, reset } = useChat();
-  const listref = useRef<ScrollView>(null);
+interface HomeProps {}
 
-  useEffect(() => {
-    const keyboard = Keyboard.addListener("keyboardDidShow", () =>
-      listref.current?.scrollToEnd()
+export default function Home({}: HomeProps) {
+    return (
+        <View>
+            <Stack.Screen
+                options={{
+                    title: "Chats",
+                    headerTransparent: true,
+                    headerRight: () => (
+                        <Link href="/chat" push asChild>
+                            <TouchableOpacity>
+                                <MaterialIcons
+                                    style={{ marginLeft: 4 }}
+                                    name="add"
+                                    size={26}
+                                    color="white"
+                                />
+                            </TouchableOpacity>
+                        </Link>
+                    ),
+                    headerLeft: () => (
+                        <Link href="/settings" push asChild>
+                            <TouchableOpacity>
+                                <EvilIcons
+                                    style={{ marginLeft: 5 }}
+                                    name="gear"
+                                    size={26}
+                                    color="white"
+                                />
+                            </TouchableOpacity>
+                        </Link>
+                    ),
+                }}
+            />
+            <SafeAreaView></SafeAreaView>
+        </View>
     );
-    return () => {
-      keyboard.remove();
-    };
-  }, []);
-
-  return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <KeyboardAvoidingView
-        behavior={"padding"}
-        keyboardVerticalOffset={10}
-        style={{ flex: 1 }}
-      >
-        <Stack.Screen
-          options={{
-            headerTitle: "Chat",
-            headerTransparent: true,
-            headerRight: () => <Button title="Reset" onPress={() => reset()} />,
-          }}
-        />
-        <ScrollView
-          style={{ flex: 1, paddingTop: 50 }}
-          ref={listref}
-          onContentSizeChange={() => {
-            listref.current?.scrollToEnd();
-          }}
-        >
-          {messages.map((i, idx) =>
-            i.role === "user" ? (
-              <View key={idx} style={{ alignItems: "flex-end" }}>
-                <GlassView
-                  isInteractive
-                  style={{ margin: 5, borderRadius: 25 }}
-                >
-                  <Text selectable style={{ color: "white", padding: 12 }}>
-                    {i.content as string}
-                  </Text>
-                </GlassView>
-              </View>
-            ) : (
-              <Markdown key={idx} markdown={i.content as string} />
-            )
-          )}
-        </ScrollView>
-        <GlassView
-          isInteractive
-          style={{
-            flexDirection: "row",
-            marginHorizontal: 10,
-            padding: 10,
-            borderRadius: 25,
-            marginTop: 10,
-          }}
-        >
-          <TextInput
-            style={{
-              flexGrow: 1,
-              flexShrink: 1,
-              color: "white",
-            }}
-            onChangeText={setText}
-            value={text}
-          />
-          <Button onPress={() => sendMessage()} title="Send" />
-        </GlassView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
 }

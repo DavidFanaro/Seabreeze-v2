@@ -14,21 +14,26 @@ const expoDb = openDatabaseSync(dbname);
 const db = drizzle(expoDb);
 
 export default function RootLayout() {
-  useMigrations(db, migrations);
+    useMigrations(db, migrations);
 
-  return (
-    <Suspense fallback={<Text>Loading</Text>}>
-      <SQLiteProvider
-        databaseName={dbname}
-        useSuspense={true}
-        options={{ enableChangeListener: true }}
-      >
-        <KeyboardProvider>
-          <ThemeContext value={DarkTheme}>
-            <Stack />
-          </ThemeContext>
-        </KeyboardProvider>
-      </SQLiteProvider>
-    </Suspense>
-  );
+    return (
+        <Suspense fallback={<Text>Loading</Text>}>
+            <SQLiteProvider
+                databaseName={dbname}
+                useSuspense={true}
+                options={{ enableChangeListener: true }}
+            >
+                <KeyboardProvider>
+                    <ThemeContext value={DarkTheme}>
+                        <Stack>
+                            <Stack.Screen
+                                name="settings/index"
+                                options={{ presentation: "fullScreenModal" }}
+                            />
+                        </Stack>
+                    </ThemeContext>
+                </KeyboardProvider>
+            </SQLiteProvider>
+        </Suspense>
+    );
 }
