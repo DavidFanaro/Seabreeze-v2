@@ -11,9 +11,16 @@
 - **Language**: TypeScript with strict mode enabled
 - **Imports**: Use `@/*` path aliases, group external imports first, then internal
 - **Components**: Functional components with TypeScript interfaces for props
-- **State**: React hooks (useState, useCallback, useMemo, useRef)
+- **State**: React hooks (useState, useCallback, useMemo, useRef), Zustand for global state
 - **Database**: Drizzle ORM with SQLite
-- **AI Integration**: Vercel AI SDK with Apple Intelligence and OpenRouter providers
+- **Storage**: expo-secure-store for secure data storage
+- **AI Integration**: Vercel AI SDK with Apple Intelligence, OpenRouter, and Ollama providers
+- **Navigation**: React Navigation with bottom tabs
+- **Lists**: @shopify/flash-list for performant lists, @legendapp/list for advanced list features
+- **Animation**: @legendapp/motion for animations, react-native-reanimated for complex animations
+- **Markdown**: react-native-marked and react-native-remark for markdown rendering
+- **UI Components**: @expo/ui components, expo-glass-effect for glassmorphism
+- **Web**: react-native-webview for web content
 - **Styling**: React Native StyleSheet objects, inline styles for simple cases
 - **Error Handling**: Try-catch blocks with user-friendly error messages
 - **Naming**: camelCase for variables/functions, PascalCase for components/types
