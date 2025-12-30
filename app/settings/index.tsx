@@ -15,17 +15,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { GlassView } from "expo-glass-effect";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Suspense, useEffect, useState } from "react";
-
-enum settingTags {
-    OpenAIAPIKey = "open_ai_apikey",
-    OpenRouterAPIkey = "openrouter_apikey",
-    OllamaURL = "ollama_url",
-}
-enum services {
-    OpenAI = "openai",
-    OpenRouter = "openrouter",
-    Ollama = "ollama",
-}
+import { services, settingTags } from "@/util/kvtags";
 
 async function saveOpenAIApiKey(apiKey: string) {
     await SecureStore.setItemAsync(settingTags.OpenAIAPIKey, apiKey);

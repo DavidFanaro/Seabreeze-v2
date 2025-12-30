@@ -1,7 +1,10 @@
+import { chat } from "@/db/schema";
 import useChat from "@/hooks/useChat";
+import useDatabase from "@/hooks/useDatabase";
+import { eq } from "drizzle-orm";
 import { GlassView } from "expo-glass-effect";
-import { Stack } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import { Stack, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Button,
     Keyboard,
@@ -13,12 +16,53 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Markdown } from "react-native-remark";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ModelMessage } from "ai";
 
-interface ChatProps {}
-
-export default function Chat({}: ChatProps) {
-    const { text, setText, messages, sendMessage, reset } = useChat();
+export default function Chat() {
+    const db = useDatabase();
+    const [chatID, setChatID] = useState(0);
+    const {
+        text,
+        setText,
+        messages,
+        sendMessage,
+        reset,
+        isStreaming,
+        setMessages,
+        generateTitle,
+        setTitle,
+        title,
+    } = useChat();
     const listref = useRef<ScrollView>(null);
+    const params = useLocalSearchParams<{ id?: string }>();
+
+    useEffect(() => {
+        const update = async () => {
+            await db
+                .update(chat)
+                .set({ messages: messages })
+                .where(eq(chat.id, chatID));
+        };
+
+        if (isStreaming) {
+            console.log("Currently Streaming");
+        } else {
+            update();
+            if (title === "Chat") {
+                generateTitle();
+            }
+        }
+    }, [isStreaming]);
+
+    useEffect(() => {
+        const updateTitle = async () => {
+            await db
+                .update(chat)
+                .set({ title: title })
+                .where(eq(chat.id, chatID));
+        };
+        updateTitle();
+    }, [title]);
 
     useEffect(() => {
         const keyboard = Keyboard.addListener("keyboardDidShow", () =>
@@ -27,6 +71,36 @@ export default function Chat({}: ChatProps) {
         return () => {
             keyboard.remove();
         };
+    }, []);
+
+    useEffect(() => {
+        const setupChat = async () => {
+            if (params.id === "new") {
+                if (messages.length === 0) {
+                    const data = (
+                        await db
+                            .insert(chat)
+                            .values({ messages: messages, title: "" })
+                            .returning({ id: chat.id })
+                    )[0];
+                    setChatID(data.id);
+                    console.log("Chat Created with ID: " + data.id);
+                }
+            } else {
+                const id = Number(params.id);
+                const data = await db
+                    .select()
+                    .from(chat)
+                    .where(eq(chat.id, id))
+                    .all()[0];
+                setMessages(data.messages as ModelMessage[]);
+                setTitle(data.title as string);
+                setChatID(id);
+                console.log(`Chat: ${params.id}`);
+            }
+        };
+
+        setupChat();
     }, []);
 
     return (
@@ -38,7 +112,7 @@ export default function Chat({}: ChatProps) {
             >
                 <Stack.Screen
                     options={{
-                        headerTitle: "Chat",
+                        headerTitle: title,
                         headerTransparent: true,
                         headerRight: () => (
                             <Button title="Reset" onPress={() => reset()} />

@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { Text } from "react-native";
+import { Text, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DarkTheme, ThemeContext } from "@react-navigation/native";
 import { drizzle } from "drizzle-orm/expo-sqlite";
@@ -8,6 +8,7 @@ import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
 import { Suspense } from "react";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import migrations from "../drizzle/migrations";
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 
 const dbname = "seabreeze";
 const expoDb = openDatabaseSync(dbname);
@@ -15,7 +16,14 @@ const db = drizzle(expoDb);
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
-    useMigrations(db, migrations);
+    const { success, error } = useMigrations(db, migrations);
+    useDrizzleStudio(db.$client);
+
+    if (error) {
+        <View>
+            <Text>Migration error: {error.message}</Text>
+        </View>;
+    }
 
     return (
         <Suspense fallback={<Text>Loading</Text>}>
