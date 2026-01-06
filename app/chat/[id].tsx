@@ -36,6 +36,10 @@ export default function Chat() {
     const listref = useRef<ScrollView>(null);
     const params = useLocalSearchParams<{ id?: string }>();
 
+    const sendChatMessages = async () => {
+        sendMessage();
+    };
+
     useEffect(() => {
         const update = async () => {
             await db
@@ -74,7 +78,7 @@ export default function Chat() {
     }, []);
 
     useEffect(() => {
-        const setupChat = async () => {
+        const saveIfNew = async () => {
             if (params.id === "new") {
                 if (messages.length === 0) {
                     const data = (
@@ -86,7 +90,12 @@ export default function Chat() {
                     setChatID(data.id);
                     console.log("Chat Created with ID: " + data.id);
                 }
-            } else {
+            }
+        };
+        saveIfNew();
+
+        const setupChat = async () => {
+            if (params.id !== "new") {
                 const id = Number(params.id);
                 const data = await db
                     .select()
@@ -99,7 +108,6 @@ export default function Chat() {
                 console.log(`Chat: ${params.id}`);
             }
         };
-
         setupChat();
     }, []);
 
@@ -168,7 +176,7 @@ export default function Chat() {
                         onChangeText={setText}
                         value={text}
                     />
-                    <Button onPress={() => sendMessage()} title="Send" />
+                    <Button onPress={() => sendChatMessages()} title="Send" />
                 </GlassView>
             </KeyboardAvoidingView>
         </SafeAreaView>

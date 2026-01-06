@@ -6,8 +6,8 @@
 - **iOS**: `npm run ios` (Run on iOS device/simulator)
 - **Web**: `npm run web` (Run in web browser)
 - **Lint**: `npm run lint` (ESLint with expo config)
-- **Test**: No test framework configured - check with user before adding tests
-- **Type Check**: `npx tsc --noEmit` (TypeScript strict mode)
+- **Type Check**: `npm run typecheck` (TypeScript strict mode)
+- **Database**: `npm run db:generate` (Generate database schema), `npm run db:push` (Push schema changes), `npm run db:studio` (Open Drizzle Studio)
 
 ## Code Style
 - **Framework**: React Native 0.81.4 with Expo Router ~6.0.7
