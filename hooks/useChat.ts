@@ -76,7 +76,9 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
 
             const generatedTitle = result.text.trim();
             console.log(generatedTitle);
-            setTitle(generatedTitle);
+            if (generatedTitle) {
+                setTitle(generatedTitle);
+            }
             return generatedTitle;
         } catch (error) {
             console.error("Error generating title:", error);

@@ -1,21 +1,12 @@
 import { router, Stack } from "expo-router";
 import * as React from "react";
 import * as SecureStore from "expo-secure-store";
-import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    SafeAreaView,
-    Button,
-    Pressable,
-} from "react-native";
-import AntDesign from "@expo/vector-icons/AntDesign";
+import { View, Text, SafeAreaView } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { GlassView } from "expo-glass-effect";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { services, settingTags } from "@/util/kvtags";
+import { IconButton, SettingInput, SaveButton, useTheme } from "@/components";
 
 async function saveOpenAIApiKey(apiKey: string) {
     await SecureStore.setItemAsync(settingTags.OpenAIAPIKey, apiKey);
@@ -37,6 +28,7 @@ async function getOllamaURL() {
 }
 
 export default function Settings() {
+    const { theme } = useTheme();
     const openApiKey = useQuery({
         queryKey: [services.OpenAI],
         queryFn: getOpenAIAPIKey,
@@ -77,129 +69,54 @@ export default function Settings() {
         ollamaURlMutation.mutate(ollamaURlState!);
     }
 
+    const isSaving =
+        openAIAPIKeyMutation.isPending ||
+        openRouterAPIKeyMutation.isPending ||
+        ollamaURlMutation.isPending;
+
     return (
-        <View>
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
             <Stack.Screen
                 options={{
                     headerTitle: "Settings",
                     headerTransparent: true,
                     headerRight: () => (
-                        <TouchableOpacity
-                            onPress={() => {
-                                router.dismiss();
-                            }}
-                        >
-                            <AntDesign
-                                style={{ marginLeft: 6 }}
-                                name="close"
-                                size={24}
-                                color="white"
-                            />
-                        </TouchableOpacity>
+                        <IconButton
+                            icon="xmark"
+                            onPress={() => router.dismiss()}
+                            size={24}
+                            style={{ marginLeft: 6 }}
+                        />
                     ),
                 }}
             />
-            <SafeAreaView>
+            <SafeAreaView style={{ flex: 1 }}>
                 <Suspense fallback={<Text>Loading</Text>}>
-                    <KeyboardAwareScrollView>
-                        <View style={{ paddingHorizontal: 10 }}>
-                            <Text
-                                style={{
-                                    color: "white",
-                                    fontSize: 20,
-                                    paddingBottom: 5,
-                                }}
-                            >
-                                Open Router Api Key
-                            </Text>
-                            <GlassView
-                                isInteractive
-                                style={{ marginVertical: 5, borderRadius: 10 }}
-                            >
-                                <TextInput
-                                    autoCapitalize="none"
-                                    value={openRouterIAPIKeyState || ""}
-                                    onChangeText={setOpenRouterAPIKeyState}
-                                    secureTextEntry={true}
-                                    style={{
-                                        color: "white",
-                                        height: 30,
-                                        margin: 4,
-                                    }}
-                                />
-                            </GlassView>
-                        </View>
-                        <View style={{ paddingTop: 10, paddingHorizontal: 10 }}>
-                            <Text
-                                style={{
-                                    color: "white",
-                                    fontSize: 20,
-                                    paddingBottom: 5,
-                                }}
-                            >
-                                OpenAI Api Key
-                            </Text>
-                            <GlassView
-                                isInteractive
-                                style={{ marginVertical: 5, borderRadius: 10 }}
-                            >
-                                <TextInput
-                                    autoCapitalize="none"
-                                    value={openAIAPIKeyState || ""}
-                                    onChangeText={setOpenAIAPIKeyState}
-                                    secureTextEntry={true}
-                                    style={{
-                                        color: "white",
-                                        height: 30,
-                                        margin: 4,
-                                    }}
-                                />
-                            </GlassView>
-                        </View>
-                        <View style={{ paddingTop: 10, paddingHorizontal: 10 }}>
-                            <Text
-                                style={{
-                                    color: "white",
-                                    fontSize: 20,
-                                    paddingBottom: 5,
-                                }}
-                            >
-                                Ollama URL
-                            </Text>
-                            <GlassView
-                                isInteractive
-                                style={{ marginVertical: 5, borderRadius: 10 }}
-                            >
-                                <TextInput
-                                    autoCapitalize="none"
-                                    value={ollamaURlState || ""}
-                                    onChangeText={setOllamaURlState}
-                                    style={{
-                                        color: "white",
-                                        height: 30,
-                                        margin: 4,
-                                    }}
-                                />
-                            </GlassView>
-                        </View>
-                        <TouchableOpacity
-                            style={{
-                                flex: 1,
-                                justifyContent: "center",
-                                alignItems: "center",
-                                backgroundColor: "#0567d1",
-                                margin: 10,
-                                padding: 10,
-                                borderRadius: 20,
-                            }}
-                            onPress={() => {
-                                saveSettings();
-                            }}
-                        >
-                            <Text style={{ color: "white", fontSize: 20 }}>
-                                Save
-                            </Text>
-                        </TouchableOpacity>
+                    <KeyboardAwareScrollView
+                        style={{ flex: 1 }}
+                        contentContainerStyle={{ flexGrow: 1 }}
+                    >
+                        <SettingInput
+                            label="Open Router Api Key"
+                            value={openRouterIAPIKeyState || ""}
+                            onChangeText={setOpenRouterAPIKeyState}
+                            secureTextEntry={true}
+                        />
+                        <SettingInput
+                            label="OpenAI Api Key"
+                            value={openAIAPIKeyState || ""}
+                            onChangeText={setOpenAIAPIKeyState}
+                            secureTextEntry={true}
+                            style={{ paddingTop: theme.spacing.sm + 2 }}
+                        />
+                        <SettingInput
+                            label="Ollama URL"
+                            value={ollamaURlState || ""}
+                            onChangeText={setOllamaURlState}
+                            style={{ paddingTop: theme.spacing.sm + 2 }}
+                        />
+                        <View style={{ flex: 1 }} />
+                        <SaveButton onPress={saveSettings} loading={isSaving} />
                     </KeyboardAwareScrollView>
                 </Suspense>
             </SafeAreaView>

@@ -1,73 +1,76 @@
-import { Link, router, Stack } from "expo-router";
+import { Link, Stack } from "expo-router";
 import * as React from "react";
-import { SafeAreaView, TouchableOpacity, View } from "react-native";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import EvilIcons from "@expo/vector-icons/EvilIcons";
+import { FlatList, SafeAreaView, View } from "react-native";
 import { useLiveQuery } from "drizzle-orm/expo-sqlite";
 import useDatabase from "@/hooks/useDatabase";
-import ChatCell from "@/components/ChatCell";
-import { Host, Button, List, Text } from "@expo/ui/swift-ui";
-import { eq } from "drizzle-orm";
 import { chat } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { IconButton, ChatListItem, useTheme } from "@/components";
+import { ModelMessage } from "ai";
 
-interface HomeProps {}
+const getPreview = (messages: unknown): string | null => {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return null;
+    }
+    const lastMessage = messages[messages.length - 1] as ModelMessage;
+    if (!lastMessage?.content) return null;
+    const content =
+        typeof lastMessage.content === "string"
+            ? lastMessage.content
+            : String(lastMessage.content);
+    return content.length > 50 ? content.slice(0, 50) + "..." : content;
+};
 
-export default function Home({}: HomeProps) {
+export default function Home() {
     const db = useDatabase();
+    const { theme } = useTheme();
     const chats = useLiveQuery(db.query.chat.findMany());
 
+    const deleteChat = async (id: number) => {
+        await db.delete(chat).where(eq(chat.id, id));
+    };
+
     return (
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
             <Stack.Screen
                 options={{
                     title: "Chats",
                     headerTransparent: true,
                     headerRight: () => (
                         <Link href="/chat/new" push asChild>
-                            <TouchableOpacity>
-                                <MaterialIcons
-                                    style={{ marginLeft: 4 }}
-                                    name="add"
-                                    size={26}
-                                    color="white"
-                                />
-                            </TouchableOpacity>
+                            <IconButton
+                                icon="plus"
+                                onPress={() => {}}
+                                style={{ marginLeft: 4 }}
+                            />
                         </Link>
                     ),
                     headerLeft: () => (
                         <Link href="/settings" push asChild>
-                            <TouchableOpacity>
-                                <EvilIcons
-                                    style={{ marginLeft: 5 }}
-                                    name="gear"
-                                    size={26}
-                                    color="white"
-                                />
-                            </TouchableOpacity>
+                            <IconButton
+                                icon="gear"
+                                onPress={() => {}}
+                                style={{ marginLeft: 5 }}
+                            />
                         </Link>
                     ),
                 }}
             />
             <SafeAreaView style={{ flex: 1 }}>
-                <Host style={{ flex: 1 }}>
-                    <List
-                        scrollEnabled
-                        onDeleteItem={async (i) =>
-                            await db
-                                .delete(chat)
-                                .where(eq(chat.id, chats.data[i].id))
-                        }
-                        listStyle={"plain"}
-                    >
-                        {chats.data.map((i, idx) => (
-                            <Link href={`/chat/${i.id}`} push asChild key={idx}>
-                                <Button>
-                                    {i.title !== "" ? i.title! : "No Title"}
-                                </Button>
-                            </Link>
-                        ))}
-                    </List>
-                </Host>
+                <FlatList
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ flexGrow: 1 }}
+                    data={chats.data}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item }) => (
+                        <ChatListItem
+                            id={item.id}
+                            title={item.title}
+                            preview={getPreview(item.messages)}
+                            onDelete={deleteChat}
+                        />
+                    )}
+                />
             </SafeAreaView>
         </View>
     );

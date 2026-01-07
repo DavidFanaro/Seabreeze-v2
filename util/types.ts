@@ -1,7 +1,7 @@
-import { roles } from "@/components/ChatBubble.tsx/ChatBubble";
+export type MessageRole = "user" | "assistant";
 
 export interface ChatMessage {
-  id: string;
-  role: roles;
-  message: string;
+    id: string;
+    role: MessageRole;
+    message: string;
 }
