@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, ViewStyle } from "react-native";
 import { GlassView } from "expo-glass-effect";
-import { Markdown } from "react-native-remark";
+import { ThemedMarkdown } from "./ThemedMarkdown";
 import { useTheme } from "./ThemeProvider";
 
 interface MessageBubbleProps {
@@ -41,5 +41,5 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         );
     }
 
-    return <Markdown markdown={content} />;
+    return <ThemedMarkdown content={content} />;
 };
