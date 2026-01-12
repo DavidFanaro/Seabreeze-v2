@@ -34,13 +34,19 @@ export default function Chat() {
 
     useEffect(() => {
         const saveOrUpdate = async () => {
+            const now = new Date();
             if (chatID === 0) {
                 // New chat - insert only if there are messages
                 if (messages.length > 0) {
                     const data = (
                         await db
                             .insert(chat)
-                            .values({ messages: messages, title: null })
+                            .values({
+                                messages: messages,
+                                title: null,
+                                createdAt: now,
+                                updatedAt: now,
+                            })
                             .returning({ id: chat.id })
                     )[0];
                     setChatID(data.id);
@@ -50,7 +56,7 @@ export default function Chat() {
                 // Existing chat - update messages
                 await db
                     .update(chat)
-                    .set({ messages: messages })
+                    .set({ messages: messages, updatedAt: now })
                     .where(eq(chat.id, chatID));
             }
         };
@@ -70,7 +76,7 @@ export default function Chat() {
             if (chatID !== 0 && title && title !== "Chat") {
                 await db
                     .update(chat)
-                    .set({ title: title })
+                    .set({ title: title, updatedAt: new Date() })
                     .where(eq(chat.id, chatID));
             }
         };

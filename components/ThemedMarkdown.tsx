@@ -10,7 +10,13 @@ import {
 import Markdown, { RenderRules } from "react-native-markdown-display";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "expo-glass-effect";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme, Theme } from "./ThemeProvider";
+import CodeHighlighter from "react-native-code-highlighter";
+import {
+    atomOneDark,
+    atomOneLight,
+} from "react-syntax-highlighter/dist/esm/styles/hljs";
 
 interface ThemedMarkdownProps {
     content: string;
@@ -33,34 +39,21 @@ const CopyButton: React.FC<CopyButtonProps> = ({ code }) => {
     return (
         <TouchableOpacity
             onPress={handleCopy}
-            style={[
-                styles.copyButton,
-                {
-                    backgroundColor: copied
-                        ? theme.colors.accent
-                        : theme.colors.surface,
-                    borderColor: theme.colors.border,
-                },
-            ]}
+            style={styles.copyButton}
             activeOpacity={0.7}
         >
-            <Text
-                style={[
-                    styles.copyButtonText,
-                    {
-                        color: copied
-                            ? theme.colors.surface
-                            : theme.colors.textSecondary,
-                    },
-                ]}
-            >
-                {copied ? "Copied!" : "Copy"}
-            </Text>
+            <Ionicons
+                name={copied ? "checkmark" : "copy-outline"}
+                size={18}
+                color={copied ? "#22c55e" : theme.colors.textSecondary}
+            />
         </TouchableOpacity>
     );
 };
 
-const createMarkdownStyles = (theme: Theme): Record<string, TextStyle | ViewStyle> => ({
+const createMarkdownStyles = (
+    theme: Theme,
+): Record<string, TextStyle | ViewStyle> => ({
     body: {
         color: theme.colors.text,
         fontSize: 16,
@@ -244,18 +237,27 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, nodeKey }) => {
                     )}
                     <CopyButton code={code} />
                 </View>
-                <Text
-                    selectable
-                    style={[
-                        styles.codeText,
-                        {
-                            color: theme.colors.text,
-                            backgroundColor: "transparent",
-                        },
-                    ]}
+                <CodeHighlighter
+                    hljsStyle={atomOneDark}
+                    language={language || "plaintext"}
+                    scrollViewProps={{
+                        horizontal: false,
+                        scrollEnabled: false,
+                    }}
+                    containerStyle={{
+                        padding: 12,
+                        flex: 1,
+                        backgroundColor: "#282c34",
+                    }}
+                    textStyle={{
+                        fontSize: 14,
+                        fontFamily: "monospace",
+                        color: "#abb2bf",
+                        flexWrap: "wrap",
+                    }}
                 >
-                    {code}
-                </Text>
+                    {code.trim()}
+                </CodeHighlighter>
             </GlassView>
         </View>
     );
@@ -270,7 +272,8 @@ export const ThemedMarkdown: React.FC<ThemedMarkdownProps> = ({ content }) => {
         () => ({
             fence: (node) => {
                 const code = node.content || "";
-                const language = (node as { sourceInfo?: string }).sourceInfo || "";
+                const language =
+                    (node as { sourceInfo?: string }).sourceInfo || "";
                 return (
                     <CodeBlock
                         key={node.key}
@@ -283,15 +286,11 @@ export const ThemedMarkdown: React.FC<ThemedMarkdownProps> = ({ content }) => {
             code_block: (node) => {
                 const code = node.content || "";
                 return (
-                    <CodeBlock
-                        key={node.key}
-                        code={code}
-                        nodeKey={node.key}
-                    />
+                    <CodeBlock key={node.key} code={code} nodeKey={node.key} />
                 );
             },
         }),
-        []
+        [],
     );
 
     return (
@@ -330,22 +329,7 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
     copyButton: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
-        borderWidth: 1,
-    },
-    copyButtonText: {
-        fontSize: 12,
-        fontWeight: "500",
-    },
-    codeText: {
-        fontFamily: "monospace",
-        fontSize: 14,
-        lineHeight: 20,
-        paddingHorizontal: 12,
-        paddingBottom: 12,
-        paddingTop: 4,
+        padding: 4,
     },
 });
 

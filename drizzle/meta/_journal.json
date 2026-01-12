@@ -15,6 +15,13 @@
       "when": 1767060921496,
       "tag": "0001_daffy_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1768192787610,
+      "tag": "0002_tiresome_red_shift",
+      "breakpoints": true
     }
   ]
 }

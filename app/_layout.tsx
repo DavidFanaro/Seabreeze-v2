@@ -11,8 +11,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import migrations from "../drizzle/migrations";
 import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import { ThemeProvider } from "@/components";
-
 const dbname = "seabreeze";
+
 const expoDb = openDatabaseSync(dbname);
 const db = drizzle(expoDb);
 const queryClient = new QueryClient();
