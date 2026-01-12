@@ -1,7 +1,8 @@
 import React, { useRef, useEffect } from "react";
-import { ScrollView, ViewStyle } from "react-native";
+import { ScrollView, View, ViewStyle } from "react-native";
 import { ModelMessage } from "ai";
 import { MessageBubble } from "./MessageBubble";
+import { useTheme } from "./ThemeProvider";
 
 interface MessageListProps {
     messages: ModelMessage[];
@@ -15,6 +16,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     contentContainerStyle,
 }) => {
     const scrollRef = useRef<ScrollView>(null);
+    const { theme } = useTheme();
 
     useEffect(() => {
         scrollRef.current?.scrollToEnd({ animated: true });
@@ -23,19 +25,31 @@ export const MessageList: React.FC<MessageListProps> = ({
     return (
         <ScrollView
             ref={scrollRef}
-            style={[{ flex: 1, paddingTop: 50 }, style]}
-            contentContainerStyle={contentContainerStyle}
+            style={[{ flex: 1 }, style]}
+            contentContainerStyle={[
+                {
+                    paddingTop: 125,
+                    paddingBottom: theme.spacing.sm,
+                    flexGrow: 1,
+                },
+                contentContainerStyle,
+            ]}
             onContentSizeChange={() => {
                 scrollRef.current?.scrollToEnd();
             }}
+            showsVerticalScrollIndicator={false}
         >
-            {messages.map((message, idx) => (
-                <MessageBubble
-                    key={idx}
-                    content={message.content as string}
-                    isUser={message.role === "user"}
-                />
-            ))}
+            {messages.length === 0 ? (
+                <View style={{ flex: 1 }} />
+            ) : (
+                messages.map((message, idx) => (
+                    <MessageBubble
+                        key={idx}
+                        content={message.content as string}
+                        isUser={message.role === "user"}
+                    />
+                ))
+            )}
         </ScrollView>
     );
 };

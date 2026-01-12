@@ -34,8 +34,8 @@ export const GlassInput: React.FC<GlassInputProps> = ({
             style={[
                 {
                     borderRadius: theme.borderRadius.md,
-                    paddingHorizontal: theme.spacing.sm,
-                    paddingVertical: theme.spacing.xs,
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm + 4,
                 },
                 style,
             ]}
@@ -52,8 +52,8 @@ export const GlassInput: React.FC<GlassInputProps> = ({
                 style={[
                     {
                         color: theme.colors.text,
-                        minHeight: 30,
-                        fontSize: 16,
+                        minHeight: 24,
+                        fontSize: 17,
                     },
                     inputStyle,
                 ]}

@@ -94,29 +94,40 @@ export default function Settings() {
                 <Suspense fallback={<Text>Loading</Text>}>
                     <KeyboardAwareScrollView
                         style={{ flex: 1 }}
-                        contentContainerStyle={{ flexGrow: 1 }}
+                        contentContainerStyle={{
+                            flexGrow: 1,
+                            paddingTop: theme.spacing.lg,
+                        }}
                     >
-                        <SettingInput
-                            label="Open Router Api Key"
-                            value={openRouterIAPIKeyState || ""}
-                            onChangeText={setOpenRouterAPIKeyState}
-                            secureTextEntry={true}
+                        <View style={{ gap: theme.spacing.lg }}>
+                            <SettingInput
+                                label="Open Router API Key"
+                                value={openRouterIAPIKeyState || ""}
+                                onChangeText={setOpenRouterAPIKeyState}
+                                secureTextEntry={true}
+                                placeholder="sk-or-..."
+                            />
+                            <SettingInput
+                                label="OpenAI API Key"
+                                value={openAIAPIKeyState || ""}
+                                onChangeText={setOpenAIAPIKeyState}
+                                secureTextEntry={true}
+                                placeholder="sk-..."
+                            />
+                            <SettingInput
+                                label="Ollama URL"
+                                value={ollamaURlState || ""}
+                                onChangeText={setOllamaURlState}
+                                placeholder="http://localhost:11434"
+                            />
+                        </View>
+                        <View style={{ flex: 1, minHeight: theme.spacing.xl }} />
+                        <SaveButton
+                            onPress={saveSettings}
+                            loading={isSaving}
+                            title="Save Settings"
                         />
-                        <SettingInput
-                            label="OpenAI Api Key"
-                            value={openAIAPIKeyState || ""}
-                            onChangeText={setOpenAIAPIKeyState}
-                            secureTextEntry={true}
-                            style={{ paddingTop: theme.spacing.sm + 2 }}
-                        />
-                        <SettingInput
-                            label="Ollama URL"
-                            value={ollamaURlState || ""}
-                            onChangeText={setOllamaURlState}
-                            style={{ paddingTop: theme.spacing.sm + 2 }}
-                        />
-                        <View style={{ flex: 1 }} />
-                        <SaveButton onPress={saveSettings} loading={isSaving} />
+                        <View style={{ height: theme.spacing.md }} />
                     </KeyboardAwareScrollView>
                 </Suspense>
             </SafeAreaView>

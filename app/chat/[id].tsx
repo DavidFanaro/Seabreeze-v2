@@ -96,31 +96,34 @@ export default function Chat() {
     }, []);
 
     return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.colors.background }}
-        >
-            <KeyboardAvoidingView
-                behavior={"padding"}
-                keyboardVerticalOffset={10}
-                style={{ flex: 1 }}
-            >
-                <Stack.Screen
-                    options={{
-                        headerTitle: title,
-                        headerTransparent: true,
-                        headerRight: () => (
-                            <Button title="Reset" onPress={() => reset()} />
-                        ),
-                    }}
-                />
-                <MessageList messages={messages} />
-                <MessageInput
-                    value={text}
-                    onChangeText={setText}
-                    onSend={sendChatMessages}
-                    disabled={isStreaming}
-                />
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+        <>
+            <Stack.Screen
+                options={{
+                    headerTitle: title,
+                    headerTransparent: true,
+
+                    headerRight: () => (
+                        <Button title="Reset" onPress={() => reset()} />
+                    ),
+                }}
+            />
+            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+                <KeyboardAvoidingView
+                    behavior={"padding"}
+                    keyboardVerticalOffset={-30}
+                    style={{ flex: 1 }}
+                >
+                    <MessageList messages={messages} />
+                    <SafeAreaView edges={["bottom"]}>
+                        <MessageInput
+                            value={text}
+                            onChangeText={setText}
+                            onSend={sendChatMessages}
+                            disabled={isStreaming}
+                        />
+                    </SafeAreaView>
+                </KeyboardAvoidingView>
+            </View>
+        </>
     );
 }

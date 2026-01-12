@@ -23,12 +23,15 @@ export const SettingInput: React.FC<SettingInputProps> = ({
     const { theme } = useTheme();
 
     return (
-        <View style={[{ paddingHorizontal: theme.spacing.sm + 2 }, style]}>
+        <View style={[{ paddingHorizontal: theme.spacing.md }, style]}>
             <Text
                 style={{
-                    color: theme.colors.text,
-                    fontSize: 20,
-                    paddingBottom: theme.spacing.xs + 1,
+                    color: theme.colors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    marginBottom: theme.spacing.xs + 2,
                 }}
             >
                 {label}
@@ -38,7 +41,6 @@ export const SettingInput: React.FC<SettingInputProps> = ({
                 onChangeText={onChangeText}
                 placeholder={placeholder}
                 secureTextEntry={secureTextEntry}
-                style={{ marginVertical: theme.spacing.xs + 1 }}
             />
         </View>
     );

@@ -19,19 +19,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
     if (isUser) {
         return (
-            <View style={[{ alignItems: "flex-end" }, style]}>
+            <View
+                style={[
+                    {
+                        alignItems: "flex-end",
+                        paddingHorizontal: theme.spacing.md,
+                        marginVertical: theme.spacing.xs,
+                    },
+                    style,
+                ]}
+            >
                 <GlassView
                     isInteractive
                     style={{
-                        margin: theme.spacing.xs,
                         borderRadius: theme.borderRadius.lg,
+                        maxWidth: "85%",
                     }}
                 >
                     <Text
                         selectable
                         style={{
                             color: theme.colors.text,
-                            padding: theme.spacing.sm + 4,
+                            paddingHorizontal: theme.spacing.md,
+                            paddingVertical: theme.spacing.sm + 4,
+                            fontSize: 16,
+                            lineHeight: 22,
                         }}
                     >
                         {content}
@@ -41,5 +53,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         );
     }
 
-    return <ThemedMarkdown content={content} />;
+    return (
+        <View
+            style={[
+                {
+                    marginVertical: theme.spacing.xs,
+                },
+                style,
+            ]}
+        >
+            <ThemedMarkdown content={content} />
+        </View>
+    );
 };

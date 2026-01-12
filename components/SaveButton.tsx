@@ -23,6 +23,7 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
     style,
 }) => {
     const { theme } = useTheme();
+    const isDisabled = disabled || loading;
 
     return (
         <TouchableOpacity
@@ -30,23 +31,39 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
                 {
                     justifyContent: "center",
                     alignItems: "center",
-                    backgroundColor: disabled
+                    backgroundColor: isDisabled
                         ? theme.colors.textSecondary
                         : theme.colors.accent,
-                    margin: theme.spacing.sm + 2,
-                    padding: theme.spacing.sm + 2,
-                    borderRadius: theme.borderRadius.lg,
-                    minHeight: 44,
+                    marginHorizontal: theme.spacing.md,
+                    marginVertical: theme.spacing.sm,
+                    paddingVertical: theme.spacing.md,
+                    paddingHorizontal: theme.spacing.lg,
+                    borderRadius: theme.borderRadius.md,
+                    minHeight: 50,
+                    shadowColor: theme.colors.accent,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: isDisabled ? 0 : 0.3,
+                    shadowRadius: 8,
+                    elevation: isDisabled ? 0 : 4,
                 },
                 style,
             ]}
             onPress={onPress}
-            disabled={disabled || loading}
+            disabled={isDisabled}
+            activeOpacity={0.8}
         >
             {loading ? (
                 <ActivityIndicator color="#ffffff" />
             ) : (
-                <Text style={{ color: "#ffffff", fontSize: 20 }}>{title}</Text>
+                <Text
+                    style={{
+                        color: "#ffffff",
+                        fontSize: 17,
+                        fontWeight: "600",
+                    }}
+                >
+                    {title}
+                </Text>
             )}
         </TouchableOpacity>
     );
