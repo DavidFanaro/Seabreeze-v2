@@ -29,7 +29,7 @@
         "drizzle-orm": "^0.44.5",
         "expo": "^54.0.30",
         "expo-blur": "~15.0.7",
-        "expo-clipboard": "^8.0.8",
+        "expo-clipboard": "~8.0.8",
         "expo-constants": "~18.0.9",
         "expo-dev-client": "~6.0.12",
         "expo-drizzle-studio-plugin": "^0.2.1",
