@@ -6,6 +6,7 @@ import {
     ActivityIndicator,
 } from "react-native";
 import { useTheme } from "./ThemeProvider";
+import useHapticFeedback from "@/hooks/useHapticFeedback";
 
 interface SaveButtonProps {
     onPress: () => void;
@@ -23,7 +24,14 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
     style,
 }) => {
     const { theme } = useTheme();
+    const { triggerSuccess, triggerPress } = useHapticFeedback();
     const isDisabled = disabled || loading;
+
+    const handlePress = () => {
+        triggerPress("medium");
+        onPress();
+        triggerSuccess();
+    };
 
     return (
         <TouchableOpacity
@@ -48,7 +56,7 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
                 },
                 style,
             ]}
-            onPress={onPress}
+            onPress={handlePress}
             disabled={isDisabled}
             activeOpacity={0.8}
         >

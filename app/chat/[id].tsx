@@ -4,11 +4,11 @@ import useDatabase from "@/hooks/useDatabase";
 import { eq } from "drizzle-orm";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Button, Keyboard, View } from "react-native";
+import { View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ModelMessage } from "ai";
-import { MessageList, MessageInput, useTheme } from "@/components";
+import { MessageList, MessageInput, useTheme, IconButton } from "@/components";
 
 export default function Chat() {
     const db = useDatabase();
@@ -27,6 +27,10 @@ export default function Chat() {
         title,
     } = useChat();
     const params = useLocalSearchParams<{ id?: string }>();
+
+    const handleReset = () => {
+        reset();
+    };
 
     const sendChatMessages = async () => {
         sendMessage();
@@ -109,7 +113,7 @@ export default function Chat() {
                     headerTransparent: true,
 
                     headerRight: () => (
-                        <Button title="Reset" onPress={() => reset()} />
+                        <IconButton icon="arrow.clockwise" onPress={handleReset} size={22} />
                     ),
                 }}
             />

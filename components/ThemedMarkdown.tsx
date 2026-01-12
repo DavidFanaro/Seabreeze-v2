@@ -13,10 +13,8 @@ import { GlassView } from "expo-glass-effect";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme, Theme } from "./ThemeProvider";
 import CodeHighlighter from "react-native-code-highlighter";
-import {
-    atomOneDark,
-    atomOneLight,
-} from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import useHapticFeedback from "@/hooks/useHapticFeedback";
 
 interface ThemedMarkdownProps {
     content: string;
@@ -29,12 +27,14 @@ interface CopyButtonProps {
 const CopyButton: React.FC<CopyButtonProps> = ({ code }) => {
     const [copied, setCopied] = useState(false);
     const { theme } = useTheme();
+    const { triggerSuccess } = useHapticFeedback();
 
     const handleCopy = useCallback(async () => {
         await Clipboard.setStringAsync(code);
         setCopied(true);
+        triggerSuccess();
         setTimeout(() => setCopied(false), 2000);
-    }, [code]);
+    }, [code, triggerSuccess]);
 
     return (
         <TouchableOpacity

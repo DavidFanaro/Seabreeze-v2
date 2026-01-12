@@ -3,6 +3,7 @@ import { TextInput, TouchableOpacity, ViewStyle } from "react-native";
 import { GlassView } from "expo-glass-effect";
 import { useTheme } from "./ThemeProvider";
 import { SymbolView } from "expo-symbols";
+import useHapticFeedback from "@/hooks/useHapticFeedback";
 
 interface MessageInputProps {
     value: string;
@@ -22,7 +23,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     style,
 }) => {
     const { theme } = useTheme();
+    const { triggerPress } = useHapticFeedback();
     const canSend = value.trim().length > 0 && !disabled;
+
+    const handleSend = () => {
+        if (canSend) {
+            triggerPress("light");
+            onSend();
+        }
+    };
 
     return (
         <GlassView
@@ -59,7 +68,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 multiline
             />
             <TouchableOpacity
-                onPress={onSend}
+                onPress={handleSend}
                 disabled={!canSend}
                 activeOpacity={0.7}
                 style={{

@@ -2,6 +2,7 @@ import React from "react";
 import { TouchableOpacity, ViewStyle } from "react-native";
 import { SymbolView } from "expo-symbols";
 import { useTheme } from "./ThemeProvider";
+import useHapticFeedback from "@/hooks/useHapticFeedback";
 
 interface IconButtonProps {
     icon: string;
@@ -21,11 +22,17 @@ export const IconButton: React.FC<IconButtonProps> = ({
     disabled = false,
 }) => {
     const { theme } = useTheme();
+    const { triggerPress } = useHapticFeedback();
     const iconColor = color ?? theme.colors.text;
+
+    const handlePress = () => {
+        triggerPress("light");
+        onPress();
+    };
 
     return (
         <TouchableOpacity
-            onPress={onPress}
+            onPress={handlePress}
             disabled={disabled}
             activeOpacity={0.7}
             style={[

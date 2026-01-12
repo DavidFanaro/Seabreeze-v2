@@ -2,6 +2,7 @@ import React from "react";
 import { TextInput, ViewStyle, TextStyle } from "react-native";
 import { GlassView } from "expo-glass-effect";
 import { useTheme } from "./ThemeProvider";
+import useHapticFeedback from "@/hooks/useHapticFeedback";
 
 interface GlassInputProps {
     value: string;
@@ -27,6 +28,11 @@ export const GlassInput: React.FC<GlassInputProps> = ({
     editable = true,
 }) => {
     const { theme } = useTheme();
+    const { triggerPress } = useHapticFeedback();
+
+    const handleFocus = () => {
+        triggerPress("light");
+    };
 
     return (
         <GlassView
@@ -49,6 +55,7 @@ export const GlassInput: React.FC<GlassInputProps> = ({
                 autoCapitalize={autoCapitalize}
                 multiline={multiline}
                 editable={editable}
+                onFocus={handleFocus}
                 style={[
                     {
                         color: theme.colors.text,

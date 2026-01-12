@@ -87,7 +87,7 @@ export default function Home() {
     const chats = useLiveQuery(
         db.query.chat.findMany({
             orderBy: [desc(chat.updatedAt)],
-        })
+        }),
     );
 
     const deleteChat = async (id: number) => {
@@ -122,13 +122,13 @@ export default function Home() {
                     ),
                 }}
             />
-            <SafeAreaView style={{ flex: 1 }}>
+            <View style={{ flex: 1 }}>
                 {hasChats ? (
                     <FlatList
                         style={{ flex: 1 }}
                         contentContainerStyle={{
                             flexGrow: 1,
-                            paddingTop: 8,
+                            paddingTop: 125,
                             paddingBottom: 20,
                         }}
                         data={chats.data}
@@ -147,7 +147,7 @@ export default function Home() {
                 ) : (
                     <EmptyState />
                 )}
-            </SafeAreaView>
+            </View>
         </View>
     );
 }

@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { GlassView } from "expo-glass-effect";
 import { useTheme } from "./ThemeProvider";
+import useHapticFeedback from "@/hooks/useHapticFeedback";
 
 interface GlassButtonProps {
     title: string;
@@ -29,6 +30,23 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     textStyle,
 }) => {
     const { theme } = useTheme();
+    const { triggerPress, triggerError } = useHapticFeedback();
+
+    const handlePress = () => {
+        switch (variant) {
+            case "primary":
+                triggerPress("medium");
+                break;
+            case "secondary":
+                triggerPress("light");
+                break;
+            case "danger":
+                triggerPress("heavy");
+                triggerError();
+                break;
+        }
+        onPress();
+    };
 
     const getBackgroundColor = () => {
         if (disabled) return theme.colors.surface;
@@ -56,7 +74,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
     return (
         <TouchableOpacity
-            onPress={onPress}
+            onPress={handlePress}
             disabled={disabled || loading}
             activeOpacity={0.7}
         >
