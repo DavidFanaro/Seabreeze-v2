@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { classifyError, ErrorClassification, ErrorCategory } from "@/lib/providers/fallback-chain";
+import { classifyError, ErrorClassification, ErrorCategory } from "@/providers/fallback-chain";
 
 /**
  * Configuration for retry behavior

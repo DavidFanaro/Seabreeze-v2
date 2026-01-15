@@ -2,8 +2,8 @@ import { useCallback, useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import * as SecureStore from "expo-secure-store";
-import { ProviderId } from "@/lib/types/provider-types";
-import { useAIProviderStore } from "@/stores/useAIStore";
+import { ProviderId } from "@/types/provider.types";
+import { useProviderStore } from "@/stores";
 
 /**
  * Chat-specific provider/model override
@@ -39,14 +39,12 @@ const secureStorage = {
     try {
       await SecureStore.setItemAsync(name, value);
     } catch (error) {
-      console.error("Error saving chat overrides to SecureStore:", error);
     }
   },
   removeItem: async (name: string): Promise<void> => {
     try {
       await SecureStore.deleteItemAsync(name);
     } catch (error) {
-      console.error("Error deleting chat overrides from SecureStore:", error);
     }
   },
 };
@@ -111,7 +109,7 @@ export interface EffectiveProviderModel {
  * @returns Unified chat state management functions
  */
 export function useChatState(chatId: string | null) {
-  const { selectedProvider, selectedModel } = useAIProviderStore();
+  const { selectedProvider, selectedModel } = useProviderStore();
   const { 
     overrides, 
     setChatOverride, 
@@ -163,7 +161,6 @@ export function useChatState(chatId: string | null) {
   const setOverride = useCallback(
     (provider: ProviderId, model: string) => {
       if (!chatId || chatId === "new") {
-        console.warn("Cannot set override for new chat - use global settings instead");
         return;
       }
       setChatOverride(chatId, provider, model);
@@ -238,7 +235,7 @@ export function useChatState(chatId: string | null) {
  * Useful for non-hook contexts
  */
 export function getEffectiveProviderModelSync(chatId: string | null): EffectiveProviderModel {
-  const { selectedProvider, selectedModel } = useAIProviderStore.getState();
+  const { selectedProvider, selectedModel } = useProviderStore.getState();
   const { overrides } = useChatOverrideStore.getState();
 
   if (!chatId || chatId === "new") {

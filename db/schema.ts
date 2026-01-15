@@ -1,5 +1,5 @@
 import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { ProviderId } from "@/lib/types/provider-types";
+import { ProviderId } from "@/types/provider.types";
 
 export const chat = sqliteTable("chat", {
     id: int().primaryKey({ autoIncrement: true }),

@@ -1,5 +1,5 @@
 import { chat } from "@/db/schema";
-import useChat from "@/hooks/useChat";
+import useChat from "@/hooks/chat/useChat";
 import useDatabase from "@/hooks/useDatabase";
 import { useChatState } from "@/hooks/useChatState";
 import { eq } from "drizzle-orm";
@@ -9,15 +9,15 @@ import { View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ModelMessage } from "ai";
-import { MessageList, MessageInput, useTheme, ChatContextMenu } from "@/components";
-import { ProviderId } from "@/lib/types/provider-types";
+import { MessageList, MessageInput, useTheme, ChatContextMenu, RetryBanner } from "@/components";
+import { ProviderId } from "@/types/provider.types";
 
 export default function Chat() {
     const db = useDatabase();
     const { theme } = useTheme();
     const params = useLocalSearchParams<{ id?: string }>();
     
-    // Get the chat ID from params (or "new" for new chats)
+    // Get chat ID from params (or "new" for new chats)
     const chatIdParam = params.id || "new";
     
     // Use unified chat state management
@@ -41,18 +41,13 @@ export default function Chat() {
         currentProvider,
         currentModel,
         isUsingFallback,
-        // Available for future UI enhancements (retry button, etc.)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         retryLastMessage,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         canRetry,
     } = useChat({ 
         chatId: chatIdParam,
         onFallback: (from, to, reason) => {
-            console.log(`Provider fallback: ${from} -> ${to} (${reason})`);
         },
         onError: (error) => {
-            console.error("Chat error:", error);
         },
     });
 
@@ -88,7 +83,6 @@ export default function Chat() {
                             .returning({ id: chat.id })
                     )[0];
                     setChatID(data.id);
-                    console.log("Chat Created with ID:", data.id, "Provider:", currentProvider, "Model:", currentModel);
                 }
             } else {
                 // Existing chat - update messages and provider/model
@@ -104,9 +98,7 @@ export default function Chat() {
             }
         };
 
-        if (isStreaming) {
-            console.log("Currently Streaming with provider:", currentProvider, "model:", currentModel);
-        } else {
+        if (!isStreaming) {
             saveOrUpdate();
             if (!title || title === "Chat") {
                 generateTitle();
@@ -133,21 +125,12 @@ export default function Chat() {
     useEffect(() => {
         const setupChat = async () => {
             if (params.id !== "new") {
-                console.log("Loading existing chat with ID:", params.id);
                 const id = Number(params.id);
                 const data = await db
                     .select()
                     .from(chat)
                     .where(eq(chat.id, id))
                     .all()[0];
-                    
-                console.log("Loaded chat data:", {
-                    id: data.id,
-                    title: data.title,
-                    providerId: data.providerId,
-                    modelId: data.modelId,
-                    messagesCount: Array.isArray(data.messages) ? data.messages.length : 0
-                });
                 
                 setMessages(data.messages as ModelMessage[]);
                 setTitle(data.title as string);
@@ -160,10 +143,6 @@ export default function Chat() {
                         data.modelId
                     );
                 }
-                
-                console.log(`Chat loaded: ${params.id}`);
-            } else {
-                console.log("Creating new chat with provider:", chatState.provider, "model:", chatState.model);
             }
         };
         setupChat();
@@ -200,6 +179,10 @@ export default function Chat() {
                     style={{ flex: 1 }}
                 >
                     <MessageList messages={messages} />
+                    <RetryBanner 
+                        canRetry={canRetry}
+                        onRetry={retryLastMessage}
+                    />
                     <SafeAreaView edges={["bottom"]}>
                         <MessageInput
                             value={text}

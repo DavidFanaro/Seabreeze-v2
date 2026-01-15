@@ -25,9 +25,11 @@ export default function RootLayout() {
     useDrizzleStudio(db.$client);
 
     if (error) {
-        <View>
-            <Text>Migration error: {error.message}</Text>
-        </View>;
+        return (
+            <View>
+                <Text>Migration error: {error.message}</Text>
+            </View>
+        );
     }
 
     return (

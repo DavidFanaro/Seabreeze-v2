@@ -4,14 +4,14 @@ import { View, Text, SafeAreaView, StyleSheet, ScrollView } from "react-native";
 import { Suspense, useState, useEffect } from "react";
 import { IconButton, SettingInput, SaveButton, ModelListManager, useTheme } from "@/components";
 import { SymbolView } from "expo-symbols";
-import { useAIProviderStore, useAIAuthStore } from "@/stores/useAIStore";
-import { testProviderConnection } from "@/lib/providers/provider-factory";
-import { OPENROUTER_MODELS } from "@/lib/types/provider-types";
+import { useProviderStore, useAuthStore } from "@/stores";
+import { testProviderConnection } from "@/providers/provider-factory";
+import { OPENROUTER_MODELS } from "@/types/provider.types";
 
 export default function OpenRouterSettings() {
     const { theme } = useTheme();
-    const { selectedModel, setSelectedModel } = useAIProviderStore();
-    const { openrouterApiKey, setOpenRouterApiKey } = useAIAuthStore();
+    const { selectedModel, setSelectedModel } = useProviderStore();
+    const { openrouterApiKey, setOpenRouterApiKey } = useAuthStore();
 
     const [apiKey, setApiKeyState] = useState(openrouterApiKey || "");
     const [isTesting, setIsTesting] = useState(false);

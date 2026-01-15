@@ -1,6 +1,6 @@
 import { Link, Stack } from "expo-router";
 import * as React from "react";
-import { FlatList, SafeAreaView, View, Text } from "react-native";
+import { FlatList, View, Text } from "react-native";
 import { useLiveQuery } from "drizzle-orm/expo-sqlite";
 import useDatabase from "@/hooks/useDatabase";
 import { chat } from "@/db/schema";

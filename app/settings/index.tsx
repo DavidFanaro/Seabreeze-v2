@@ -2,10 +2,10 @@ import { router, Stack } from "expo-router";
 import { View, Text, SafeAreaView, Pressable, StyleSheet } from "react-native";
 import { Suspense } from "react";
 import { IconButton, useTheme } from "@/components";
-import { ProviderIcon } from "@/components/ProviderIcons";
-import { isProviderConfigured } from "@/stores/useAIStore";
+import { ProviderIcon } from "@/components/ui/ProviderIcons";
+import { isProviderConfigured } from "@/stores";
 import { SymbolView } from "expo-symbols";
-import { ProviderId } from "@/lib/types/provider-types";
+import { ProviderId } from "@/types/provider.types";
 
 interface ProviderListItemProps {
   providerId: ProviderId;

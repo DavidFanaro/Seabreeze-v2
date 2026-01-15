@@ -1,5 +1,5 @@
-import { ErrorCategory, ErrorClassification, classifyError } from "@/lib/providers/fallback-chain";
-import { ProviderId } from "@/lib/types/provider-types";
+import { ErrorCategory, ErrorClassification, classifyError } from "@/providers/fallback-chain";
+import { ProviderId } from "@/types/provider.types";
 
 /**
  * Action that the user can take to resolve an error

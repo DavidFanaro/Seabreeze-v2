@@ -4,17 +4,17 @@ import { View, Text, SafeAreaView, StyleSheet, ScrollView, Pressable, ActivityIn
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { IconButton, SettingInput, SaveButton, ModelListManager, useTheme } from "@/components";
 import { SymbolView } from "expo-symbols";
-import { useAIProviderStore, useAIAuthStore } from "@/stores/useAIStore";
-import { testProviderConnection } from "@/lib/providers/provider-factory";
-import { fetchOllamaModels } from "@/lib/providers/ollama-provider";
-import { OLLAMA_MODELS } from "@/lib/types/provider-types";
+import { useProviderStore, useAuthStore } from "@/stores";
+import { testProviderConnection } from "@/providers/provider-factory";
+import { fetchOllamaModels } from "@/providers/ollama-provider";
+import { OLLAMA_MODELS } from "@/types/provider.types";
 
 type ConnectionStatus = "unknown" | "checking" | "connected" | "disconnected";
 
 export default function OllamaSettings() {
     const { theme } = useTheme();
-    const { selectedModel, setSelectedModel, customModels, addCustomModel } = useAIProviderStore();
-    const { ollamaUrl, setOllamaUrl } = useAIAuthStore();
+    const { selectedModel, setSelectedModel, customModels, addCustomModel } = useProviderStore();
+    const { ollamaUrl, setOllamaUrl } = useAuthStore();
 
     const [url, setUrlState] = useState(ollamaUrl || "");
     const [isTesting, setIsTesting] = useState(false);

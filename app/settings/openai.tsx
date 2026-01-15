@@ -4,14 +4,14 @@ import { View, Text, SafeAreaView, StyleSheet, ScrollView } from "react-native";
 import { Suspense, useState, useEffect } from "react";
 import { IconButton, SettingInput, SaveButton, ModelListManager, useTheme } from "@/components";
 import { SymbolView } from "expo-symbols";
-import { OPENAI_MODELS } from "@/lib/types/provider-types";
-import { useAIProviderStore, useAIAuthStore } from "@/stores/useAIStore";
-import { testProviderConnection } from "@/lib/providers/provider-factory";
+import { OPENAI_MODELS } from "@/types/provider.types";
+import { useProviderStore, useAuthStore } from "@/stores";
+import { testProviderConnection } from "@/providers/provider-factory";
 
 export default function OpenAISettings() {
     const { theme } = useTheme();
-    const { selectedModel, setSelectedModel } = useAIProviderStore();
-    const { openaiApiKey, setOpenAIApiKey } = useAIAuthStore();
+    const { selectedModel, setSelectedModel } = useProviderStore();
+    const { openaiApiKey, setOpenAIApiKey } = useAuthStore();
 
     const [apiKey, setApiKeyState] = useState(openaiApiKey || "");
     const [isTesting, setIsTesting] = useState(false);
