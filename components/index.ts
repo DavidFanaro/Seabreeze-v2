@@ -17,3 +17,11 @@ export { MessageList } from "./MessageList";
 
 // Settings Components
 export { SettingInput } from "./SettingInput";
+export { ProviderSelector } from "./ProviderSelector";
+export { ModelSelector } from "./ModelSelector";
+export { ModelListManager } from "./ModelListManager";
+export { ProviderIcon, PROVIDER_ICONS } from "./ProviderIcons";
+export type { ProviderIconProps } from "./ProviderIcons";
+
+// Context Menu Components
+export { ChatContextMenu } from "./ChatContextMenu";

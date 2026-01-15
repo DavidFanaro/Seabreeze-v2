@@ -7,10 +7,11 @@ import * as schema from "../db/schema";
 export const dbname = "seabreeze";
 
 const expoDb = openDatabaseSync(dbname, {
-    enableChangeListener: true,
+  enableChangeListener: true,
 });
 const db = drizzle(expoDb, { schema });
+migrate(db, migrations);
 
 export default function useDatabase() {
-    return db;
+  return db;
 }

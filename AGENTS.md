@@ -56,3 +56,5 @@
 - `assets/` - Images, fonts, and static assets (fonts/, images/)
 - `ios/` - iOS-specific configuration and Xcode project
 - `.vscode/` - VS Code settings and configuration
+
+When you need to search docs, use `context7` tools.

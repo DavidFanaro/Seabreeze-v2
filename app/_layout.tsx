@@ -1,3 +1,6 @@
+// Polyfills must be imported first for AI SDK streaming support
+import "@/lib/polyfills";
+
 import { Stack } from "expo-router";
 import { Text, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -42,6 +45,36 @@ export default function RootLayout() {
                                     <Stack>
                                         <Stack.Screen
                                             name="settings/index"
+                                            options={{
+                                                presentation: "fullScreenModal",
+                                            }}
+                                        />
+                                        <Stack.Screen
+                                            name="settings/general"
+                                            options={{
+                                                presentation: "fullScreenModal",
+                                            }}
+                                        />
+                                        <Stack.Screen
+                                            name="settings/openai"
+                                            options={{
+                                                presentation: "fullScreenModal",
+                                            }}
+                                        />
+                                        <Stack.Screen
+                                            name="settings/openrouter"
+                                            options={{
+                                                presentation: "fullScreenModal",
+                                            }}
+                                        />
+                                        <Stack.Screen
+                                            name="settings/ollama"
+                                            options={{
+                                                presentation: "fullScreenModal",
+                                            }}
+                                        />
+                                        <Stack.Screen
+                                            name="settings/apple"
                                             options={{
                                                 presentation: "fullScreenModal",
                                             }}
