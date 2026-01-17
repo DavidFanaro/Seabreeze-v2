@@ -150,15 +150,6 @@ export default function Chat() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [params.id]);
 
-    // Create header subtitle showing current provider/model (available for future UI enhancement)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _getHeaderSubtitle = useCallback(() => {
-        if (isUsingFallback) {
-            return `${currentProvider} (fallback)`;
-        }
-        return undefined;
-    }, [isUsingFallback, currentProvider]);
-
     return (
         <>
             <Stack.Screen
@@ -172,11 +163,11 @@ export default function Chat() {
                     ),
                 }}
             />
-            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
                 <KeyboardAvoidingView
                     behavior={"padding"}
                     keyboardVerticalOffset={-30}
-                    style={{ flex: 1 }}
+                    className="flex-1"
                 >
                     <MessageList messages={messages} />
                     <RetryBanner 

@@ -9,6 +9,7 @@ interface SettingInputProps {
     onChangeText: (text: string) => void;
     placeholder?: string;
     secureTextEntry?: boolean;
+    autoCapitalize?: "none" | "sentences" | "words" | "characters";
     style?: ViewStyle;
 }
 
@@ -18,20 +19,19 @@ export const SettingInput: React.FC<SettingInputProps> = ({
     onChangeText,
     placeholder,
     secureTextEntry = false,
+    autoCapitalize,
     style,
 }) => {
     const { theme } = useTheme();
 
     return (
-        <View style={[{ paddingHorizontal: theme.spacing.md }, style]}>
+        <View className="px-4" style={style}>
             <Text
+                className="text-[13px] font-bold uppercase tracking-wide"
                 style={{
                     color: theme.colors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: "600",
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
                     marginBottom: theme.spacing.xs + 2,
+                    letterSpacing: 0.5,
                 }}
             >
                 {label}
@@ -41,6 +41,7 @@ export const SettingInput: React.FC<SettingInputProps> = ({
                 onChangeText={onChangeText}
                 placeholder={placeholder}
                 secureTextEntry={secureTextEntry}
+                autoCapitalize={autoCapitalize}
             />
         </View>
     );

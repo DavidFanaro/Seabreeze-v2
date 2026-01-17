@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import Markdown, { RenderRules } from "react-native-markdown-display";
 import * as Clipboard from "expo-clipboard";
-import { GlassView } from "expo-glass-effect";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme, Theme } from "@/components/ui/ThemeProvider";
 import CodeHighlighter from "react-native-code-highlighter";
@@ -39,7 +38,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({ code }) => {
     return (
         <TouchableOpacity
             onPress={handleCopy}
-            style={styles.copyButton}
+            className="p-1"
             activeOpacity={0.7}
         >
             <Ionicons
@@ -125,7 +124,7 @@ const createMarkdownStyles = (
         paddingLeft: 12,
         paddingVertical: 8,
         marginVertical: 8,
-        borderRadius: theme.borderRadius.sm,
+        borderRadius: 4,
     },
     code_inline: {
         backgroundColor: theme.colors.surface,
@@ -141,7 +140,7 @@ const createMarkdownStyles = (
         fontFamily: "monospace",
         fontSize: 14,
         padding: 12,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: 8,
         marginVertical: 8,
     },
     fence: {
@@ -149,7 +148,7 @@ const createMarkdownStyles = (
         fontFamily: "monospace",
         fontSize: 14,
         padding: 12,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: 8,
         marginVertical: 8,
     },
     list_item: {
@@ -172,7 +171,7 @@ const createMarkdownStyles = (
     table: {
         borderWidth: 1,
         borderColor: theme.colors.border,
-        borderRadius: theme.borderRadius.sm,
+        borderRadius: 4,
         marginVertical: 8,
     },
     thead: {
@@ -201,7 +200,7 @@ const createMarkdownStyles = (
         marginVertical: 16,
     },
     image: {
-        borderRadius: theme.borderRadius.md,
+        borderRadius: 8,
     },
 });
 
@@ -215,20 +214,16 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, nodeKey }) => {
     const { theme } = useTheme();
 
     return (
-        <View key={nodeKey} style={styles.codeBlockContainer}>
-            <GlassView
-                style={[
-                    styles.codeBlockGlass,
-                    { borderRadius: theme.borderRadius.md },
-                ]}
+        <View key={nodeKey} className="my-2">
+            <View
+                className="overflow-hidden rounded-md"
+                style={{ backgroundColor: theme.colors.surface }}
             >
-                <View style={styles.codeBlockHeader}>
+                <View className="flex-row justify-between items-center px-3 pt-2 pb-1">
                     {language ? (
                         <Text
-                            style={[
-                                styles.languageLabel,
-                                { color: theme.colors.textSecondary },
-                            ]}
+                            className="text-[12px] font-medium uppercase tracking-wide"
+                            style={{ color: theme.colors.textSecondary }}
                         >
                             {language}
                         </Text>
@@ -258,7 +253,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, nodeKey }) => {
                 >
                     {code.trim()}
                 </CodeHighlighter>
-            </GlassView>
+            </View>
         </View>
     );
 };
@@ -294,43 +289,12 @@ export const ThemedMarkdown: React.FC<ThemedMarkdownProps> = ({ content }) => {
     );
 
     return (
-        <View style={styles.container}>
+        <View className="flex-1 px-3 py-2">
             <Markdown style={markdownStyles} rules={rules}>
                 {content}
             </Markdown>
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    codeBlockContainer: {
-        marginVertical: 8,
-    },
-    codeBlockGlass: {
-        overflow: "hidden",
-    },
-    codeBlockHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 12,
-        paddingTop: 8,
-        paddingBottom: 4,
-    },
-    languageLabel: {
-        fontSize: 12,
-        fontWeight: "500",
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-    },
-    copyButton: {
-        padding: 4,
-    },
-});
 
 export default ThemedMarkdown;

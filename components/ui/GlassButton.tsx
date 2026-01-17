@@ -6,7 +6,6 @@ import {
     TextStyle,
     ActivityIndicator,
 } from "react-native";
-import { GlassView } from "expo-glass-effect";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
 
@@ -77,39 +76,19 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
             onPress={handlePress}
             disabled={disabled || loading}
             activeOpacity={0.7}
+            className="items-center justify-center min-h-11 py-2 px-4 rounded-lg"
+            style={[{ backgroundColor: getBackgroundColor() }, style]}
         >
-            <GlassView
-                isInteractive
-                style={[
-                    {
-                        backgroundColor: getBackgroundColor(),
-                        paddingVertical: theme.spacing.sm,
-                        paddingHorizontal: theme.spacing.md,
-                        borderRadius: theme.borderRadius.lg,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        minHeight: 44,
-                    },
-                    style,
-                ]}
-            >
-                {loading ? (
-                    <ActivityIndicator color={getTextColor()} />
-                ) : (
-                    <Text
-                        style={[
-                            {
-                                color: getTextColor(),
-                                fontSize: 16,
-                                fontWeight: "600",
-                            },
-                            textStyle,
-                        ]}
-                    >
-                        {title}
-                    </Text>
-                )}
-            </GlassView>
+            {loading ? (
+                <ActivityIndicator color={getTextColor()} />
+            ) : (
+                <Text
+                    className="text-base font-semibold"
+                    style={[{ color: getTextColor() }, textStyle]}
+                >
+                    {title}
+                </Text>
+            )}
         </TouchableOpacity>
     );
 };

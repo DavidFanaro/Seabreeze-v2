@@ -2,10 +2,10 @@ import React, { useState, useCallback, useMemo } from "react";
 import {
     View,
     Text,
-    StyleSheet,
     Pressable,
     TextInput,
     Alert,
+    StyleSheet,
 } from "react-native";
 import { SymbolView } from "expo-symbols";
 import { useTheme } from "@/components/ui/ThemeProvider";
@@ -137,27 +137,23 @@ export function ModelListManager({
     }, []);
 
     return (
-        <View style={styles.container}>
+        <View className="gap-2">
             {/* Header with Add and Edit buttons */}
-            <View style={styles.header}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
+            <View className="flex-row justify-between items-center px-4">
+                <Text className="text-[13px] font-bold uppercase tracking-wide" style={{ color: theme.colors.textSecondary }}>
                     Models
                 </Text>
-                <View style={styles.headerActions}>
+                <View className="flex-row items-center gap-3">
                     {hasModels && !isAdding && !editingModel && (
                         <Pressable
                             onPress={toggleEditMode}
                             disabled={disabled}
-                            style={({ pressed }) => [
-                                styles.headerButton,
-                                { opacity: pressed ? 0.7 : 1 },
-                            ]}
+                            className="py-1 px-2"
+                            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                         >
                             <Text
-                                style={[
-                                    styles.headerButtonText,
-                                    { color: theme.colors.accent },
-                                ]}
+                                className="text-[16px] font-medium"
+                                style={{ color: theme.colors.accent }}
                             >
                                 {isEditMode ? "Done" : "Edit"}
                             </Text>
@@ -167,10 +163,8 @@ export function ModelListManager({
                         <Pressable
                             onPress={() => setIsAdding(true)}
                             disabled={disabled}
-                            style={({ pressed }) => [
-                                styles.addButton,
-                                { opacity: pressed ? 0.7 : 1 },
-                            ]}
+                            className="p-1"
+                            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                         >
                             <SymbolView
                                 name="plus.circle.fill"
@@ -185,16 +179,15 @@ export function ModelListManager({
             {/* Add new model input */}
             {isAdding && (
                 <View
-                    style={[
-                        styles.inputRow,
-                        {
-                            backgroundColor: theme.colors.surface,
-                            borderColor: theme.colors.border,
-                        },
-                    ]}
+                    className="flex-row items-center mx-4 rounded-md border px-3 pr-1 py-1"
+                    style={{
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                    }}
                 >
                     <TextInput
-                        style={[styles.input, { color: theme.colors.text }]}
+                        className="flex-1 text-[16px] py-2"
+                        style={{ color: theme.colors.text }}
                         value={newModelName}
                         onChangeText={setNewModelName}
                         placeholder="Enter model name..."
@@ -203,8 +196,8 @@ export function ModelListManager({
                         onSubmitEditing={handleAddModel}
                         returnKeyType="done"
                     />
-                    <View style={styles.inputActions}>
-                        <Pressable onPress={handleCancelAdd} style={styles.inputButton}>
+                    <View className="flex-row gap-1">
+                        <Pressable onPress={handleCancelAdd} className="p-1">
                             <SymbolView
                                 name="xmark.circle.fill"
                                 size={24}
@@ -213,7 +206,7 @@ export function ModelListManager({
                         </Pressable>
                         <Pressable
                             onPress={handleAddModel}
-                            style={styles.inputButton}
+                            className="p-1"
                             disabled={!newModelName.trim()}
                         >
                             <SymbolView
@@ -233,16 +226,15 @@ export function ModelListManager({
             {/* Edit model input */}
             {editingModel && (
                 <View
-                    style={[
-                        styles.inputRow,
-                        {
-                            backgroundColor: theme.colors.surface,
-                            borderColor: theme.colors.border,
-                        },
-                    ]}
+                    className="flex-row items-center mx-4 rounded-md border px-3 pr-1 py-1"
+                    style={{
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                    }}
                 >
                     <TextInput
-                        style={[styles.input, { color: theme.colors.text }]}
+                        className="flex-1 text-[16px] py-2"
+                        style={{ color: theme.colors.text }}
                         value={editedName}
                         onChangeText={setEditedName}
                         placeholder="Enter model name..."
@@ -251,8 +243,8 @@ export function ModelListManager({
                         onSubmitEditing={handleSaveEdit}
                         returnKeyType="done"
                     />
-                    <View style={styles.inputActions}>
-                        <Pressable onPress={handleCancelEdit} style={styles.inputButton}>
+                    <View className="flex-row gap-1">
+                        <Pressable onPress={handleCancelEdit} className="p-1">
                             <SymbolView
                                 name="xmark.circle.fill"
                                 size={24}
@@ -261,7 +253,7 @@ export function ModelListManager({
                         </Pressable>
                         <Pressable
                             onPress={handleSaveEdit}
-                            style={styles.inputButton}
+                            className="p-1"
                             disabled={!editedName.trim()}
                         >
                             <SymbolView
@@ -281,13 +273,11 @@ export function ModelListManager({
             {/* Search input */}
             {showSearch && !isEditMode && !isAdding && !editingModel && (
                 <View
-                    style={[
-                        styles.searchContainer,
-                        {
-                            backgroundColor: theme.colors.surface,
-                            borderColor: theme.colors.border,
-                        },
-                    ]}
+                    className="flex-row items-center mx-4 rounded-md border px-3 py-2"
+                    style={{
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                    }}
                 >
                     <SymbolView
                         name="magnifyingglass"
@@ -295,7 +285,8 @@ export function ModelListManager({
                         tintColor={theme.colors.textSecondary}
                     />
                     <TextInput
-                        style={[styles.searchInput, { color: theme.colors.text }]}
+                        className="flex-1 text-[16px] py-2"
+                        style={{ color: theme.colors.text }}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder="Search models..."
@@ -318,32 +309,26 @@ export function ModelListManager({
 
             {/* Model list */}
             <View
-                style={[
-                    styles.listContainer,
-                    {
-                        backgroundColor: theme.colors.surface,
-                        borderColor: theme.colors.border,
-                    },
-                ]}
+                className="mx-4 rounded-lg border overflow-hidden"
+                style={{
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                }}
             >
                 {allModels.length === 0 ? (
-                    <View style={styles.emptyState}>
+                    <View className="p-6 items-center">
                         <Text
-                            style={[
-                                styles.emptyText,
-                                { color: theme.colors.textSecondary },
-                            ]}
+                            className="text-[14px] text-center"
+                            style={{ color: theme.colors.textSecondary }}
                         >
                             No models available. Tap + to add one.
                         </Text>
                     </View>
                 ) : filteredModels.length === 0 ? (
-                    <View style={styles.emptyState}>
+                    <View className="p-6 items-center">
                         <Text
-                            style={[
-                                styles.emptyText,
-                                { color: theme.colors.textSecondary },
-                            ]}
+                            className="text-[14px] text-center"
+                            style={{ color: theme.colors.textSecondary }}
                         >
                             No models match &quot;{searchQuery}&quot;
                         </Text>
@@ -382,88 +367,3 @@ export function ModelListManager({
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        gap: 8,
-    },
-    header: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 16,
-    },
-    headerActions: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-    },
-    headerButton: {
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-    },
-    headerButtonText: {
-        fontSize: 16,
-        fontWeight: "500",
-    },
-    sectionTitle: {
-        fontSize: 13,
-        fontWeight: "600",
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-    },
-    addButton: {
-        padding: 4,
-    },
-    listContainer: {
-        marginHorizontal: 16,
-        borderRadius: 10,
-        borderWidth: StyleSheet.hairlineWidth,
-        overflow: "hidden",
-    },
-
-    inputRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginHorizontal: 16,
-        borderRadius: 10,
-        borderWidth: StyleSheet.hairlineWidth,
-        paddingLeft: 12,
-        paddingRight: 4,
-        paddingVertical: 4,
-    },
-    input: {
-        flex: 1,
-        fontSize: 16,
-        paddingVertical: 8,
-    },
-    inputActions: {
-        flexDirection: "row",
-        gap: 4,
-    },
-    inputButton: {
-        padding: 4,
-    },
-    emptyState: {
-        padding: 24,
-        alignItems: "center",
-    },
-    emptyText: {
-        fontSize: 14,
-        textAlign: "center",
-    },
-    searchContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginHorizontal: 16,
-        borderRadius: 10,
-        borderWidth: StyleSheet.hairlineWidth,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 16,
-        paddingVertical: 8,
-    },
-});

@@ -136,12 +136,11 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
           })}
         </ContextMenu.Items>
         <ContextMenu.Trigger>
-          <View style={{ paddingLeft: 7 }}>
+          <View className="pl-1.5">
             <SymbolView
               name="ellipsis.circle"
               size={22}
               tintColor={theme.colors.text}
-              style={{}}
             />
           </View>
         </ContextMenu.Trigger>

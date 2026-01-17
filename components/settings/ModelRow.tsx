@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { View, Pressable, StyleSheet, Text } from "react-native";
+import { View, Pressable, Text } from "react-native";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import { Theme } from "@/components/ui/ThemeProvider";
@@ -37,34 +37,29 @@ export function ModelRow({
         <Pressable
             onPress={onSelect}
             disabled={disabled || isEditMode}
-            style={({ pressed }) => [
-                styles.modelRow,
-                {
-                    backgroundColor: pressed && !isEditMode
-                        ? theme.colors.surface
-                        : theme.colors.background,
-                },
-            ]}
+            className="flex-row items-center justify-between py-3 px-4 min-h-[44px]"
+            style={({ pressed }) => ({
+                backgroundColor: pressed && !isEditMode
+                    ? theme.colors.surface
+                    : theme.colors.background,
+            })}
         >
-            <View style={styles.modelRowContent}>
+            <View className="flex-1 flex-row items-center gap-2 mr-2">
                 <Text
-                    style={[styles.modelName, { color: theme.colors.text }]}
+                    className="text-[16px] flex-shrink-0"
+                    style={{ color: theme.colors.text }}
                     numberOfLines={1}
                 >
                     {model}
                 </Text>
                 {isCustom && !isEditMode && (
                     <View
-                        style={[
-                            styles.customBadge,
-                            { backgroundColor: theme.colors.surface },
-                        ]}
+                        className="px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: theme.colors.surface }}
                     >
                         <Text
-                            style={[
-                                styles.customBadgeText,
-                                { color: theme.colors.textSecondary },
-                            ]}
+                            className="text-[10px] font-bold uppercase"
+                            style={{ color: theme.colors.textSecondary }}
                         >
                             Custom
                         </Text>
@@ -73,20 +68,18 @@ export function ModelRow({
             </View>
 
             {isEditMode ? (
-                <View style={styles.editActions}>
+                <View className="flex-row gap-2">
                     {isCustom && (
                         <Pressable
                             onPress={() => {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 onEdit();
                             }}
-                            style={({ pressed }) => [
-                                styles.actionButton,
-                                {
-                                    backgroundColor: theme.colors.accent,
-                                    opacity: pressed ? 0.7 : 1,
-                                },
-                            ]}
+                            className="w-[28px] h-[28px] rounded-full justify-center items-center"
+                            style={({ pressed }) => ({
+                                backgroundColor: theme.colors.accent,
+                                opacity: pressed ? 0.7 : 1,
+                            })}
                         >
                             <SymbolView name="pencil" size={14} tintColor="#ffffff" />
                         </Pressable>
@@ -96,13 +89,11 @@ export function ModelRow({
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                             onDelete();
                         }}
-                        style={({ pressed }) => [
-                            styles.actionButton,
-                            {
-                                backgroundColor: theme.colors.error,
-                                opacity: pressed ? 0.7 : 1,
-                            },
-                        ]}
+                        className="w-[28px] h-[28px] rounded-full justify-center items-center"
+                        style={({ pressed }) => ({
+                            backgroundColor: theme.colors.error,
+                            opacity: pressed ? 0.7 : 1,
+                        })}
                     >
                         <SymbolView name="trash" size={14} tintColor="#ffffff" />
                     </Pressable>
@@ -119,46 +110,3 @@ export function ModelRow({
         </Pressable>
     );
 }
-
-const styles = StyleSheet.create({
-    modelRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        minHeight: 44,
-    },
-    modelRowContent: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        marginRight: 8,
-    },
-    modelName: {
-        fontSize: 16,
-        flexShrink: 1,
-    },
-    customBadge: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    customBadgeText: {
-        fontSize: 10,
-        fontWeight: "600",
-        textTransform: "uppercase",
-    },
-    editActions: {
-        flexDirection: "row",
-        gap: 8,
-    },
-    actionButton: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-});

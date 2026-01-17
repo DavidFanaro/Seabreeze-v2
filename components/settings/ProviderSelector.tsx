@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import { useTheme } from "@/components";
 import { ProviderIcon } from "@/components/ui/ProviderIcons";
 import { ProviderId, PROVIDERS } from "@/types/provider.types";
@@ -20,12 +20,12 @@ export function ProviderSelector({
     const providers: ProviderId[] = ["apple", "openai", "openrouter", "ollama"];
 
     return (
-        <View style={styles.container}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>AI Provider</Text>
+        <View className="gap-2">
+            <Text className="text-[14px] font-medium" style={{ color: theme.colors.text }}>AI Provider</Text>
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.providerRow}
+                contentContainerClassName="gap-2 py-1"
             >
                 {providers.map((providerId) => {
                     const info = PROVIDERS[providerId];
@@ -36,17 +36,15 @@ export function ProviderSelector({
                     return (
                         <Pressable
                             key={providerId}
-                            style={[
-                                styles.providerButton,
-                                {
-                                    backgroundColor: isSelected
-                                        ? theme.colors.accent
-                                        : theme.colors.surface,
-                                    borderColor: isSelected
-                                        ? theme.colors.accent
-                                        : theme.colors.border,
-                                },
-                            ]}
+                            className="px-4 py-3 rounded-md border items-center min-w-[120px]"
+                            style={{
+                                backgroundColor: isSelected
+                                    ? theme.colors.accent
+                                    : theme.colors.surface,
+                                borderColor: isSelected
+                                    ? theme.colors.accent
+                                    : theme.colors.border,
+                            }}
                             onPress={() => onProviderSelect(providerId)}
                             disabled={disabled}
                         >
@@ -56,41 +54,35 @@ export function ProviderSelector({
                                 color={isSelected ? theme.colors.surface : theme.colors.text}
                             />
                             <Text
-                                style={[
-                                    styles.providerName,
-                                    {
-                                        color: isSelected
-                                            ? theme.colors.surface
-                                            : theme.colors.text,
-                                    },
-                                ]}
+                                className="text-[14px] font-semibold mt-1"
+                                style={{
+                                    color: isSelected
+                                        ? theme.colors.surface
+                                        : theme.colors.text,
+                                }}
                             >
                                 {info.name}
                             </Text>
                             {!isApple && !configured && (
                                 <Text
-                                    style={[
-                                        styles.configBadge,
-                                        {
-                                            color: isSelected
-                                                ? theme.colors.surface
-                                                : theme.colors.textSecondary,
-                                        },
-                                    ]}
+                                    className="text-[11px] mt-1"
+                                    style={{
+                                        color: isSelected
+                                            ? theme.colors.surface
+                                            : theme.colors.textSecondary,
+                                    }}
                                 >
                                     Not configured
                                 </Text>
                             )}
                             {isApple && (
                                 <Text
-                                    style={[
-                                        styles.configBadge,
-                                        {
-                                            color: isSelected
-                                                ? theme.colors.surface
-                                                : theme.colors.accent,
-                                        },
-                                    ]}
+                                    className="text-[11px] mt-1"
+                                    style={{
+                                        color: isSelected
+                                            ? theme.colors.surface
+                                            : theme.colors.accent,
+                                    }}
                                 >
                                     Default
                                 </Text>
@@ -102,34 +94,3 @@ export function ProviderSelector({
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        gap: 8,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: "500",
-    },
-    providerRow: {
-        gap: 8,
-        paddingVertical: 4,
-    },
-    providerButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        alignItems: "center",
-        minWidth: 120,
-    },
-    providerName: {
-        fontSize: 14,
-        fontWeight: "600",
-        marginTop: 4,
-    },
-    configBadge: {
-        fontSize: 11,
-        marginTop: 4,
-    },
-});

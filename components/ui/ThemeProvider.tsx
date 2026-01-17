@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useColorScheme } from "react-native";
 
 export interface Theme {
     colors: {
@@ -78,13 +79,16 @@ const darkTheme: Theme = {
     },
 };
 
+export type ThemeMode = "light" | "dark" | "system";
 type ThemeType = "light" | "dark";
 
 interface ThemeContextType {
     theme: Theme;
     themeType: ThemeType;
+    themeMode: ThemeMode;
     toggleTheme: () => void;
     setThemeType: (type: ThemeType) => void;
+    setTheme: (mode: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -99,24 +103,43 @@ export const useTheme = (): ThemeContextType => {
 
 interface ThemeProviderProps {
     children: ReactNode;
-    defaultTheme?: ThemeType;
+    defaultTheme?: ThemeMode;
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     children,
     defaultTheme = "dark",
 }) => {
-    const [themeType, setThemeType] = useState<ThemeType>(defaultTheme);
+    const systemColorScheme = useColorScheme();
+    const [themeMode, setThemeMode] = useState<ThemeMode>(defaultTheme);
+
+    // Determine actual theme type based on mode
+    const themeType: ThemeType = themeMode === "system" 
+        ? (systemColorScheme === "light" ? "light" : "dark")
+        : themeMode;
 
     const theme = themeType === "light" ? lightTheme : darkTheme;
 
     const toggleTheme = () => {
-        setThemeType((prev) => (prev === "light" ? "dark" : "light"));
+        setThemeMode((prev) => {
+            if (prev === "light") return "dark";
+            if (prev === "dark") return "light";
+            // If system, toggle to opposite of current system theme
+            return systemColorScheme === "light" ? "dark" : "light";
+        });
+    };
+
+    const setThemeType = (type: ThemeType) => {
+        setThemeMode(type);
+    };
+
+    const setTheme = (mode: ThemeMode) => {
+        setThemeMode(mode);
     };
 
     return (
         <ThemeContext.Provider
-            value={{ theme, themeType, toggleTheme, setThemeType }}
+            value={{ theme, themeType, themeMode, toggleTheme, setThemeType, setTheme }}
         >
             {children}
         </ThemeContext.Provider>

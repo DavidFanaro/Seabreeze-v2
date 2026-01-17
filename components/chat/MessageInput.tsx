@@ -1,6 +1,5 @@
 import React from "react";
-import { TextInput, TouchableOpacity, ViewStyle } from "react-native";
-import { GlassView } from "expo-glass-effect";
+import { View, TextInput, TouchableOpacity, ViewStyle } from "react-native";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { SymbolView } from "expo-symbols";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
@@ -34,32 +33,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     };
 
     return (
-        <GlassView
-            isInteractive
-            style={[
-                {
-                    flexDirection: "row",
-                    alignItems: "flex-end",
-                    marginHorizontal: theme.spacing.md,
-                    marginVertical: theme.spacing.sm,
-                    paddingLeft: theme.spacing.md,
-                    paddingRight: theme.spacing.xs,
-                    paddingVertical: theme.spacing.xs,
-                    borderRadius: theme.borderRadius.lg + 4,
-                    minHeight: 48,
-                },
-                style,
-            ]}
+        <View
+            className="flex-row items-end mx-4 my-2 pl-4 pr-1 py-1 rounded-xl min-h-12"
+            style={[{ backgroundColor: theme.colors.surface }, style]}
         >
             <TextInput
-                style={{
-                    flex: 1,
-                    color: theme.colors.text,
-                    fontSize: 16,
-                    paddingVertical: theme.spacing.sm,
-                    maxHeight: 120,
-                    alignSelf: "center",
-                }}
+                className="flex-1 py-2 max-h-[120px] self-center text-base"
+                style={{ color: theme.colors.text }}
                 onChangeText={onChangeText}
                 value={value}
                 placeholder={placeholder}
@@ -71,19 +51,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 onPress={handleSend}
                 disabled={!canSend}
                 activeOpacity={0.7}
-                style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: canSend ? "#007AFF" : "#3A3A3C",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    marginLeft: theme.spacing.sm,
-                    alignSelf: "center",
-                }}
+                className="w-9 h-9 rounded-full justify-center items-center ml-2 self-center"
+                style={{ backgroundColor: canSend ? "#007AFF" : "#3A3A3C" }}
             >
                 <SymbolView name="arrow.up" size={18} tintColor="#ffffff" />
             </TouchableOpacity>
-        </GlassView>
+        </View>
     );
 };

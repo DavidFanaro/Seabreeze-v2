@@ -1,6 +1,6 @@
 import { router, Stack } from "expo-router";
 import * as React from "react";
-import { View, Text, SafeAreaView, StyleSheet, ScrollView } from "react-native";
+import { View, Text, SafeAreaView, ScrollView } from "react-native";
 import { Suspense, useState, useEffect } from "react";
 import { IconButton, SettingInput, SaveButton, ModelListManager, useTheme } from "@/components";
 import { SymbolView } from "expo-symbols";
@@ -43,7 +43,7 @@ export default function OpenRouterSettings() {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
             <Stack.Screen
                 options={{
                     headerTitle: "OpenRouter",
@@ -58,81 +58,60 @@ export default function OpenRouterSettings() {
                     ),
                 }}
             />
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView className="flex-1">
                 <Suspense fallback={<Text>Loading</Text>}>
                     <ScrollView
-                        style={{ flex: 1 }}
-                        contentContainerStyle={{
-                            flexGrow: 1,
-                            paddingTop: theme.spacing.lg,
-                        }}
+                        className="flex-1"
+                        contentContainerClassName="flex-grow pt-5 gap-5"
                         keyboardShouldPersistTaps="handled"
                     >
-                        <View style={{ gap: theme.spacing.lg }}>
-                            <SettingInput
-                                label="API Key"
-                                value={apiKey}
-                                onChangeText={setApiKeyState}
-                                secureTextEntry={true}
-                                placeholder="sk-or-..."
+                        <SettingInput
+                            label="API Key"
+                            value={apiKey}
+                            onChangeText={setApiKeyState}
+                            secureTextEntry={true}
+                            placeholder="sk-or-..."
+                        />
+
+                        <View className="mt-4">
+                            <ModelListManager
+                                providerId="openrouter"
+                                predefinedModels={OPENROUTER_MODELS}
+                                selectedModel={selectedModel}
+                                onModelSelect={setSelectedModel}
                             />
-
-                            <View style={{ marginTop: theme.spacing.md }}>
-                                <ModelListManager
-                                    providerId="openrouter"
-                                    predefinedModels={OPENROUTER_MODELS}
-                                    selectedModel={selectedModel}
-                                    onModelSelect={setSelectedModel}
-                                />
-                            </View>
-
-                            {testResult && (
-                                <View
-                                    style={[
-                                        styles.statusContainer,
-                                        {
-                                            backgroundColor: theme.colors.surface,
-                                        },
-                                    ]}
-                                >
-                                    <SymbolView
-                                        name={testResult.success ? "checkmark.circle" : "xmark.circle"}
-                                        size={20}
-                                        tintColor={testResult.success ? theme.colors.accent : theme.colors.error}
-                                    />
-                                    <Text
-                                        style={{
-                                            color: testResult.success ? theme.colors.accent : theme.colors.error,
-                                            fontSize: 14,
-                                            marginLeft: 8,
-                                        }}
-                                    >
-                                        {testResult.message}
-                                    </Text>
-                                </View>
-                            )}
                         </View>
 
-                        <View style={{ flex: 1, minHeight: theme.spacing.xl }} />
+                        {testResult && (
+                            <View
+                                className="flex-row items-center mx-4 p-3 rounded-md"
+                                style={{ backgroundColor: theme.colors.surface }}
+                            >
+                                <SymbolView
+                                    name={testResult.success ? "checkmark.circle" : "xmark.circle"}
+                                    size={20}
+                                    tintColor={testResult.success ? theme.colors.accent : theme.colors.error}
+                                />
+                                <Text
+                                    className="text-[14px] ml-2"
+                                    style={{
+                                        color: testResult.success ? theme.colors.accent : theme.colors.error,
+                                    }}
+                                >
+                                    {testResult.message}
+                                </Text>
+                            </View>
+                        )}
+                        <View className="flex-1 min-h-5" />
                         <SaveButton
                             onPress={handleSave}
                             loading={isSaving || isTesting}
                             title="Save Settings"
                         />
-                        <View style={{ height: theme.spacing.md }} />
+                        <View className="h-4" />
                     </ScrollView>
                 </Suspense>
             </SafeAreaView>
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    statusContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginHorizontal: 16,
-        padding: 12,
-        borderRadius: 8,
-    },
-});

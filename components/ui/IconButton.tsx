@@ -35,12 +35,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
             onPress={handlePress}
             disabled={disabled}
             activeOpacity={0.7}
-            style={[
-                {
-                    opacity: disabled ? 0.5 : 1,
-                },
-                style,
-            ]}
+            style={[{ opacity: disabled ? 0.5 : 1 }, style]}
         >
             <SymbolView
                 style={{

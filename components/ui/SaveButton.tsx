@@ -35,19 +35,12 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
 
     return (
         <TouchableOpacity
+            className="justify-center items-center mx-4 my-2 py-3 px-6 rounded-md min-h-[50px]"
             style={[
                 {
-                    justifyContent: "center",
-                    alignItems: "center",
                     backgroundColor: isDisabled
                         ? theme.colors.textSecondary
                         : theme.colors.accent,
-                    marginHorizontal: theme.spacing.md,
-                    marginVertical: theme.spacing.sm,
-                    paddingVertical: theme.spacing.md,
-                    paddingHorizontal: theme.spacing.lg,
-                    borderRadius: theme.borderRadius.md,
-                    minHeight: 50,
                     shadowColor: theme.colors.accent,
                     shadowOffset: { width: 0, height: 4 },
                     shadowOpacity: isDisabled ? 0 : 0.3,
@@ -63,13 +56,7 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
             {loading ? (
                 <ActivityIndicator color="#ffffff" />
             ) : (
-                <Text
-                    style={{
-                        color: "#ffffff",
-                        fontSize: 17,
-                        fontWeight: "600",
-                    }}
-                >
+                <Text className="text-white text-[17px] font-semibold">
                     {title}
                 </Text>
             )}

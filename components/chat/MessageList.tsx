@@ -25,13 +25,10 @@ export const MessageList: React.FC<MessageListProps> = ({
     return (
         <ScrollView
             ref={scrollRef}
-            style={[{ flex: 1 }, style]}
+            className="flex-1"
+            style={style}
             contentContainerStyle={[
-                {
-                    paddingTop: 125,
-                    paddingBottom: theme.spacing.sm,
-                    flexGrow: 1,
-                },
+                { paddingTop: 125, paddingBottom: theme.spacing.sm, flexGrow: 1 },
                 contentContainerStyle,
             ]}
             onContentSizeChange={() => {
@@ -40,7 +37,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             showsVerticalScrollIndicator={false}
         >
             {messages.length === 0 ? (
-                <View style={{ flex: 1 }} />
+                <View className="flex-1" />
             ) : (
                 messages.map((message, idx) => (
                     <MessageBubble

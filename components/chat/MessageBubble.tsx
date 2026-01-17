@@ -1,6 +1,5 @@
 import React from "react";
 import { View, Text, ViewStyle } from "react-native";
-import { GlassView } from "expo-glass-effect";
 import { ThemedMarkdown } from "./ThemedMarkdown";
 import { useTheme } from "@/components/ui/ThemeProvider";
 
@@ -20,47 +19,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     if (isUser) {
         return (
             <View
-                style={[
-                    {
-                        alignItems: "flex-end",
-                        paddingHorizontal: theme.spacing.md,
-                        marginVertical: theme.spacing.xs,
-                    },
-                    style,
-                ]}
+                className="items-end px-4 my-1"
+                style={style}
             >
-                <GlassView
-                    isInteractive
-                    style={{
-                        borderRadius: theme.borderRadius.lg,
-                        maxWidth: "85%",
-                    }}
+                <View
+                    className="rounded-lg max-w-[85%]"
+                    style={{ backgroundColor: theme.colors.surface }}
                 >
                     <Text
                         selectable
-                        style={{
-                            color: theme.colors.text,
-                            paddingHorizontal: theme.spacing.md,
-                            paddingVertical: theme.spacing.sm + 4,
-                            fontSize: 16,
-                            lineHeight: 22,
-                        }}
+                        className="px-4 py-3 text-base leading-[22px]"
+                        style={{ color: theme.colors.text }}
                     >
                         {content}
                     </Text>
-                </GlassView>
+                </View>
             </View>
         );
     }
 
     return (
         <View
-            style={[
-                {
-                    marginVertical: theme.spacing.xs,
-                },
-                style,
-            ]}
+            className="my-1"
+            style={style}
         >
             <ThemedMarkdown content={content} />
         </View>

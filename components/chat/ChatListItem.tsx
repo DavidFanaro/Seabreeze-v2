@@ -27,6 +27,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
     const swipeableRef = useRef<Swipeable>(null);
     const scaleValue = useRef(new Animated.Value(1)).current;
     const fadeValue = useRef(new Animated.Value(0)).current;
+    const pressOpacity = useRef(new Animated.Value(1)).current;
 
     React.useEffect(() => {
         Animated.timing(fadeValue, {
@@ -50,17 +51,17 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
     const renderRightActions = (_: any, dragX: Animated.AnimatedAddition<number>) => {
         return (
             <Animated.View
-                style={{
-                    justifyContent: "center",
-                    alignItems: "center",
-                    marginHorizontal: 12,
-                    transform: [{ scale: deleteScale }],
-                    opacity: dragX.interpolate({
-                        inputRange: [-100, -50, 0],
-                        outputRange: [1, 0.5, 0],
-                        extrapolate: "clamp",
-                    }),
-                }}
+                className="justify-center items-center mx-3"
+                style={[
+                    { transform: [{ scale: deleteScale }] },
+                    {
+                        opacity: dragX.interpolate({
+                            inputRange: [-100, -50, 0],
+                            outputRange: [1, 0.5, 0],
+                            extrapolate: "clamp",
+                        }),
+                    },
+                ]}
             >
                 <Pressable
                     onPress={() => {
@@ -68,13 +69,9 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                         onDelete(id);
                         swipeableRef.current?.close();
                     }}
+                    className="justify-center items-center w-[44px] h-[44px] rounded-full"
                     style={({ pressed }) => ({
                         backgroundColor: theme.colors.error,
-                        justifyContent: "center",
-                        alignItems: "center",
-                        width: 44,
-                        height: 44,
-                        borderRadius: 22,
                         opacity: pressed ? 0.8 : 1,
                         transform: [{ scale: pressed ? 0.95 : 1 }],
                         shadowColor: theme.colors.error,
@@ -118,7 +115,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 tension: 80,
                 friction: 5,
             }),
-            Animated.timing(fadeValue, {
+            Animated.timing(pressOpacity, {
                 toValue: 0.85,
                 duration: 80,
                 useNativeDriver: true,
@@ -134,7 +131,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 tension: 120,
                 friction: 4,
             }),
-            Animated.timing(fadeValue, {
+            Animated.timing(pressOpacity, {
                 toValue: 1,
                 duration: 120,
                 useNativeDriver: true,
@@ -172,47 +169,34 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
     }, []);
 
     return (
-        <Animated.View style={{ opacity: fadeValue }}>
+        <Animated.View style={{ opacity: Animated.multiply(fadeValue, pressOpacity) }}>
             <Swipeable
                 ref={swipeableRef}
                 renderRightActions={renderRightActions}
                 overshootRight={false}
                 friction={2}
                 rightThreshold={40}
-                containerStyle={{
-                    marginBottom: 10,
-                }}
+                containerStyle={{ marginBottom: 10 }}
                 childrenContainerStyle={{
                     backgroundColor: "transparent",
                 }}
             >
-                <Link href={`/chat/${id}`} push asChild>
-                    <Pressable
-                        onPressIn={handlePressIn}
-                        onPressOut={handlePressOut}
-                        style={({ pressed }) => [
-                            {
-                                padding: theme.spacing.sm,
-                                paddingBottom: theme.spacing.sm + 10,
-                                minHeight: 85,
-                                justifyContent: "center",
-                                transform: [{ scale: scaleValue }],
-                            },
-                            style,
-                        ]}
-                    >
+                <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
+                    <Link href={`/chat/${id}`} push asChild>
+                        <Pressable
+                            onPressIn={handlePressIn}
+                            onPressOut={handlePressOut}
+                            className="px-2 pb-[14px] min-h-[85px] justify-center"
+                            style={style}
+                        >
                         <Animated.View
                             style={{
                                 transform: [{ translateY: slideValue }],
                             }}
                         >
                             <View
+                                className="p-3 rounded-lg min-h-[75px] justify-center border"
                                 style={{
-                                    padding: theme.spacing.md,
-                                    borderRadius: theme.borderRadius.lg,
-                                    minHeight: 75,
-                                    justifyContent: "center",
-                                    borderWidth: 1,
                                     borderColor: theme.colors.border,
                                     backgroundColor: theme.colors.glass,
                                     shadowColor: "#000",
@@ -223,30 +207,11 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                                 }}
                             >
                                 {/* Header row with title and timestamp */}
-                                <View
-                                    style={{
-                                        flexDirection: "row",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        marginBottom: 8,
-                                    }}
-                                >
-                                    <View
-                                        style={{
-                                            flexDirection: "row",
-                                            alignItems: "center",
-                                            flex: 1,
-                                        }}
-                                    >
+                                <View className="flex-row justify-between items-center mb-2">
+                                    <View className="flex-row items-center flex-1">
                                         <Text
-                                            style={{
-                                                color: theme.colors.text,
-                                                fontSize: 16,
-                                                fontWeight: "700",
-                                                flex: 1,
-                                                marginRight: 8,
-                                                letterSpacing: -0.3,
-                                            }}
+                                            className="text-[16px] font-bold flex-1 mr-2 tracking-tight"
+                                            style={{ color: theme.colors.text, letterSpacing: -0.3 }}
                                             numberOfLines={1}
                                         >
                                             {title || "New Chat"}
@@ -262,15 +227,10 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                                             }}
                                         >
                                             <Text
+                                                className="text-[11px] font-medium px-1.5 py-0.5 rounded overflow-hidden"
                                                 style={{
                                                     color: theme.colors.textSecondary,
-                                                    fontSize: 11,
-                                                    fontWeight: "500",
                                                     backgroundColor: theme.colors.glass,
-                                                    paddingHorizontal: 6,
-                                                    paddingVertical: 2,
-                                                    borderRadius: 6,
-                                                    overflow: "hidden",
                                                 }}
                                             >
                                                 {displayTime}
@@ -289,12 +249,8 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                                     }}
                                 >
                                     <Text
-                                        style={{
-                                            color: theme.colors.textSecondary,
-                                            fontSize: 14,
-                                            marginTop: 2,
-                                            lineHeight: 18,
-                                        }}
+                                        className="text-[14px] mt-0.5 leading-[18px]"
+                                        style={{ color: theme.colors.textSecondary }}
                                         numberOfLines={2}
                                     >
                                         {displayPreview}
@@ -304,8 +260,9 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                                 
                             </View>
                         </Animated.View>
-                    </Pressable>
-                </Link>
+                        </Pressable>
+                    </Link>
+                </Animated.View>
             </Swipeable>
         </Animated.View>
     );

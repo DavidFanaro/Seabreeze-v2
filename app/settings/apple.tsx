@@ -1,21 +1,14 @@
 import { router, Stack } from "expo-router";
-import { View, Text, SafeAreaView, StyleSheet } from "react-native";
+import * as React from "react";
+import { View, Text, SafeAreaView, ScrollView } from "react-native";
 import { Suspense } from "react";
-import { IconButton, useTheme } from "@/components";
-import { SymbolView } from "expo-symbols";
+import { useTheme, IconButton } from "@/components";
 
 export default function AppleSettings() {
     const { theme } = useTheme();
 
-    const features = [
-        { icon: "cpu", text: "On-device processing for privacy" },
-        { icon: "lock.shield", text: "Your data stays on your device" },
-        { icon: "bolt.fill", text: "Fast inference with Apple Silicon" },
-        { icon: "hand.tap", text: "System integration with iOS" },
-    ];
-
     return (
-        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
             <Stack.Screen
                 options={{
                     headerTitle: "Apple Intelligence",
@@ -30,153 +23,109 @@ export default function AppleSettings() {
                     ),
                 }}
             />
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView className="flex-1">
                 <Suspense fallback={<Text>Loading</Text>}>
-                    <View style={styles.container}>
-                        <View style={styles.header}>
-                            <View
-                                style={[
-                                    styles.iconContainer,
-                                    { backgroundColor: theme.colors.surface },
-                                ]}
+                    <ScrollView
+                        className="flex-1"
+                        contentContainerClassName="flex-grow pt-5 px-4"
+                    >
+                        <View
+                            className="p-4 rounded-lg mb-4"
+                            style={{ backgroundColor: theme.colors.surface }}
+                        >
+                            <Text
+                                className="text-[16px] font-semibold mb-2"
+                                style={{ color: theme.colors.text }}
                             >
-                                <SymbolView
-                                    name="apple.logo"
-                                    size={48}
-                                    tintColor={theme.colors.text}
-                                />
-                            </View>
-                            <Text style={[styles.title, { color: theme.colors.text }]}>
-                                Apple Intelligence
+                                About Apple Intelligence
                             </Text>
-                            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                                On-device AI powered by Apple Silicon
+                            <Text
+                                className="text-[14px] leading-[20px]"
+                                style={{ color: theme.colors.textSecondary }}
+                            >
+                                Apple Intelligence provides on-device AI capabilities powered by Apple Silicon. It includes writing tools, image recognition, and natural language processing that runs locally on your device for privacy and performance.
                             </Text>
                         </View>
 
-                        <View style={styles.infoSection}>
-                            <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
-                                FEATURES
+                        <View
+                            className="p-4 rounded-lg mb-4"
+                            style={{ backgroundColor: theme.colors.surface }}
+                        >
+                            <Text
+                                className="text-[16px] font-semibold mb-2"
+                                style={{ color: theme.colors.text }}
+                            >
+                                Features
                             </Text>
-                            <View
-                                style={[
-                                    styles.featuresContainer,
-                                    { borderColor: theme.colors.border },
-                                ]}
-                            >
-                                {features.map((feature, index) => (
-                                    <View key={index} style={styles.featureItem}>
-                                        <SymbolView
-                                            name={feature.icon as any}
-                                            size={24}
-                                            tintColor={theme.colors.accent}
-                                        />
-                                        <Text
-                                            style={[
-                                                styles.featureText,
-                                                { color: theme.colors.text },
-                                            ]}
-                                        >
-                                            {feature.text}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </View>
-
-                        <View style={styles.noteSection}>
-                            <View
-                                style={[
-                                    styles.noteContainer,
-                                    { backgroundColor: theme.colors.surface },
-                                ]}
-                            >
-                                <SymbolView
-                                    name="info.circle"
-                                    size={20}
-                                    tintColor={theme.colors.textSecondary}
-                                />
+                            <View className="gap-2">
                                 <Text
-                                    style={[
-                                        styles.noteText,
-                                        { color: theme.colors.textSecondary },
-                                    ]}
+                                    className="text-[14px] leading-[20px]"
+                                    style={{ color: theme.colors.text }}
                                 >
-                                    Apple Intelligence is built into your device and requires no configuration. It uses system-default models optimized for Apple Silicon.
+                                    • Writing Tools: Rewriting, summarizing, and composing text
+                                </Text>
+                                <Text
+                                    className="text-[14px] leading-[20px]"
+                                    style={{ color: theme.colors.text }}
+                                >
+                                    • Image Recognition: Identifying objects and text in images
+                                </Text>
+                                <Text
+                                    className="text-[14px] leading-[20px]"
+                                    style={{ color: theme.colors.text }}
+                                >
+                                    • Siri Integration: Enhanced Siri capabilities
+                                </Text>
+                                <Text
+                                    className="text-[14px] leading-[20px]"
+                                    style={{ color: theme.colors.text }}
+                                >
+                                    • On-Device Processing: All data stays on your device
                                 </Text>
                             </View>
                         </View>
-                    </View>
+
+                        <View
+                            className="p-4 rounded-lg"
+                            style={{ backgroundColor: theme.colors.surface }}
+                        >
+                            <Text
+                                className="text-[16px] font-semibold mb-2"
+                                style={{ color: theme.colors.text }}
+                            >
+                                System Requirements
+                            </Text>
+                            <View className="gap-2">
+                                <Text
+                                    className="text-[14px] leading-[20px]"
+                                    style={{ color: theme.colors.text }}
+                                >
+                                    • iPhone 15 Pro or later
+                                </Text>
+                                <Text
+                                    className="text-[14px] leading-[20px]"
+                                    style={{ color: theme.colors.text }}
+                                >
+                                    • iPad with M1 chip or later
+                                </Text>
+                                <Text
+                                    className="text-[14px] leading-[20px]"
+                                    style={{ color: theme.colors.text }}
+                                >
+                                    • Mac with M1 chip or later
+                                </Text>
+                                <Text
+                                    className="text-[14px] leading-[20px]"
+                                    style={{ color: theme.colors.text }}
+                                >
+                                    • Latest iOS, iPadOS, or macOS
+                                </Text>
+                            </View>
+                        </View>
+                        <View className="h-4" />
+                    </ScrollView>
                 </Suspense>
             </SafeAreaView>
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        paddingTop: 100,
-        paddingHorizontal: 16,
-    },
-    header: {
-        alignItems: "center",
-        marginBottom: 32,
-    },
-    iconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 20,
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 16,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: "700",
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 16,
-        textAlign: "center",
-    },
-    infoSection: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 13,
-        fontWeight: "600",
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        marginBottom: 8,
-    },
-    featuresContainer: {
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    featureItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    featureText: {
-        fontSize: 15,
-        marginLeft: 12,
-    },
-    noteSection: {
-        marginTop: 16,
-    },
-    noteContainer: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        padding: 16,
-        borderRadius: 12,
-    },
-    noteText: {
-        fontSize: 14,
-        flex: 1,
-        marginLeft: 12,
-        lineHeight: 20,
-    },
-});

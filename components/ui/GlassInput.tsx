@@ -1,6 +1,5 @@
 import React from "react";
 import { TextInput, ViewStyle, TextStyle } from "react-native";
-import { GlassView } from "expo-glass-effect";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
 
@@ -35,36 +34,18 @@ export const GlassInput: React.FC<GlassInputProps> = ({
     };
 
     return (
-        <GlassView
-            isInteractive
-            style={[
-                {
-                    borderRadius: theme.borderRadius.md,
-                    paddingHorizontal: theme.spacing.md,
-                    paddingVertical: theme.spacing.sm + 4,
-                },
-                style,
-            ]}
-        >
-            <TextInput
-                value={value}
-                onChangeText={onChangeText}
-                placeholder={placeholder}
-                placeholderTextColor={theme.colors.textSecondary}
-                secureTextEntry={secureTextEntry}
-                autoCapitalize={autoCapitalize}
-                multiline={multiline}
-                editable={editable}
-                onFocus={handleFocus}
-                style={[
-                    {
-                        color: theme.colors.text,
-                        minHeight: 24,
-                        fontSize: 17,
-                    },
-                    inputStyle,
-                ]}
-            />
-        </GlassView>
+        <TextInput
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+            placeholderTextColor={theme.colors.textSecondary}
+            secureTextEntry={secureTextEntry}
+            autoCapitalize={autoCapitalize}
+            multiline={multiline}
+            editable={editable}
+            onFocus={handleFocus}
+            className="rounded-md px-4 py-3 text-[17px] min-h-6"
+            style={[{ color: theme.colors.text }, style]}
+        />
     );
 };

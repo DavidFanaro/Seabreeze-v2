@@ -1,5 +1,5 @@
 import { router, Stack } from "expo-router";
-import { View, Text, SafeAreaView, Pressable, StyleSheet } from "react-native";
+import { View, Text, SafeAreaView, Pressable } from "react-native";
 import { Suspense } from "react";
 import { IconButton, useTheme } from "@/components";
 import { ProviderIcon } from "@/components/ui/ProviderIcons";
@@ -34,22 +34,18 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.listItem,
-        {
-          backgroundColor: pressed
-            ? theme.colors.surface
-            : theme.colors.background,
-          borderColor: theme.colors.border,
-        },
-      ]}
+      className="flex-row items-center justify-between py-3.5 px-4 border-b"
+      style={({ pressed }) => ({
+        backgroundColor: pressed
+          ? theme.colors.surface
+          : theme.colors.background,
+        borderColor: theme.colors.border,
+      })}
     >
-      <View style={styles.listItemLeft}>
+      <View className="flex-row items-center flex-1">
         <View
-          style={[
-            styles.iconContainer,
-            { backgroundColor: theme.colors.surface },
-          ]}
+          className="w-[40px] h-[40px] rounded-lg justify-center items-center mr-3"
+          style={{ backgroundColor: theme.colors.surface }}
         >
           <ProviderIcon
             providerId={providerId}
@@ -57,28 +53,27 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
             color={getStatusColor()}
           />
         </View>
-        <View style={styles.listItemContent}>
-          <Text style={[styles.listItemTitle, { color: theme.colors.text }]}>
+        <View className="flex-1">
+          <Text className="text-[16px] font-semibold mb-0.5" style={{ color: theme.colors.text }}>
             {name}
           </Text>
           <Text
-            style={[
-              styles.listItemDescription,
-              { color: theme.colors.textSecondary },
-            ]}
+            className="text-[13px]"
+            style={{ color: theme.colors.textSecondary }}
           >
             {description}
           </Text>
           {selectedModel && (
             <Text
-              style={[styles.listItemModel, { color: theme.colors.accent }]}
+              className="text-[12px] mt-1"
+              style={{ color: theme.colors.accent }}
             >
               {selectedModel}
             </Text>
           )}
         </View>
       </View>
-      <View style={styles.listItemRight}>
+      <View className="ml-2">
         <SymbolView
           name="chevron.right"
           size={18}
@@ -124,7 +119,7 @@ export default function SettingsIndex() {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <Stack.Screen
         options={{
           headerTitle: "Settings",
@@ -147,23 +142,19 @@ export default function SettingsIndex() {
           ),
         }}
       />
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView className="flex-1">
         <Suspense fallback={<Text>Loading</Text>}>
-          <View style={styles.container}>
-            <View style={styles.section}>
+          <View className="flex-1 pt-4">
+            <View className="mb-6">
               <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: theme.colors.textSecondary },
-                ]}
+                className="text-[13px] font-bold uppercase tracking-wide px-4 mb-2"
+                style={{ color: theme.colors.textSecondary }}
               >
                 PROVIDERS
               </Text>
               <View
-                style={[
-                  styles.listContainer,
-                  { borderColor: theme.colors.border },
-                ]}
+                className="border-b"
+                style={{ borderColor: theme.colors.border }}
               >
                 {providers.map((provider) => (
                   <ProviderListItem
@@ -183,64 +174,3 @@ export default function SettingsIndex() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 16,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  listContainer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  listItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  listItemLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  listItemContent: {
-    flex: 1,
-  },
-  listItemTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  listItemDescription: {
-    fontSize: 13,
-  },
-  listItemModel: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  listItemRight: {
-    marginLeft: 8,
-  },
-});
