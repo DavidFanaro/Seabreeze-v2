@@ -1,51 +1,43 @@
 import React from "react";
-import { TextInput, ViewStyle, TextStyle } from "react-native";
-import { useTheme } from "@/components/ui/ThemeProvider";
-import useHapticFeedback from "@/hooks/useHapticFeedback";
+import { TextField as HeroUITextField } from "heroui-native";
 
 interface GlassInputProps {
+    placeholder?: string;
     value: string;
     onChangeText: (text: string) => void;
-    placeholder?: string;
     secureTextEntry?: boolean;
-    autoCapitalize?: "none" | "sentences" | "words" | "characters";
     multiline?: boolean;
-    style?: ViewStyle;
-    inputStyle?: TextStyle;
-    editable?: boolean;
+    numberOfLines?: number;
+    disabled?: boolean;
+    autoCapitalize?: "none" | "sentences" | "words" | "characters";
+    style?: any;
+    testID?: string;
 }
 
 export const GlassInput: React.FC<GlassInputProps> = ({
+    placeholder,
     value,
     onChangeText,
-    placeholder,
     secureTextEntry = false,
-    autoCapitalize = "none",
     multiline = false,
+    disabled = false,
     style,
-    inputStyle,
-    editable = true,
+    testID,
 }) => {
-    const { theme } = useTheme();
-    const { triggerPress } = useHapticFeedback();
-
-    const handleFocus = () => {
-        triggerPress("light");
-    };
-
     return (
-        <TextInput
-            value={value}
-            onChangeText={onChangeText}
-            placeholder={placeholder}
-            placeholderTextColor={theme.colors.textSecondary}
-            secureTextEntry={secureTextEntry}
-            autoCapitalize={autoCapitalize}
-            multiline={multiline}
-            editable={editable}
-            onFocus={handleFocus}
-            className="rounded-md px-4 py-3 text-[17px] min-h-6"
-            style={[{ color: theme.colors.text }, style]}
-        />
+        <HeroUITextField
+            isDisabled={disabled}
+        >
+            <HeroUITextField.Label>{placeholder}</HeroUITextField.Label>
+            <HeroUITextField.Input
+                placeholder={placeholder}
+                value={value}
+                onChangeText={onChangeText}
+                secureTextEntry={secureTextEntry}
+                multiline={multiline}
+                numberOfLines={multiline ? 4 : 1}
+                testID={testID}
+            />
+        </HeroUITextField>
     );
 };

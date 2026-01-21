@@ -1,51 +1,37 @@
 import React from "react";
-import { TouchableOpacity, ViewStyle } from "react-native";
 import { SymbolView } from "expo-symbols";
-import { useTheme } from "@/components/ui/ThemeProvider";
-import useHapticFeedback from "@/hooks/useHapticFeedback";
+import { Button as HeroUIButton } from "heroui-native";
 
 interface IconButtonProps {
     icon: string;
-    onPress: () => void;
     size?: number;
     color?: string;
-    style?: ViewStyle;
+    onPress?: () => void;
     disabled?: boolean;
+    style?: any;
 }
 
 export const IconButton: React.FC<IconButtonProps> = ({
     icon,
+    size = 24,
+    color = "#007AFF",
     onPress,
-    size = 26,
-    color,
-    style,
     disabled = false,
+    style,
 }) => {
-    const { theme } = useTheme();
-    const { triggerPress } = useHapticFeedback();
-    const iconColor = color ?? theme.colors.text;
-
-    const handlePress = () => {
-        triggerPress("light");
-        onPress();
-    };
-
     return (
-        <TouchableOpacity
-            onPress={handlePress}
-            disabled={disabled}
-            activeOpacity={0.7}
-            style={[{ opacity: disabled ? 0.5 : 1 }, style]}
+        <HeroUIButton
+            variant="ghost"
+            size="md"
+            onPress={onPress}
+            isDisabled={disabled}
+            isIconOnly
         >
             <SymbolView
-                style={{
-                    width: size,
-                    height: size,
-                }}
                 name={icon as any}
                 size={size}
-                tintColor={iconColor}
+                tintColor={color}
             />
-        </TouchableOpacity>
+        </HeroUIButton>
     );
 };
