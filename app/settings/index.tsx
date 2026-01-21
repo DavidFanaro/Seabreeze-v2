@@ -1,9 +1,10 @@
 import { router, Stack } from "expo-router";
-import { View, Text, SafeAreaView, Pressable } from "react-native";
-import { Suspense } from "react";
-import { IconButton, useTheme } from "@/components";
+import { View, Text, SafeAreaView, Pressable, ScrollView, Switch } from "react-native";
+import { Suspense, useState, useEffect } from "react";
+import { IconButton, useTheme, GlassButton } from "@/components";
 import { ProviderIcon } from "@/components/ui/ProviderIcons";
 import { isProviderConfigured } from "@/stores";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import { SymbolView } from "expo-symbols";
 import { ProviderId } from "@/types/provider.types";
 
@@ -85,14 +86,28 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
 };
 
 export default function SettingsIndex() {
-  const { theme } = useTheme();
+  const { theme, themeMode, setTheme } = useTheme();
+  const showCodeLineNumbers = useSettingsStore((state) => state.showCodeLineNumbers);
+  const setShowCodeLineNumbers = useSettingsStore((state) => state.setShowCodeLineNumbers);
+  const [selectedTheme, setSelectedTheme] = useState(themeMode);
+
+  useEffect(() => {
+    setSelectedTheme(themeMode);
+  }, [themeMode]);
 
   const navigateToProvider = (providerId: string) => {
     router.navigate(`/settings/${providerId}` as any);
   };
 
-  const navigateToGeneral = () => {
-    router.navigate("/settings/general" as any);
+  const themeOptions = [
+    { id: "light", name: "Light", icon: "sun.max" },
+    { id: "dark", name: "Dark", icon: "moon" },
+    { id: "system", name: "System", icon: "circle.lefthalf.filled" },
+  ] as const;
+
+  const handleThemeChange = async (newTheme: "light" | "dark" | "system") => {
+    setSelectedTheme(newTheme);
+    setTheme(newTheme);
   };
 
   const providers = [
@@ -132,43 +147,125 @@ export default function SettingsIndex() {
               style={{ marginLeft: 6 }}
             />
           ),
-          headerRight: () => (
-            <IconButton
-              icon="gearshape"
-              onPress={navigateToGeneral}
-              size={24}
-              style={{ marginLeft: 6 }}
-            />
-          ),
         }}
       />
       <SafeAreaView className="flex-1">
         <Suspense fallback={<Text>Loading</Text>}>
-          <View className="flex-1 pt-4">
-            <View className="mb-6">
-              <Text
-                className="text-[13px] font-bold uppercase tracking-wide px-4 mb-2"
-                style={{ color: theme.colors.textSecondary }}
-              >
-                PROVIDERS
-              </Text>
-              <View
-                className="border-b"
-                style={{ borderColor: theme.colors.border }}
-              >
-                {providers.map((provider) => (
-                  <ProviderListItem
-                    key={provider.id}
-                    providerId={provider.id as ProviderId}
-                    name={provider.name}
-                    description={provider.description}
-                    isConfigured={isProviderConfigured(provider.id as ProviderId)}
-                    onPress={() => navigateToProvider(provider.id)}
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName="flex-grow pt-5 px-4"
+          >
+            <Text
+              className="text-[13px] font-bold uppercase tracking-wide mb-2"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              APPEARANCE
+            </Text>
+
+            <View
+              className="rounded-lg overflow-hidden"
+              style={{ backgroundColor: theme.colors.surface }}
+            >
+              {themeOptions.map((option, index) => {
+                const isSelected = selectedTheme === option.id;
+                return (
+                  <GlassButton
+                    key={option.id}
+                    title={option.name}
+                    onPress={() => handleThemeChange(option.id)}
+                    variant={isSelected ? "primary" : "secondary"}
+                    style={{
+                      margin: 0,
+                      borderRadius: 0,
+                      borderWidth: 0,
+                      borderBottomWidth: index < themeOptions.length - 1 ? 1 : 0,
+                      borderBottomColor: theme.colors.border,
+                    }}
                   />
-                ))}
+                );
+              })}
+            </View>
+
+            <Text
+              className="text-[13px] font-bold uppercase tracking-wide mb-2 mt-6"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              CHAT
+            </Text>
+
+            <View
+              className="rounded-lg overflow-hidden p-4"
+              style={{ backgroundColor: theme.colors.surface }}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1">
+                  <Text
+                    className="text-[16px] font-semibold"
+                    style={{ color: theme.colors.text }}
+                  >
+                    Show Code Line Numbers
+                  </Text>
+                  <Text
+                    className="text-[13px] mt-1"
+                    style={{ color: theme.colors.textSecondary }}
+                  >
+                    Display line numbers in code blocks
+                  </Text>
+                </View>
+                <Switch
+                  value={showCodeLineNumbers}
+                  onValueChange={setShowCodeLineNumbers}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
+                  thumbColor={showCodeLineNumbers ? "#ffffff" : theme.colors.textSecondary}
+                />
               </View>
             </View>
-          </View>
+
+            <Text
+              className="text-[13px] font-bold uppercase tracking-wide px-4 mb-2 mt-6"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              PROVIDERS
+            </Text>
+            <View
+              className="rounded-lg overflow-hidden"
+              style={{ backgroundColor: theme.colors.surface }}
+            >
+              {providers.map((provider) => (
+                <ProviderListItem
+                  key={provider.id}
+                  providerId={provider.id as ProviderId}
+                  name={provider.name}
+                  description={provider.description}
+                  isConfigured={isProviderConfigured(provider.id as ProviderId)}
+                  onPress={() => navigateToProvider(provider.id)}
+                />
+              ))}
+            </View>
+
+            <View
+              className="p-4 rounded-lg mt-6"
+              style={{ backgroundColor: theme.colors.surface }}
+            >
+              <Text
+                className="text-[16px] font-semibold mb-2"
+                style={{ color: theme.colors.text }}
+              >
+                About
+              </Text>
+              <Text
+                className="text-[14px] leading-[20px]"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                Seabreeze v1.0.0
+                {"\n"}
+                A modern AI chat interface powered by React Native and Expo.
+                {"\n\n"}
+                Built with ❤️ for iOS, Android, and Web.
+              </Text>
+            </View>
+            <View className="h-4" />
+          </ScrollView>
         </Suspense>
       </SafeAreaView>
     </View>
