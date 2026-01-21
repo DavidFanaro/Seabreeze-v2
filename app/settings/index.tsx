@@ -102,10 +102,13 @@ export default function SettingsIndex() {
   const themeOptions = [
     { id: "light", name: "Light", icon: "sun.max" },
     { id: "dark", name: "Dark", icon: "moon" },
+    { id: "nord", name: "Nord", icon: "snowflake" },
+    { id: "catppuccin", name: "Catppuccin", icon: "pawprint" },
+    { id: "tokyo-night", name: "Tokyo Night", icon: "moon.stars" },
     { id: "system", name: "System", icon: "circle.lefthalf.filled" },
   ] as const;
 
-  const handleThemeChange = async (newTheme: "light" | "dark" | "system") => {
+  const handleThemeChange = async (newTheme: "light" | "dark" | "nord" | "catppuccin" | "tokyo-night" | "system") => {
     setSelectedTheme(newTheme);
     setTheme(newTheme);
   };

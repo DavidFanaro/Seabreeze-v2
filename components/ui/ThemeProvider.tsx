@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode } from "react";
 import { useColorScheme } from "react-native";
 
 export interface Theme {
@@ -79,8 +79,86 @@ const darkTheme: Theme = {
     },
 };
 
-export type ThemeMode = "light" | "dark" | "system";
-type ThemeType = "light" | "dark";
+const nordTheme: Theme = {
+    colors: {
+        background: "#2E3440",
+        surface: "#3B4252",
+        text: "#ECEFF4",
+        textSecondary: "#D8DEE9",
+        accent: "#88C0D0",
+        glass: "rgba(59, 66, 82, 0.8)",
+        border: "rgba(136, 192, 208, 0.3)",
+        error: "#BF616A",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        sm: 8,
+        md: 12,
+        lg: 20,
+        full: 9999,
+    },
+};
+
+const catppuccinTheme: Theme = {
+    colors: {
+        background: "#1E1E2E",
+        surface: "#313244",
+        text: "#CDD6F4",
+        textSecondary: "#BAC2DE",
+        accent: "#89B4FA",
+        glass: "rgba(49, 50, 68, 0.8)",
+        border: "rgba(137, 180, 250, 0.3)",
+        error: "#F38BA8",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        sm: 8,
+        md: 12,
+        lg: 20,
+        full: 9999,
+    },
+};
+
+const tokyoNightTheme: Theme = {
+    colors: {
+        background: "#1a1b26",
+        surface: "#24283b",
+        text: "#c0caf5",
+        textSecondary: "#a9b1d6",
+        accent: "#7aa2f7",
+        glass: "rgba(36, 40, 59, 0.8)",
+        border: "rgba(122, 162, 247, 0.3)",
+        error: "#f7768e",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        sm: 8,
+        md: 12,
+        lg: 20,
+        full: 9999,
+    },
+};
+
+export type ThemeMode = "light" | "dark" | "nord" | "catppuccin" | "tokyo-night" | "system";
+type ThemeType = "light" | "dark" | "nord" | "catppuccin" | "tokyo-night";
 
 interface ThemeContextType {
     theme: Theme;
@@ -113,12 +191,19 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     const systemColorScheme = useColorScheme();
     const [themeMode, setThemeMode] = useState<ThemeMode>(defaultTheme);
 
-    // Determine actual theme type based on mode
-    const themeType: ThemeType = themeMode === "system" 
+    const themes: Record<ThemeType, Theme> = {
+        light: lightTheme,
+        dark: darkTheme,
+        nord: nordTheme,
+        catppuccin: catppuccinTheme,
+        "tokyo-night": tokyoNightTheme,
+    };
+
+    const themeType: ThemeType = themeMode === "system"
         ? (systemColorScheme === "light" ? "light" : "dark")
         : themeMode;
 
-    const theme = themeType === "light" ? lightTheme : darkTheme;
+    const theme = themes[themeType];
 
     const toggleTheme = () => {
         setThemeMode((prev) => {
