@@ -1,4 +1,5 @@
 import { apple } from "@react-native-ai/apple";
+import { isAppleIntelligenceCompatible } from "@/lib/deviceCapabilities";
 
 export type AppleLanguageModel = ReturnType<typeof apple>;
 
@@ -12,6 +13,10 @@ export function isAppleModel(model: unknown): model is AppleLanguageModel {
 
 export async function testAppleIntelligence(): Promise<boolean> {
     try {
+        if (!isAppleIntelligenceCompatible()) {
+            return false;
+        }
+        
         const model = createAppleModel();
         if (!model) {
             return false;
