@@ -10,7 +10,7 @@ import { ModelMessage } from "ai";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { SymbolView } from "expo-symbols";
 
-const getPreview = (messages: unknown): string | null => {
+export const getPreview = (messages: unknown): string | null => {
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return null;
   }
