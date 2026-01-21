@@ -30,6 +30,14 @@ jest.mock('expo-sqlite', () => ({
   openDatabaseSync: jest.fn(),
 }));
 
+jest.mock('react-native-keyboard-controller', () => ({
+  KeyboardProvider: ({ children }) => children,
+}));
+
+jest.mock('react-native-gesture-handler', () => ({
+  GestureHandlerRootView: ({ children }) => children,
+}));
+
 global.console = {
   ...console,
   warn: jest.fn(),

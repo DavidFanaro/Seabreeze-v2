@@ -22,6 +22,10 @@ const expoDb = openDatabaseSync(dbname);
 const db = drizzle(expoDb);
 const queryClient = new QueryClient();
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export default function RootLayout() {
   const { success, error } = useMigrations(db, migrations);
   useDrizzleStudio(db.$client);
