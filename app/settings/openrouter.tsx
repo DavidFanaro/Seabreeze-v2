@@ -103,13 +103,15 @@ export default function OpenRouterSettings() {
                                 </Text>
                             </View>
                         )}
-                        <View className="flex-1 min-h-5" />
-                        <SaveButton
-                            onPress={handleSave}
-                            loading={isSaving || isTesting}
-                            title="Save Settings"
-                        />
-                        <View className="h-4" />
+                        <View className="flex-1 min-h-2" />
+                        <View className="px-4">
+                            <SaveButton
+                                onPress={handleSave}
+                                loading={isSaving || isTesting}
+                                title="Save Settings"
+                            />
+                        </View>
+                        <View className="h-2" />
                     </ScrollView>
                 </Suspense>
             </SafeAreaView>

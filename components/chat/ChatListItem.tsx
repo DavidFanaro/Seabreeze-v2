@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Text, View, ViewStyle, Pressable } from "react-native";
+import { Text, View, ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
+import { Pressable } from "react-native-gesture-handler";
 import ReanimatedSwipeable, { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SymbolView } from "expo-symbols";
-import { useTheme } from "@/components/ui/ThemeProvider";
 import * as Haptics from "expo-haptics";
 import Animated, { SharedValue, useAnimatedStyle, withSpring, interpolate } from "react-native-reanimated";
+
+import { useTheme } from "@/components/ui/ThemeProvider";
 
 interface ChatListItemProps {
     id: number;
@@ -25,30 +27,47 @@ interface RightActionProps {
 
 const RightAction: React.FC<RightActionProps> = ({ dragX, onPress, theme }) => {
     const animatedStyle = useAnimatedStyle(() => ({
-        opacity: interpolate(dragX.value, [-100, -50, 0], [1, 0.5, 0], "clamp"),
+        opacity: interpolate(dragX.value, [-80, -40, 0], [1, 0.5, 0], "clamp"),
         transform: [{ scale: withSpring(1, { damping: 20, stiffness: 300 }) }],
     }));
 
+    const buttonBaseStyle = {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        backgroundColor: theme.colors.error,
+        shadowColor: theme.colors.error,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
+    };
+
     return (
         <Animated.View
-            className="justify-center items-center mx-3"
-            style={animatedStyle}
+            style={[
+                animatedStyle,
+                {
+                    width: 52,
+                    paddingRight: 8,
+                    alignItems: "flex-end",
+                    justifyContent: "center",
+                },
+            ]}
         >
             <Pressable
                 onPress={onPress}
-                className="justify-center items-center w-[44px] h-[44px] rounded-full"
-                style={({ pressed }) => ({
-                    backgroundColor: theme.colors.error,
-                    opacity: pressed ? 0.8 : 1,
-                    transform: [{ scale: pressed ? 0.95 : 1 }],
-                    shadowColor: theme.colors.error,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 4,
-                    elevation: 3,
-                })}
+                style={({ pressed }) => [
+                    buttonBaseStyle,
+                    {
+                        opacity: pressed ? 0.8 : 1,
+                        transform: [{ scale: pressed ? 0.95 : 1 }],
+                    },
+                ]}
             >
-                <SymbolView name="trash" size={20} tintColor={theme.colors.surface} />
+                <SymbolView name="trash" size={24} tintColor={theme.colors.surface} />
             </Pressable>
         </Animated.View>
     );
@@ -131,19 +150,24 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     }}
                     onPressOut={() => setIsPressed(false)}
-                    className="px-2 pb-[14px] min-h-[85px] justify-center"
-                    style={[style, { opacity: isPressed ? 0.6 : 1 }]}
+                    style={[
+                        style,
+                        {
+                            opacity: isPressed ? 0.6 : 1,
+                            paddingHorizontal: 20,
+                            paddingVertical: 8,
+                            minHeight: 100,
+                            justifyContent: "center",
+                        },
+                    ]}
                 >
                     <View
-                        className="p-3 rounded-lg min-h-[75px] justify-center border"
+                        className="rounded-lg min-h-[75px] justify-center border"
                         style={{
                             borderColor: theme.colors.border,
                             backgroundColor: theme.colors.glass,
-                            shadowColor: theme.colors.text,
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 8,
-                            elevation: 5,
+                            paddingHorizontal: 20,
+                            paddingVertical: 14,
                         }}
                     >
                         {/* Header row with title and timestamp */}

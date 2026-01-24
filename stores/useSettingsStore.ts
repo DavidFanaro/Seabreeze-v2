@@ -31,7 +31,20 @@ const secureStorage = {
 };
 
 interface SettingsState {
-  theme: 'light' | 'dark' | 'nord' | 'catppuccin' | 'tokyo-night' | 'system';
+  theme:
+    | 'light'
+    | 'dark'
+    | 'nord'
+    | 'catppuccin'
+    | 'tokyo-night'
+    | 'tokyo-night-storm'
+    | 'tokyo-night-moon'
+    | 'one-dark'
+    | 'gruvbox-dark-hard'
+    | 'gruvbox-dark-medium'
+    | 'gruvbox-dark-soft'
+    | 'darcula'
+    | 'system';
   hapticEnabled: boolean;
   autoGenerateTitles: boolean;
   messageFontSize: number;
@@ -39,7 +52,22 @@ interface SettingsState {
 }
 
 interface SettingsActions {
-  setTheme: (theme: 'light' | 'dark' | 'nord' | 'catppuccin' | 'tokyo-night' | 'system') => void;
+  setTheme: (
+    theme:
+      | 'light'
+      | 'dark'
+      | 'nord'
+      | 'catppuccin'
+      | 'tokyo-night'
+      | 'tokyo-night-storm'
+      | 'tokyo-night-moon'
+      | 'one-dark'
+      | 'gruvbox-dark-hard'
+      | 'gruvbox-dark-medium'
+      | 'gruvbox-dark-soft'
+      | 'darcula'
+      | 'system',
+  ) => void;
   setHapticEnabled: (enabled: boolean) => void;
   setAutoGenerateTitles: (enabled: boolean) => void;
   setMessageFontSize: (size: number) => void;

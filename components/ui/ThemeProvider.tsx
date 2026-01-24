@@ -207,8 +207,271 @@ const tokyoNightTheme: Theme = {
     isDark: true,
 };
 
-export type ThemeMode = "light" | "dark" | "nord" | "catppuccin" | "tokyo-night" | "system";
-type ThemeType = "light" | "dark" | "nord" | "catppuccin" | "tokyo-night";
+const tokyoNightStormTheme: Theme = {
+    colors: {
+        background: "#24283b",
+        surface: "#414868",
+        text: "#c0caf5",
+        textSecondary: "#a9b1d6",
+        accent: "#7aa2f7",
+        glass: "rgba(65, 72, 104, 0.8)",
+        border: "rgba(122, 162, 247, 0.3)",
+        error: "#f7768e",
+        overlay: "rgba(36, 40, 59, 0.95)",
+        overlayForeground: "#c0caf5",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        xs: 2,
+        sm: 8,
+        md: 12,
+        lg: 20,
+        xl: 24,
+        '2xl': 32,
+        '3xl': 48,
+        '4xl': 64,
+        full: 9999,
+    },
+    isDark: true,
+};
+
+const tokyoNightMoonTheme: Theme = {
+    colors: {
+        background: "#222436",
+        surface: "#2f334d",
+        text: "#c8d3f5",
+        textSecondary: "#a9b8e8",
+        accent: "#82aaff",
+        glass: "rgba(47, 51, 77, 0.8)",
+        border: "rgba(130, 170, 255, 0.3)",
+        error: "#ff757f",
+        overlay: "rgba(34, 36, 54, 0.95)",
+        overlayForeground: "#c8d3f5",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        xs: 2,
+        sm: 8,
+        md: 12,
+        lg: 20,
+        xl: 24,
+        '2xl': 32,
+        '3xl': 48,
+        '4xl': 64,
+        full: 9999,
+    },
+    isDark: true,
+};
+
+const oneDarkTheme: Theme = {
+    colors: {
+        background: "#282c34",
+        surface: "#2c313a",
+        text: "#abb2bf",
+        textSecondary: "#9aa1ad",
+        accent: "#61afef",
+        glass: "rgba(44, 49, 58, 0.8)",
+        border: "rgba(97, 175, 239, 0.3)",
+        error: "#e06c75",
+        overlay: "rgba(40, 44, 52, 0.95)",
+        overlayForeground: "#abb2bf",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        xs: 2,
+        sm: 8,
+        md: 12,
+        lg: 20,
+        xl: 24,
+        '2xl': 32,
+        '3xl': 48,
+        '4xl': 64,
+        full: 9999,
+    },
+    isDark: true,
+};
+
+const gruvboxDarkHardTheme: Theme = {
+    colors: {
+        background: "#1d2021",
+        surface: "#282828",
+        text: "#ebdbb2",
+        textSecondary: "#d5c4a1",
+        accent: "#83a598",
+        glass: "rgba(40, 40, 40, 0.8)",
+        border: "rgba(131, 165, 152, 0.3)",
+        error: "#fb4934",
+        overlay: "rgba(29, 32, 33, 0.95)",
+        overlayForeground: "#ebdbb2",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        xs: 2,
+        sm: 8,
+        md: 12,
+        lg: 20,
+        xl: 24,
+        '2xl': 32,
+        '3xl': 48,
+        '4xl': 64,
+        full: 9999,
+    },
+    isDark: true,
+};
+
+const gruvboxDarkMediumTheme: Theme = {
+    colors: {
+        background: "#282828",
+        surface: "#3c3836",
+        text: "#ebdbb2",
+        textSecondary: "#d5c4a1",
+        accent: "#83a598",
+        glass: "rgba(60, 56, 54, 0.8)",
+        border: "rgba(131, 165, 152, 0.3)",
+        error: "#fb4934",
+        overlay: "rgba(40, 40, 40, 0.95)",
+        overlayForeground: "#ebdbb2",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        xs: 2,
+        sm: 8,
+        md: 12,
+        lg: 20,
+        xl: 24,
+        '2xl': 32,
+        '3xl': 48,
+        '4xl': 64,
+        full: 9999,
+    },
+    isDark: true,
+};
+
+const gruvboxDarkSoftTheme: Theme = {
+    colors: {
+        background: "#32302f",
+        surface: "#3c3836",
+        text: "#ebdbb2",
+        textSecondary: "#d5c4a1",
+        accent: "#83a598",
+        glass: "rgba(60, 56, 54, 0.8)",
+        border: "rgba(131, 165, 152, 0.3)",
+        error: "#fb4934",
+        overlay: "rgba(50, 48, 47, 0.95)",
+        overlayForeground: "#ebdbb2",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        xs: 2,
+        sm: 8,
+        md: 12,
+        lg: 20,
+        xl: 24,
+        '2xl': 32,
+        '3xl': 48,
+        '4xl': 64,
+        full: 9999,
+    },
+    isDark: true,
+};
+
+const darculaTheme: Theme = {
+    colors: {
+        background: "#2b2b2b",
+        surface: "#323232",
+        text: "#a9b7c6",
+        textSecondary: "#808080",
+        accent: "#6897bb",
+        glass: "rgba(50, 50, 50, 0.8)",
+        border: "rgba(104, 151, 187, 0.3)",
+        error: "#ff6b68",
+        overlay: "rgba(43, 43, 43, 0.95)",
+        overlayForeground: "#a9b7c6",
+    },
+    spacing: {
+        xs: 4,
+        sm: 8,
+        md: 16,
+        lg: 24,
+        xl: 32,
+    },
+    borderRadius: {
+        xs: 2,
+        sm: 8,
+        md: 12,
+        lg: 20,
+        xl: 24,
+        '2xl': 32,
+        '3xl': 48,
+        '4xl': 64,
+        full: 9999,
+    },
+    isDark: true,
+};
+
+export type ThemeMode =
+    | "light"
+    | "dark"
+    | "nord"
+    | "catppuccin"
+    | "tokyo-night"
+    | "tokyo-night-storm"
+    | "tokyo-night-moon"
+    | "one-dark"
+    | "gruvbox-dark-hard"
+    | "gruvbox-dark-medium"
+    | "gruvbox-dark-soft"
+    | "darcula"
+    | "system";
+type ThemeType =
+    | "light"
+    | "dark"
+    | "nord"
+    | "catppuccin"
+    | "tokyo-night"
+    | "tokyo-night-storm"
+    | "tokyo-night-moon"
+    | "one-dark"
+    | "gruvbox-dark-hard"
+    | "gruvbox-dark-medium"
+    | "gruvbox-dark-soft"
+    | "darcula";
 
 interface ThemeContextType {
     theme: Theme;
@@ -244,7 +507,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 }) => {
     const systemColorScheme = useColorScheme();
     const storedThemeMode = useSettingsStore((state) => state.theme);
-    const setStoredTheme = useSettingsStore((state) => state.setTheme);
+    const setStoredTheme = useSettingsStore(
+        (state) => state.setTheme,
+    ) as (theme: ThemeMode) => void;
     const [hasHydrated, setHasHydrated] = useState(
         useSettingsStore.persist.hasHydrated(),
     );
@@ -267,6 +532,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
         nord: nordTheme,
         catppuccin: catppuccinTheme,
         "tokyo-night": tokyoNightTheme,
+        "tokyo-night-storm": tokyoNightStormTheme,
+        "tokyo-night-moon": tokyoNightMoonTheme,
+        "one-dark": oneDarkTheme,
+        "gruvbox-dark-hard": gruvboxDarkHardTheme,
+        "gruvbox-dark-medium": gruvboxDarkMediumTheme,
+        "gruvbox-dark-soft": gruvboxDarkSoftTheme,
+        darcula: darculaTheme,
     };
 
     const themeMode = storedThemeMode ?? defaultTheme;

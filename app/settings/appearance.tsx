@@ -1,22 +1,45 @@
 import { router, Stack } from "expo-router";
-import { View, Text, SafeAreaView, ScrollView, Switch } from "react-native";
+import { Pressable, View, Text, SafeAreaView, ScrollView, Switch } from "react-native";
 import { Suspense } from "react";
-import { IconButton, GlassButton, useTheme } from "@/components";
+import { SymbolView } from "expo-symbols";
+import { IconButton, useTheme } from "@/components";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { ThemeMode } from "@/components/ui/ThemeProvider";
+
+const hexToRgba = (hex: string, alpha: number): string => {
+    const sanitized = hex.replace("#", "");
+    const normalized = sanitized.length === 3
+        ? sanitized
+            .split("")
+            .map((value) => value + value)
+            .join("")
+        : sanitized;
+    const red = Number.parseInt(normalized.slice(0, 2), 16);
+    const green = Number.parseInt(normalized.slice(2, 4), 16);
+    const blue = Number.parseInt(normalized.slice(4, 6), 16);
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+};
 
 export default function AppearanceSettings() {
     const { theme, themeMode, setTheme } = useTheme();
     const showCodeLineNumbers = useSettingsStore((state) => state.showCodeLineNumbers);
     const setShowCodeLineNumbers = useSettingsStore((state) => state.setShowCodeLineNumbers);
 
-    const themeOptions: { id: ThemeMode; name: string; icon: string }[] = [
-        { id: "light", name: "Light", icon: "sun.max" },
-        { id: "dark", name: "Dark", icon: "moon" },
-        { id: "nord", name: "Nord", icon: "snowflake" },
-        { id: "catppuccin", name: "Catppuccin", icon: "pawprint" },
-        { id: "tokyo-night", name: "Tokyo Night", icon: "moon.stars" },
-        { id: "system", name: "System", icon: "circle.lefthalf.filled" },
+    const themeOptions: { id: ThemeMode; name: string }[] = [
+        { id: "light", name: "Light" },
+        { id: "dark", name: "Dark" },
+        { id: "nord", name: "Nord" },
+        { id: "catppuccin", name: "Catppuccin" },
+        { id: "tokyo-night", name: "Tokyo Night (Night)" },
+        { id: "tokyo-night-storm", name: "Tokyo Night (Storm)" },
+        { id: "tokyo-night-moon", name: "Tokyo Night (Moon)" },
+        { id: "one-dark", name: "One Dark" },
+        { id: "gruvbox-dark-hard", name: "Gruvbox (Dark Hard)" },
+        { id: "gruvbox-dark-medium", name: "Gruvbox (Dark Medium)" },
+        { id: "gruvbox-dark-soft", name: "Gruvbox (Dark Soft)" },
+        { id: "darcula", name: "Darcula" },
+        { id: "system", name: "System" },
     ];
 
     const handleThemeChange = (newTheme: ThemeMode) => {
@@ -59,20 +82,45 @@ export default function AppearanceSettings() {
                         >
                             {themeOptions.map((option, index) => {
                                 const isSelected = themeMode === option.id;
+                                const selectedBackground = hexToRgba(theme.colors.accent, 0.14);
+                                const pressedBackground = isSelected
+                                    ? hexToRgba(theme.colors.accent, 0.2)
+                                    : theme.colors.border;
+
                                 return (
-                                    <GlassButton
+                                    <Pressable
                                         key={option.id}
-                                        title={option.name}
                                         onPress={() => handleThemeChange(option.id)}
-                                        variant={isSelected ? "primary" : "secondary"}
-                                        style={{
-                                            margin: 0,
-                                            borderRadius: 0,
-                                            borderWidth: 0,
+                                        className="flex-row items-center justify-between px-4 py-4"
+                                        style={({ pressed }) => ({
+                                            minHeight: 56,
+                                            backgroundColor: pressed
+                                                ? pressedBackground
+                                                : isSelected
+                                                    ? selectedBackground
+                                                    : theme.colors.surface,
                                             borderBottomWidth: index < themeOptions.length - 1 ? 1 : 0,
                                             borderBottomColor: theme.colors.border,
-                                        }}
-                                    />
+                                        })}
+                                    >
+                                        <View className="flex-row items-center flex-1">
+                                            <Text
+                                                className="text-[16px] font-semibold"
+                                                style={{ color: theme.colors.text }}
+                                            >
+                                                {option.name}
+                                            </Text>
+                                        </View>
+                                        {isSelected ? (
+                                            <SymbolView
+                                                name="checkmark"
+                                                size={16}
+                                                tintColor={theme.colors.accent}
+                                            />
+                                        ) : (
+                                            <View className="w-[16px]" />
+                                        )}
+                                    </Pressable>
                                 );
                             })}
                         </View>

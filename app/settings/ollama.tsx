@@ -145,7 +145,7 @@ export default function OllamaSettings() {
                                 </Text>
                             </View>
                         )}
-                        <View className="flex-1 min-h-5" />
+                        <View className="flex-1 min-h-2" />
                     </ScrollView>
                 </Suspense>
             </SafeAreaView>

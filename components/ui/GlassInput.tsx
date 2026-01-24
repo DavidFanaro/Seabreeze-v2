@@ -1,6 +1,8 @@
 import React from "react";
 import { TextField as HeroUITextField } from "heroui-native";
 
+import { useTheme } from "@/components/ui/ThemeProvider";
+
 interface GlassInputProps {
     placeholder?: string;
     value: string;
@@ -24,13 +26,28 @@ export const GlassInput: React.FC<GlassInputProps> = ({
     style,
     testID,
 }) => {
+    const { theme } = useTheme();
     const inputProps: any = {
         placeholder,
         value,
         onChangeText,
         secureTextEntry,
         testID,
+        placeholderTextColor: theme.colors.textSecondary,
     };
+
+    const inputStyle = [
+        {
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surface,
+            color: theme.colors.text,
+            borderRadius: theme.borderRadius.md,
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm + 2,
+        },
+        style,
+    ];
 
     if (multiline) {
         inputProps.multiline = true;
@@ -40,10 +57,8 @@ export const GlassInput: React.FC<GlassInputProps> = ({
     return (
         <HeroUITextField
             isDisabled={disabled}
-            style={style}
         >
-            {placeholder && <HeroUITextField.Label>{placeholder}</HeroUITextField.Label>}
-            <HeroUITextField.Input {...inputProps} />
+            <HeroUITextField.Input {...inputProps} style={inputStyle} />
         </HeroUITextField>
     );
 };
