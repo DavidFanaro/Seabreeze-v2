@@ -43,12 +43,18 @@ export default function OpenRouterSettings() {
     };
 
     return (
+        // ROOT CONTAINER: Full-screen outer wrapper with themed background color
         <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+            {/* HEADER SECTION: Navigation bar with title and close button */}
             <Stack.Screen
                 options={{
+                    // Sets the screen title to "OpenRouter"
                     headerTitle: "OpenRouter",
+                    // Transparent header for seamless integration with background
                     headerTransparent: true,
+                    // Tint color matches the theme's text color for consistency
                     headerTintColor: theme.colors.text,
+                    // Right header action: Close/dismiss button
                     headerRight: () => (
                         <IconButton
                             icon="xmark"
@@ -59,40 +65,52 @@ export default function OpenRouterSettings() {
                     ),
                 }}
             />
+            {/* SAFE AREA VIEW: Ensures content respects device safe areas (notches, etc.) */}
             <SafeAreaView className="flex-1">
+                {/* SUSPENSE BOUNDARY: Loading fallback while content is being prepared */}
                 <Suspense fallback={<Text>Loading</Text>}>
+                    {/* SCROLLABLE CONTENT CONTAINER: Allows vertical scrolling with keyboard persistence */}
                     <ScrollView
                         className="flex-1"
                         contentContainerClassName="flex-grow pt-5 gap-5"
                         keyboardShouldPersistTaps="handled"
                     >
+                        {/* API KEY INPUT SECTION: Secure text entry for OpenRouter API credentials */}
                         <SettingInput
                             label="API Key"
                             value={apiKey}
                             onChangeText={setApiKeyState}
+                            // secureTextEntry hides sensitive API key characters from view
                             secureTextEntry={true}
                             placeholder="sk-or-..."
                         />
 
+                        {/* MODEL SELECTION SECTION: Manages available OpenRouter models */}
                         <View className="mt-4">
                             <ModelListManager
                                 providerId="openrouter"
+                                // Uses predefined list of available OpenRouter models
                                 predefinedModels={OPENROUTER_MODELS}
+                                // Current selected model from global provider store
                                 selectedModel={selectedModel}
+                                // Callback to update selected model in store
                                 onModelSelect={setSelectedModel}
                             />
                         </View>
 
+                        {/* TEST RESULT FEEDBACK SECTION: Displays connection test status and message */}
                         {testResult && (
                             <View
                                 className="flex-row items-center mx-4 p-3 rounded-md"
                                 style={{ backgroundColor: theme.colors.surface }}
                             >
+                                {/* Icon: Success (checkmark) or failure (xmark) symbol */}
                                 <SymbolView
                                     name={testResult.success ? "checkmark.circle" : "xmark.circle"}
                                     size={20}
                                     tintColor={testResult.success ? theme.colors.accent : theme.colors.error}
                                 />
+                                {/* Message: Descriptive text about the connection test result */}
                                 <Text
                                     className="text-[14px] ml-2"
                                     style={{
@@ -103,14 +121,21 @@ export default function OpenRouterSettings() {
                                 </Text>
                             </View>
                         )}
+
+                        {/* SPACER: Flexible space that pushes content up and the save button down */}
                         <View className="flex-1 min-h-2" />
+
+                        {/* SAVE BUTTON SECTION: Action button to persist settings and test connection */}
                         <View className="px-4">
                             <SaveButton
                                 onPress={handleSave}
+                                // Shows loading indicator while saving settings or testing connection
                                 loading={isSaving || isTesting}
                                 title="Save Settings"
                             />
                         </View>
+
+                        {/* BOTTOM PADDING: Small space at bottom for visual breathing room */}
                         <View className="h-2" />
                     </ScrollView>
                 </Suspense>
