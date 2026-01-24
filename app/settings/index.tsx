@@ -16,6 +16,7 @@ interface ProviderListItemProps {
   onPress: () => void;
 }
 
+// Provider list item component - displays a single AI provider with configuration status
 const ProviderListItem: React.FC<ProviderListItemProps> = ({
   providerId,
   name,
@@ -26,12 +27,16 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
 }) => {
   const { theme } = useTheme();
 
+  // Determine icon color based on provider configuration status
+  // Unconfigured providers show secondary text color, configured providers show accent color
   const getStatusColor = () => {
     if (!isConfigured) return theme.colors.textSecondary;
     return theme.colors.accent;
   };
 
   return (
+    // Pressable container for the entire provider list item
+    // Provides press feedback and navigation to provider settings
     <Pressable
       onPress={onPress}
       className="flex-row items-center justify-between py-3.5 px-4 border-b"
@@ -42,7 +47,9 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
         borderColor: theme.colors.border,
       })}
     >
+      {/* Left content section: icon + provider information */}
       <View className="flex-row items-center flex-1">
+        {/* Provider icon container with rounded background */}
         <View
           className="w-[40px] h-[40px] rounded-lg justify-center items-center mr-3"
           style={{ backgroundColor: theme.colors.surface }}
@@ -53,16 +60,23 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
             color={getStatusColor()}
           />
         </View>
+        
+        {/* Provider information section containing name, description, and optional selected model */}
         <View className="flex-1">
+          {/* Provider name label displayed in bold */}
           <Text className="text-[16px] font-semibold mb-0.5" style={{ color: theme.colors.text }}>
             {name}
           </Text>
+          
+          {/* Provider description label (e.g., "ChatGPT and other OpenAI models") */}
           <Text
             className="text-[13px]"
             style={{ color: theme.colors.textSecondary }}
           >
             {description}
           </Text>
+          
+          {/* Selected model indicator displayed when a model is configured for this provider */}
           {selectedModel && (
             <Text
               className="text-[12px] mt-1"
@@ -73,6 +87,8 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
           )}
         </View>
       </View>
+      
+      {/* Right section: navigation chevron icon indicating this is tappable */}
       <View className="ml-2">
         <SymbolView
           name="chevron.right"
@@ -84,17 +100,22 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
   );
 };
 
+// Main settings screen displaying all configuration options
 export default function SettingsIndex() {
   const { theme } = useTheme();
 
+  // Navigate to a specific provider's settings page
   const navigateToProvider = (providerId: string) => {
     router.push(`/settings/${providerId}` as any);
   };
 
+  // Navigate to appearance/theme settings page
   const navigateToAppearance = () => {
     router.push("/settings/appearance" as any);
   };
 
+  // Array of available AI providers with their names and descriptions
+  // Used to dynamically render the providers list
   const providers = [
     {
       id: "apple",
@@ -119,7 +140,9 @@ export default function SettingsIndex() {
   ];
 
   return (
+    // Root container for the settings screen
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+      {/* Header configuration: title and close button */}
       <Stack.Screen
         options={{
           headerTitle: "Settings",
@@ -135,12 +158,15 @@ export default function SettingsIndex() {
           ),
         }}
       />
+      
       <SafeAreaView className="flex-1">
         <Suspense fallback={<Text>Loading</Text>}>
+          {/* Scrollable content container for settings sections */}
           <ScrollView
             className="flex-1"
             contentContainerClassName="flex-grow pt-5 px-4"
           >
+            {/* APPEARANCE SECTION - Theme and display settings */}
             <Pressable
               onPress={navigateToAppearance}
               className="flex-row items-center justify-between py-3.5 px-4 rounded-lg mb-6"
@@ -150,7 +176,9 @@ export default function SettingsIndex() {
                   : theme.colors.surface,
               })}
             >
+              {/* Appearance section content: icon + labels */}
               <View className="flex-row items-center flex-1">
+                {/* Paintbrush icon for appearance settings */}
                 <View
                   className="w-[40px] h-[40px] rounded-lg justify-center items-center mr-3"
                   style={{ backgroundColor: theme.colors.background }}
@@ -161,10 +189,15 @@ export default function SettingsIndex() {
                     tintColor={theme.colors.accent}
                   />
                 </View>
+                
+                {/* Appearance section text content */}
                 <View className="flex-1">
+                  {/* Section title label */}
                   <Text className="text-[16px] font-semibold mb-0.5" style={{ color: theme.colors.text }}>
                     Appearance
                   </Text>
+                  
+                  {/* Section description label */}
                   <Text
                     className="text-[13px]"
                     style={{ color: theme.colors.textSecondary }}
@@ -173,6 +206,8 @@ export default function SettingsIndex() {
                   </Text>
                 </View>
               </View>
+              
+              {/* Navigation chevron icon */}
               <View className="ml-2">
                 <SymbolView
                   name="chevron.right"
@@ -182,16 +217,20 @@ export default function SettingsIndex() {
               </View>
             </Pressable>
 
+            {/* PROVIDERS SECTION HEADER - Uppercase label for the providers list */}
             <Text
               className="text-[13px] font-bold uppercase tracking-wide px-4 mb-2 mt-6"
               style={{ color: theme.colors.textSecondary }}
             >
               PROVIDERS
             </Text>
+            
+            {/* PROVIDERS SECTION - Container for all available AI providers */}
             <View
               className="rounded-lg overflow-hidden"
               style={{ backgroundColor: theme.colors.surface }}
             >
+              {/* Dynamically render provider list items for each available provider */}
               {providers.map((provider) => (
                 <ProviderListItem
                   key={provider.id}
@@ -204,16 +243,20 @@ export default function SettingsIndex() {
               ))}
             </View>
 
+            {/* ABOUT SECTION - Application information and version */}
             <View
               className="p-4 rounded-lg mt-6"
               style={{ backgroundColor: theme.colors.surface }}
             >
+              {/* About section title label */}
               <Text
                 className="text-[16px] font-semibold mb-2"
                 style={{ color: theme.colors.text }}
               >
                 About
               </Text>
+              
+              {/* About section content: version and description */}
               <Text
                 className="text-[14px] leading-[20px]"
                 style={{ color: theme.colors.textSecondary }}
@@ -225,6 +268,8 @@ export default function SettingsIndex() {
                 Built with ❤️ for iOS, Android, and Web.
               </Text>
             </View>
+            
+            {/* Bottom spacer for scroll padding */}
             <View className="h-4" />
           </ScrollView>
         </Suspense>
