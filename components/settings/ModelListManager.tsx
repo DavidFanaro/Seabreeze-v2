@@ -41,13 +41,24 @@ export function ModelListManager({
     const [editedName, setEditedName] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
 
-    const providerCustomModels = customModels[providerId] || [];
-    const providerHiddenModels = hiddenModels[providerId] || [];
+    const providerCustomModels = useMemo(
+        () => customModels[providerId] ?? [],
+        [customModels, providerId]
+    );
+    const providerHiddenModels = useMemo(
+        () => hiddenModels[providerId] ?? [],
+        [hiddenModels, providerId]
+    );
 
     // Use dynamic models if available (e.g., Ollama), otherwise use predefined
     // Filter out hidden models from predefined/dynamic
-    const baseModels = (dynamicModels?.length ? dynamicModels : predefinedModels)
-        .filter((m) => !providerHiddenModels.includes(m));
+    const baseModels = useMemo(
+        () =>
+            (dynamicModels?.length ? dynamicModels : predefinedModels).filter(
+                (m) => !providerHiddenModels.includes(m)
+            ),
+        [dynamicModels, predefinedModels, providerHiddenModels]
+    );
 
     // Combine base models with custom models
     const allModels = useMemo(

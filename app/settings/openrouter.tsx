@@ -48,6 +48,7 @@ export default function OpenRouterSettings() {
                 options={{
                     headerTitle: "OpenRouter",
                     headerTransparent: true,
+                    headerTintColor: theme.colors.text,
                     headerRight: () => (
                         <IconButton
                             icon="xmark"

@@ -3,8 +3,8 @@ import useChat from "@/hooks/chat/useChat";
 import useDatabase from "@/hooks/useDatabase";
 import { useChatState } from "@/hooks/useChatState";
 import { eq } from "drizzle-orm";
-import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState, useCallback } from "react";
+import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,16 +15,20 @@ import { ProviderId } from "@/types/provider.types";
 export default function Chat() {
     const db = useDatabase();
     const { theme } = useTheme();
-    const params = useLocalSearchParams<{ id?: string }>();
+    const params = useLocalSearchParams<{ id?: string | string[] }>();
     
     // Get chat ID from params (or "new" for new chats)
-    const chatIdParam = params.id || "new";
+    const rawChatId = Array.isArray(params.id) ? params.id[0] : params.id;
+    const chatIdParam = rawChatId || "new";
     
     // Use unified chat state management
-    const chatState = useChatState(chatIdParam);
+    const { clearOverride, syncFromDatabase } = useChatState(chatIdParam);
     
     // Local state only for database ID (not provider/model)
     const [chatID, setChatID] = useState(0);
+    const [isInitializing, setIsInitializing] = useState(false);
+    const loadIdRef = useRef(0);
+    const currentChatIdRef = useRef<string | null>(null);
     
     // Initialize useChat with chatId for unified state management
     const {
@@ -40,7 +44,6 @@ export default function Chat() {
         title,
         currentProvider,
         currentModel,
-        isUsingFallback,
         retryLastMessage,
         canRetry,
     } = useChat({ 
@@ -54,101 +57,154 @@ export default function Chat() {
     const handleReset = useCallback(() => {
         reset();
         // Clear any chat-specific overrides
-        chatState.clearOverride();
-    }, [reset, chatState]);
+        clearOverride();
+    }, [reset, clearOverride]);
 
     const sendChatMessages = useCallback(async () => {
         await sendMessage();
     }, [sendMessage]);
 
-    // Save or update chat when streaming stops
-    useEffect(() => {
-        const saveOrUpdate = async () => {
-            const now = new Date();
-            if (chatID === 0) {
-                // New chat - insert only if there are messages
-                if (messages.length > 0) {
-                    const data = (
-                        await db
-                            .insert(chat)
-                            .values({
-                                messages: messages,
-                                title: null,
-                                // Use current active provider/model (may be fallback)
-                                providerId: currentProvider,
-                                modelId: currentModel,
-                                createdAt: now,
-                                updatedAt: now,
-                            })
-                            .returning({ id: chat.id })
-                    )[0];
-                    setChatID(data.id);
+    // Save or update chat when streaming stops (only when screen is focused)
+    useFocusEffect(
+        useCallback(() => {
+            if (isInitializing || (chatIdParam !== "new" && chatID === 0)) return;
+            let isActive = true;
+            const saveOrUpdate = async () => {
+                if (!isActive) return;
+                const now = new Date();
+                if (chatID === 0) {
+                    // New chat - insert only if there are messages
+                    if (messages.length > 0) {
+                        const data = (
+                            await db
+                                .insert(chat)
+                                .values({
+                                    messages: messages,
+                                    title: null,
+                                    // Use current active provider/model (may be fallback)
+                                    providerId: currentProvider,
+                                    modelId: currentModel,
+                                    createdAt: now,
+                                    updatedAt: now,
+                                })
+                                .returning({ id: chat.id })
+                        )[0];
+                        if (!isActive) return;
+                        setChatID(data.id);
+                    }
+                } else {
+                    // Existing chat - update messages and provider/model
+                    await db
+                        .update(chat)
+                        .set({
+                            messages: messages,
+                            providerId: currentProvider,
+                            modelId: currentModel,
+                            updatedAt: now
+                        })
+                        .where(eq(chat.id, chatID));
                 }
-            } else {
-                // Existing chat - update messages and provider/model
-                await db
-                    .update(chat)
-                    .set({ 
-                        messages: messages, 
-                        providerId: currentProvider, 
-                        modelId: currentModel, 
-                        updatedAt: now 
-                    })
-                    .where(eq(chat.id, chatID));
-            }
-        };
+            };
 
-        if (!isStreaming) {
-            saveOrUpdate();
-            if (!title || title === "Chat") {
-                generateTitle();
+            if (!isStreaming && messages.length > 0) {
+                saveOrUpdate();
+                if (!title || title === "Chat") {
+                    generateTitle();
+                }
             }
-        }
-        // Only run when streaming stops to avoid excessive DB writes
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isStreaming]);
+            return () => {
+                isActive = false;
+            };
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [isStreaming, messages.length, title, chatID, db, currentProvider, currentModel, generateTitle, isInitializing])
+    );
 
-    // Update title in database
+    // Update title in database (only when screen is focused)
+    useFocusEffect(
+        useCallback(() => {
+            if (isInitializing || (chatIdParam !== "new" && chatID === 0)) return;
+            let isActive = true;
+            const updateTitle = async () => {
+                if (!isActive) return;
+                if (chatID !== 0 && title && title !== "Chat") {
+                    await db
+                        .update(chat)
+                        .set({ title: title, updatedAt: new Date() })
+                        .where(eq(chat.id, chatID));
+                }
+            };
+            updateTitle();
+            return () => {
+                isActive = false;
+            };
+        }, [title, chatID, db, isInitializing, chatIdParam])
+    );
+
+    // Reset state immediately on chat change
     useEffect(() => {
-        const updateTitle = async () => {
-            if (chatID !== 0 && title && title !== "Chat") {
-                await db
-                    .update(chat)
-                    .set({ title: title, updatedAt: new Date() })
-                    .where(eq(chat.id, chatID));
-            }
-        };
-        updateTitle();
-    }, [title, chatID, db]);
+        if (currentChatIdRef.current === chatIdParam) {
+            return;
+        }
+        setIsInitializing(true);
+        setMessages([]);
+        setTitle("Chat");
+        setText("");
+        setChatID(0);
+        clearOverride();
+    }, [chatIdParam, setMessages, setTitle, setText, clearOverride]);
 
     // Load existing chat data
     useEffect(() => {
+        const loadId = loadIdRef.current + 1;
+        loadIdRef.current = loadId;
         const setupChat = async () => {
-            if (params.id !== "new") {
-                const id = Number(params.id);
-                const data = await db
-                    .select()
-                    .from(chat)
-                    .where(eq(chat.id, id))
-                    .all()[0];
-                
-                setMessages(data.messages as ModelMessage[]);
-                setTitle(data.title as string);
-                setChatID(id);
-                
-                // Sync provider/model from database to unified state
-                if (data.providerId && data.modelId) {
-                    chatState.syncFromDatabase(
-                        data.providerId as ProviderId,
-                        data.modelId
-                    );
+            if (chatIdParam !== "new") {
+                const id = Number(chatIdParam);
+                try {
+                    const data = await db
+                        .select()
+                        .from(chat)
+                        .where(eq(chat.id, id))
+                        .get();
+
+                    if (loadId !== loadIdRef.current) return;
+
+                    if (data) {
+                        const messages = data.messages as ModelMessage[];
+                        setMessages(messages);
+                        setTitle(data.title as string);
+                        setChatID(id);
+                        currentChatIdRef.current = chatIdParam;
+
+                        // Sync provider/model from database to unified state
+                        if (data.providerId && data.modelId) {
+                            syncFromDatabase(
+                                data.providerId as ProviderId,
+                                data.modelId
+                            );
+                        }
+                    } else {
+                        setMessages([]);
+                        setTitle("Chat");
+                        setChatID(0);
+                        clearOverride();
+                        currentChatIdRef.current = null;
+                    }
+                } catch {
+                    // Error handling for failed chat loading
+                } finally {
+                    if (loadId === loadIdRef.current) {
+                        setIsInitializing(false);
+                    }
                 }
+            } else {
+                currentChatIdRef.current = "new";
+                setIsInitializing(false);
             }
         };
         setupChat();
         // Only run when params.id changes to load a different chat
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [params.id]);
+    }, [chatIdParam, db, setMessages, setTitle, syncFromDatabase, clearOverride]);
 
     return (
         <>
@@ -156,6 +212,7 @@ export default function Chat() {
                 options={{
                     headerTitle: title,
                     headerTransparent: true,
+                    headerTintColor: theme.colors.text,
                     headerRight: () => (
                         <ChatContextMenu 
                             onReset={handleReset}
@@ -169,7 +226,7 @@ export default function Chat() {
                     keyboardVerticalOffset={-30}
                     className="flex-1"
                 >
-                    <MessageList messages={messages} />
+                    <MessageList messages={messages} isStreaming={isStreaming} />
                     <RetryBanner 
                         canRetry={canRetry}
                         onRetry={retryLastMessage}

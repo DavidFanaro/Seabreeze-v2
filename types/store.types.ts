@@ -12,12 +12,7 @@ export interface AuthState {
   ollamaBaseUrl: string;
 }
 
-export interface ProviderState {
-  selectedProvider: ProviderId;
-  selectedModel: string;
-  availableModels: Record<ProviderId, string[]>;
-  providerMetadata: Record<ProviderId, Record<string, string>>;
-}
+
 
 export interface SettingsState {
   theme: 'light' | 'dark' | 'system';

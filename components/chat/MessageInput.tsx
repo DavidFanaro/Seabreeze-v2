@@ -52,9 +52,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 disabled={!canSend}
                 activeOpacity={0.7}
                 className="w-9 h-9 rounded-full justify-center items-center ml-2 self-center"
-                style={{ backgroundColor: canSend ? "#007AFF" : "#3A3A3C" }}
+                style={{ backgroundColor: canSend ? theme.colors.accent : theme.colors.surface }}
             >
-                <SymbolView name="arrow.up" size={18} tintColor="#ffffff" />
+                <SymbolView name="arrow.up" size={18} tintColor={canSend ? theme.colors.surface : theme.colors.textSecondary} />
             </TouchableOpacity>
         </View>
     );

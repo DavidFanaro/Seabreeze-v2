@@ -1,0 +1,10 @@
+# Ralphy Progress Log
+- [✓] 2026-01-21 19:42 - install heroui-native
+- [✓] 2026-01-21 19:47 - replace any current ui with heroui-native components if possible.
+- [✓] 2026-01-21 19:50 - move the general setting on to the main page of the settings route.
+- [✓] 2026-01-21 19:51 - remove dupicate settings in the setting route.
+- [✓] 2026-01-21 20:00 - set up testing with expo test. use this url for reference: https://docs.expo.dev/develop/unit-testing/.
+- [✓] 2026-01-21 20:19 - add a device check for apple intelligence capable devices. here is the site for refenence: https://www.apple.com/apple-intelligence/. only include iphones and ipads.
+- [✓] 2026-01-21 20:45 - generate testing for providers.
+- [✓] 2026-01-21 20:58 - cleanup any deep linking warnings.
+- [✓] 2026-01-21 21:05 - add more themes like nord, catppuccin and toyko night.

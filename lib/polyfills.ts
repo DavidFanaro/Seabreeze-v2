@@ -7,18 +7,23 @@
  * This file must be imported as the FIRST import in app/_layout.tsx
  */
 
-import { Platform } from 'react-native';
+import { Platform } from "react-native";
 
-if (Platform.OS !== 'web') {
+const polyfillGlobal = <T>(name: string, getValue: () => T): void => {
+    const globalObject = globalThis as Record<string, unknown>;
+
+    if (typeof globalObject[name] === "undefined") {
+        globalObject[name] = getValue();
+    }
+};
+
+if (Platform.OS !== "web") {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { polyfillGlobal } = require('react-native/Libraries/Utilities/PolyfillFunctions');
-    
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { TextEncoderStream, TextDecoderStream } = require('@stardazed/streams-text-encoding');
+    const { TextEncoderStream, TextDecoderStream } = require("@stardazed/streams-text-encoding");
 
     // Only polyfill structuredClone if it doesn't exist
-    if (typeof (global as any).structuredClone === 'undefined') {
-        polyfillGlobal('structuredClone', () => {
+    if (typeof (globalThis as Record<string, unknown>).structuredClone === "undefined") {
+        polyfillGlobal("structuredClone", () => {
             return <T>(value: T): T => {
                 if (value === undefined) return undefined as T;
                 if (value === null) return null as T;
@@ -27,8 +32,8 @@ if (Platform.OS !== 'web') {
         });
     }
 
-    polyfillGlobal('TextEncoderStream', () => TextEncoderStream);
-    polyfillGlobal('TextDecoderStream', () => TextDecoderStream);
+    polyfillGlobal("TextEncoderStream", () => TextEncoderStream);
+    polyfillGlobal("TextDecoderStream", () => TextDecoderStream);
 }
 
 export {};

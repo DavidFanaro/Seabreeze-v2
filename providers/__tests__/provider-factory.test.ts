@@ -37,8 +37,26 @@ jest.mock('../ollama-provider', () => ({
   getOllamaModel: jest.fn(() => ({})),
 }));
 
+interface MockGenerateTextResult {
+  text: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+  };
+}
+
+const mockGenerateTextResult: MockGenerateTextResult = {
+  text: 'test',
+  usage: { promptTokens: 0, completionTokens: 0 },
+};
+
+const mockGenerateText = jest
+  .fn<() => Promise<MockGenerateTextResult>>()
+  .mockResolvedValue(mockGenerateTextResult);
+
+// @ts-ignore - TypeScript strict mode issue with jest.mock and ai SDK
 jest.mock('ai', () => ({
-  generateText: jest.fn().mockResolvedValue({ text: 'test', usage: { promptTokens: 0, completionTokens: 0 } }),
+  generateText: mockGenerateText,
   LanguageModel: {},
 }));
 

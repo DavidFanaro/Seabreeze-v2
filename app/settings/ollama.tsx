@@ -1,18 +1,18 @@
 import { router, Stack } from "expo-router";
-import * as React from "react";
 import { View, Text, SafeAreaView, ScrollView } from "react-native";
 import { Suspense, useState, useEffect } from "react";
 import { IconButton, SettingInput, SaveButton, ModelListManager, useTheme } from "@/components";
 import { SymbolView } from "expo-symbols";
-import { useProviderStore } from "@/stores";
+import { useProviderStore, useAuthStore } from "@/stores";
 import { testProviderConnection } from "@/providers/provider-factory";
 import { OLLAMA_MODELS } from "@/types/provider.types";
 
 export default function OllamaSettings() {
     const { theme } = useTheme();
-    const { selectedModel, setSelectedModel, availableModels, setOllamaBaseUrl, ollamaBaseUrl } = useProviderStore();
+    const { selectedModel, setSelectedModel, availableModels } = useProviderStore();
+    const { ollamaUrl, setOllamaUrl } = useAuthStore();
 
-    const [baseUrl, setBaseUrlState] = useState(ollamaBaseUrl || "http://localhost:11434");
+    const [baseUrl, setBaseUrlState] = useState(ollamaUrl || "http://localhost:11434");
     const [isTesting, setIsTesting] = useState(false);
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -20,17 +20,17 @@ export default function OllamaSettings() {
 
     // Sync local state when store value changes
     useEffect(() => {
-        setBaseUrlState(ollamaBaseUrl || "http://localhost:11434");
-    }, [ollamaBaseUrl]);
+        setBaseUrlState(ollamaUrl || "http://localhost:11434");
+    }, [ollamaUrl]);
 
     const handleSave = async () => {
         setIsSaving(true);
         setTestResult(null);
 
-        await setOllamaBaseUrl(baseUrl);
+        await setOllamaUrl(baseUrl);
 
         setIsTesting(true);
-        const success = await testProviderConnection("ollama", { baseUrl });
+        const success = await testProviderConnection("ollama", { url: baseUrl });
         setTestResult({
             success,
             message: success ? "Connected successfully!" : "Connection failed. Check your URL and Ollama server.",
@@ -57,7 +57,7 @@ export default function OllamaSettings() {
                     message: "Failed to load models",
                 });
             }
-        } catch (error) {
+        } catch {
             setTestResult({
                 success: false,
                 message: "Connection error",
@@ -72,6 +72,7 @@ export default function OllamaSettings() {
                 options={{
                     headerTitle: "Ollama",
                     headerTransparent: true,
+                    headerTintColor: theme.colors.text,
                     headerRight: () => (
                         <IconButton
                             icon="xmark"

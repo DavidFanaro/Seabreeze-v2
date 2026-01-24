@@ -1,7 +1,8 @@
-import { Link, Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as React from "react";
 import { FlatList, View, Text } from "react-native";
 import { useLiveQuery } from "drizzle-orm/expo-sqlite";
+import { useIsFocused } from "@react-navigation/native";
 import useDatabase from "@/hooks/useDatabase";
 import { chat } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -24,7 +25,7 @@ export const getPreview = (messages: unknown): string | null => {
 };
 
 const EmptyState = () => {
-  const { theme, themeType } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <Animated.View
@@ -34,10 +35,7 @@ const EmptyState = () => {
       <View
         className="w-20 h-20 rounded-full justify-center items-center mb-5"
         style={{
-          backgroundColor:
-            themeType === "dark"
-              ? "rgba(255, 255, 255, 0.05)"
-              : "rgba(0, 0, 0, 0.03)",
+          backgroundColor: theme.colors.glass,
         }}
       >
         <SymbolView
@@ -65,6 +63,9 @@ const EmptyState = () => {
 export default function Home() {
   const db = useDatabase();
   const { theme } = useTheme();
+  const router = useRouter();
+  const isScreenFocused = useIsFocused();
+  
   const chats = useLiveQuery(
     db.query.chat.findMany({
       orderBy: [desc(chat.updatedAt)],
@@ -86,23 +87,20 @@ export default function Home() {
         options={{
           title: "Chats",
           headerTransparent: true,
+          headerTintColor: theme.colors.text,
           headerRight: () => (
-            <Link href="/chat/new" push asChild>
-              <IconButton
-                icon="plus"
-                onPress={() => {}}
-                style={{ marginLeft: 4 }}
-              />
-            </Link>
+            <IconButton
+              icon="plus"
+              onPress={() => router.push("/chat/new")}
+              style={{ marginLeft: 4 }}
+            />
           ),
           headerLeft: () => (
-            <Link href="/settings" push asChild>
-              <IconButton
-                icon="gear"
-                onPress={() => {}}
-                style={{ marginLeft: 5 }}
-              />
-            </Link>
+            <IconButton
+              icon="gear"
+              onPress={() => router.push("/settings")}
+              style={{ marginLeft: 5 }}
+            />
           ),
         }}
       />
@@ -120,6 +118,7 @@ export default function Home() {
                 preview={getPreview(item.messages)}
                 timestamp={item.updatedAt}
                 onDelete={deleteChat}
+                isScreenFocused={isScreenFocused}
               />
             )}
             showsVerticalScrollIndicator={false}

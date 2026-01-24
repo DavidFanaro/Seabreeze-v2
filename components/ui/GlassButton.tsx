@@ -3,7 +3,7 @@ import { Button as HeroUIButton, Spinner } from "heroui-native";
 
 interface GlassButtonProps {
     title: string;
-    variant?: "primary" | "secondary" | "danger";
+    variant?: "primary" | "secondary" | "tertiary" | "ghost" | "danger" | "danger-soft";
     size?: "sm" | "md" | "lg";
     onPress?: () => void;
     disabled?: boolean;
@@ -31,7 +31,11 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
             style={style}
             testID={testID}
         >
-            {loading ? <Spinner /> : title}
+            {loading ? (
+                <Spinner color="accent-foreground" />
+            ) : (
+                <HeroUIButton.Label>{title}</HeroUIButton.Label>
+            )}
         </HeroUIButton>
     );
 };

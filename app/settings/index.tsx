@@ -1,12 +1,11 @@
 import { router, Stack } from "expo-router";
-import { View, Text, SafeAreaView, Pressable, ScrollView, Switch } from "react-native";
-import { Suspense, useState, useEffect } from "react";
-import { IconButton, useTheme, GlassButton } from "@/components";
+import { View, Text, SafeAreaView, Pressable, ScrollView } from "react-native";
+import { Suspense } from "react";
+import { IconButton, useTheme } from "@/components";
 import { ProviderIcon } from "@/components/ui/ProviderIcons";
 import { isProviderConfigured } from "@/stores";
-import { useSettingsStore } from "@/stores/useSettingsStore";
 import { SymbolView } from "expo-symbols";
-import { ProviderId } from "@/types/provider.types";
+import type { ProviderId } from "@/types/provider.types";
 
 interface ProviderListItemProps {
   providerId: ProviderId;
@@ -86,31 +85,14 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
 };
 
 export default function SettingsIndex() {
-  const { theme, themeMode, setTheme } = useTheme();
-  const showCodeLineNumbers = useSettingsStore((state) => state.showCodeLineNumbers);
-  const setShowCodeLineNumbers = useSettingsStore((state) => state.setShowCodeLineNumbers);
-  const [selectedTheme, setSelectedTheme] = useState(themeMode);
-
-  useEffect(() => {
-    setSelectedTheme(themeMode);
-  }, [themeMode]);
+  const { theme } = useTheme();
 
   const navigateToProvider = (providerId: string) => {
-    router.navigate(`/settings/${providerId}` as any);
+    router.push(`/settings/${providerId}` as any);
   };
 
-  const themeOptions = [
-    { id: "light", name: "Light", icon: "sun.max" },
-    { id: "dark", name: "Dark", icon: "moon" },
-    { id: "nord", name: "Nord", icon: "snowflake" },
-    { id: "catppuccin", name: "Catppuccin", icon: "pawprint" },
-    { id: "tokyo-night", name: "Tokyo Night", icon: "moon.stars" },
-    { id: "system", name: "System", icon: "circle.lefthalf.filled" },
-  ] as const;
-
-  const handleThemeChange = async (newTheme: "light" | "dark" | "nord" | "catppuccin" | "tokyo-night" | "system") => {
-    setSelectedTheme(newTheme);
-    setTheme(newTheme);
+  const navigateToAppearance = () => {
+    router.push("/settings/appearance" as any);
   };
 
   const providers = [
@@ -142,6 +124,7 @@ export default function SettingsIndex() {
         options={{
           headerTitle: "Settings",
           headerTransparent: true,
+          headerTintColor: theme.colors.text,
           headerLeft: () => (
             <IconButton
               icon="xmark"
@@ -158,71 +141,46 @@ export default function SettingsIndex() {
             className="flex-1"
             contentContainerClassName="flex-grow pt-5 px-4"
           >
-            <Text
-              className="text-[13px] font-bold uppercase tracking-wide mb-2"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              APPEARANCE
-            </Text>
-
-            <View
-              className="rounded-lg overflow-hidden"
-              style={{ backgroundColor: theme.colors.surface }}
-            >
-              {themeOptions.map((option, index) => {
-                const isSelected = selectedTheme === option.id;
-                return (
-                  <GlassButton
-                    key={option.id}
-                    title={option.name}
-                    onPress={() => handleThemeChange(option.id)}
-                    variant={isSelected ? "primary" : "secondary"}
-                    style={{
-                      margin: 0,
-                      borderRadius: 0,
-                      borderWidth: 0,
-                      borderBottomWidth: index < themeOptions.length - 1 ? 1 : 0,
-                      borderBottomColor: theme.colors.border,
-                    }}
-                  />
-                );
+            <Pressable
+              onPress={navigateToAppearance}
+              className="flex-row items-center justify-between py-3.5 px-4 rounded-lg mb-6"
+              style={({ pressed }) => ({
+                backgroundColor: pressed
+                  ? theme.colors.border
+                  : theme.colors.surface,
               })}
-            </View>
-
-            <Text
-              className="text-[13px] font-bold uppercase tracking-wide mb-2 mt-6"
-              style={{ color: theme.colors.textSecondary }}
             >
-              CHAT
-            </Text>
-
-            <View
-              className="rounded-lg overflow-hidden p-4"
-              style={{ backgroundColor: theme.colors.surface }}
-            >
-              <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1">
+                <View
+                  className="w-[40px] h-[40px] rounded-lg justify-center items-center mr-3"
+                  style={{ backgroundColor: theme.colors.background }}
+                >
+                  <SymbolView
+                    name="paintbrush"
+                    size={24}
+                    tintColor={theme.colors.accent}
+                  />
+                </View>
                 <View className="flex-1">
-                  <Text
-                    className="text-[16px] font-semibold"
-                    style={{ color: theme.colors.text }}
-                  >
-                    Show Code Line Numbers
+                  <Text className="text-[16px] font-semibold mb-0.5" style={{ color: theme.colors.text }}>
+                    Appearance
                   </Text>
                   <Text
-                    className="text-[13px] mt-1"
+                    className="text-[13px]"
                     style={{ color: theme.colors.textSecondary }}
                   >
-                    Display line numbers in code blocks
+                    Theme and display settings
                   </Text>
                 </View>
-                <Switch
-                  value={showCodeLineNumbers}
-                  onValueChange={setShowCodeLineNumbers}
-                  trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
-                  thumbColor={showCodeLineNumbers ? "#ffffff" : theme.colors.textSecondary}
+              </View>
+              <View className="ml-2">
+                <SymbolView
+                  name="chevron.right"
+                  size={18}
+                  tintColor={theme.colors.textSecondary}
                 />
               </View>
-            </View>
+            </Pressable>
 
             <Text
               className="text-[13px] font-bold uppercase tracking-wide px-4 mb-2 mt-6"

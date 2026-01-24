@@ -81,7 +81,7 @@ export function ModelRow({
                                 opacity: pressed ? 0.7 : 1,
                             })}
                         >
-                            <SymbolView name="pencil" size={14} tintColor="#ffffff" />
+                            <SymbolView name="pencil" size={14} tintColor={theme.colors.surface} />
                         </Pressable>
                     )}
                     <Pressable
@@ -95,7 +95,7 @@ export function ModelRow({
                             opacity: pressed ? 0.7 : 1,
                         })}
                     >
-                        <SymbolView name="trash" size={14} tintColor="#ffffff" />
+                        <SymbolView name="trash" size={14} tintColor={theme.colors.surface} />
                     </Pressable>
                 </View>
             ) : (

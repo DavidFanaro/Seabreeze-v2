@@ -13,6 +13,7 @@ export default function AppleSettings() {
                 options={{
                     headerTitle: "Apple Intelligence",
                     headerTransparent: true,
+                    headerTintColor: theme.colors.text,
                     headerRight: () => (
                         <IconButton
                             icon="xmark"

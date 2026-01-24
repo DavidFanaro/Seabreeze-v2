@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
-import { useTheme } from "@/components";
+import { useTheme } from "@/components/ui/ThemeProvider";
 import { ProviderIcon } from "@/components/ui/ProviderIcons";
 import { ProviderId, PROVIDERS } from "@/types/provider.types";
 import { isProviderConfigured } from "@/stores";

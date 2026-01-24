@@ -52,6 +52,7 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
     selectedModel,
     customModels,
     hiddenModels,
+    availableModels,
     setSelectedProvider,
     setSelectedModel,
   } = useProviderStore();
@@ -64,15 +65,21 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
       const defaultModels = getDefaultModelsForProvider(providerId);
       const hidden = hiddenModels[providerId] || [];
       const custom = customModels[providerId] || [];
+      const available = availableModels[providerId] || [];
 
       if (providerId === "apple") {
         return defaultModels;
       }
 
-      const visibleDefaults = defaultModels.filter((m) => !hidden.includes(m));
+      // For Ollama, use available models instead of default models if available
+      const baseModels = providerId === "ollama" && available.length > 0 
+        ? available 
+        : defaultModels;
+
+      const visibleDefaults = baseModels.filter((m) => !hidden.includes(m));
       return [...visibleDefaults, ...custom];
     };
-  }, [customModels, hiddenModels]);
+  }, [customModels, hiddenModels, availableModels]);
 
   const handleModelSelect = (providerId: ProviderId, model: string) => {
     triggerPress("light");

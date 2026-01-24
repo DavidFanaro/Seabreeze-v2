@@ -3,7 +3,6 @@ import {
     View,
     Text,
     TouchableOpacity,
-    StyleSheet,
     TextStyle,
     ViewStyle,
 } from "react-native";
@@ -44,7 +43,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({ code }) => {
             <Ionicons
                 name={copied ? "checkmark" : "copy-outline"}
                 size={18}
-                color={copied ? "#22c55e" : theme.colors.textSecondary}
+                color={copied ? theme.colors.accent : theme.colors.textSecondary}
             />
         </TouchableOpacity>
     );
@@ -242,12 +241,12 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, nodeKey }) => {
                     containerStyle={{
                         padding: 12,
                         flex: 1,
-                        backgroundColor: "#282c34",
+                        backgroundColor: theme.colors.surface,
                     }}
                     textStyle={{
                         fontSize: 14,
                         fontFamily: "monospace",
-                        color: "#abb2bf",
+                        color: theme.colors.text,
                         flexWrap: "wrap",
                     }}
                 >

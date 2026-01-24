@@ -1,60 +1,209 @@
 # Seabreeze - Agent Guidelines
 
+An AI chat application built with React Native and Expo, supporting multiple AI providers (Apple Intelligence, OpenAI, OpenRouter, Ollama).
+
 ## Commands
-- **Build**: `npm run start` (Expo dev server) - DO NOT start without explicit user request
-- **Android**: `npm run android` (Run on Android device/emulator)
-- **iOS**: `npm run ios` (Run on iOS device/simulator)
-- **Web**: `npm run web` (Run in web browser)
-- **Lint**: `npm run lint` (ESLint with expo config)
-- **Type Check**: `npm run typecheck` (TypeScript strict mode)
-- **Database**: `npm run db:generate` (Generate database schema), `npm run db:push` (Push schema changes), `npm run db:studio` (Open Drizzle Studio)
+
+### Development
+- `npm run start` - Start Expo dev server (DO NOT start without explicit user request)
+- `npm run android` - Run on Android device/emulator
+- `npm run ios` - Run on iOS device/simulator
+- `npm run web` - Run in web browser
+
+### Code Quality
+- `npm run lint` - Run ESLint with Expo config (flat config in eslint.config.js)
+- `npx tsc --noEmit` - TypeScript type checking (strict mode)
+
+### Database (Drizzle ORM)
+- `npm run db:generate` - Generate database migrations from schema changes
+- `npm run db:push` - Push schema changes to database
+- `npm run db:studio` - Open Drizzle Studio for database inspection
+
+### Testing
+- No test framework configured currently
 
 ## Code Style
-- **Framework**: React Native 0.81.4 with Expo Router ~6.0.7
-- **Language**: TypeScript 5.9.2 with strict mode enabled
-- **React**: 19.1.0 with functional components and hooks
-- **Imports**: Use `@/*` path aliases (configured in tsconfig.json), group external imports first, then internal
-- **Components**: Functional components with TypeScript interfaces for props
-- **State**: React hooks (useState, useCallback, useMemo, useRef), Zustand ^5.0.9 for global state
-- **Database**: Drizzle ORM ^0.44.5 with SQLite (expo-sqlite ~16.0.10)
-- **Storage**: expo-secure-store ~15.0.8 for secure data storage
-- **AI Integration**: 
-  - Vercel AI SDK ^5.0.0-beta.34
-  - Apple Intelligence via @react-native-ai/apple ^0.5.0
-  - OpenRouter via @openrouter/ai-sdk-provider ^1.2.0
-  - Ollama via ollama-ai-provider-v2 ^1.3.1
-- **Navigation**: React Navigation ^7.1.6 with bottom tabs ^7.3.10
-- **Lists**: @shopify/flash-list 2.0.2 for performant lists, @legendapp/list ^2.0.8 for advanced features
-- **Animation**: @legendapp/motion ^2.3.0 for animations, react-native-reanimated ~4.1.0 for complex animations
-- **Markdown**: react-native-marked ^7.0.2 and react-native-remark ^1.0.5 for markdown rendering
-- **UI Components**: @expo/ui ~0.2.0-beta.3, expo-glass-effect ~0.1.4 for glassmorphism
-- **Web**: react-native-web ^0.21.0 and react-native-webview 13.15.0 for web content
-- **Styling**: React Native StyleSheet objects, inline styles for simple cases
-- **Error Handling**: Try-catch blocks with user-friendly error messages
-- **Naming**: camelCase for variables/functions, PascalCase for components/types
 
-## Key Dependencies & Versions
-- **Expo SDK**: ^54.0.0
-- **React Native**: 0.81.4
-- **TypeScript**: 5.9.2 (strict mode)
-- **Drizzle Kit**: ^0.31.4 (for database migrations)
+### TypeScript
+- Strict mode enabled (`"strict": true` in tsconfig.json)
+- Use explicit types for function parameters and return values
+- Define interfaces for component props
+- Use type imports: `import type { X } from "module"`
+- Prefer `interface` for object shapes, `type` for unions/intersections
+
+### Imports
+- Use `@/*` path aliases (maps to project root)
+- Order: polyfills first, then external packages, then internal modules
+- Group imports by category with blank lines between groups
+
+```typescript
+// Polyfills first (if needed)
+import "@/lib/polyfills";
+
+// External packages
+import { useState, useCallback } from "react";
+import { View, Text } from "react-native";
+
+// Internal modules
+import { useTheme } from "@/components/ui/ThemeProvider";
+import type { ProviderId } from "@/types/provider.types";
+```
+
+### Components
+- Functional components only (no class components)
+- Use `React.FC<Props>` or explicit return types
+- Props interface named `{ComponentName}Props`
+- Export named components (not default) for most files
+- Default exports for hooks (e.g., `export default function useChat()`)
+
+```typescript
+interface MessageBubbleProps {
+    content: string;
+    isUser: boolean;
+    style?: ViewStyle;
+}
+
+export const MessageBubble: React.FC<MessageBubbleProps> = ({
+    content,
+    isUser,
+    style,
+}) => {
+    // ...
+};
+```
+
+### Naming Conventions
+- `camelCase` - Variables, functions, hook names
+- `PascalCase` - Components, interfaces, types, classes
+- `SCREAMING_SNAKE_CASE` - Constants
+- `use{Name}` - Custom hooks prefix
+- Files: `camelCase.ts` for utilities, `PascalCase.tsx` for components
+
+### State Management
+- React hooks for local state: `useState`, `useCallback`, `useMemo`, `useRef`
+- Zustand for global state (stores in `stores/` directory)
+- Persist sensitive data with `expo-secure-store`
+- Use `createJSONStorage` for Zustand persistence
+
+### Styling
+- Tailwind CSS via `uniwind` for utility classes (className prop)
+- React Native `StyleSheet` for complex/dynamic styles
+- Theme values from `useTheme()` hook
+- Inline styles for one-off dynamic values
+
+```typescript
+<View
+    className="rounded-lg max-w-[85%]"
+    style={{ backgroundColor: theme.colors.surface }}
+>
+```
+
+### Error Handling
+- Try-catch blocks for async operations
+- User-friendly error messages (see `lib/error-messages.ts`)
+- Silent failures for non-critical operations (e.g., SecureStore)
+- Use `executeWithRetry` from `useErrorRecovery` for API calls
+
+### File Headers
+Use JSDoc comments for complex files:
+```typescript
+/**
+ * @file useChat.ts
+ * @purpose Main chat orchestrator with state management
+ * @connects-to useChatStreaming, useTitleGeneration, useChatState
+ */
+```
 
 ## Architecture
-- App routing via Expo Router in `app/` directory
-- Custom hooks in `hooks/` for reusable logic
-- Database schema in `db/schema.ts` with migrations in `drizzle/`
-- Utility types and test data in `util/`
-- iOS native code in `ios/` with Xcode project
-- Glassmorphism effects via expo-glass-effect
 
-## Directory Structure
-- `app/` - Expo Router pages and layouts (chat/, settings/)
-- `hooks/` - Custom React hooks (useChat.ts, useDatabase.ts)
-- `db/` - Database schema and configuration
-- `drizzle/` - Database migrations and metadata
-- `util/` - Utility functions and types (testdata.ts, types.ts)
-- `assets/` - Images, fonts, and static assets (fonts/, images/)
-- `ios/` - iOS-specific configuration and Xcode project
-- `.vscode/` - VS Code settings and configuration
+### Directory Structure
+```
+app/                    # Expo Router pages and layouts
+  _layout.tsx           # Root layout with providers
+  index.tsx             # Home screen
+  chat/[id].tsx         # Dynamic chat route
+  settings/             # Settings screens
+components/             # Reusable UI components
+  chat/                 # Chat-specific components
+  settings/             # Settings-specific components
+  ui/                   # Generic UI components
+  index.ts              # Barrel exports
+hooks/                  # Custom React hooks
+  chat/                 # Chat-related hooks
+  useDatabase.ts        # Database access hook
+  useChatState.ts       # Chat state management
+stores/                 # Zustand stores
+  useSettingsStore.ts   # App settings
+  useProviderStore.ts   # AI provider config
+  useAuthStore.ts       # Authentication state
+providers/              # AI provider implementations
+  apple-provider.ts     # Apple Intelligence
+  openai-provider.ts    # OpenAI API
+  openrouter-provider.ts# OpenRouter API
+  ollama-provider.ts    # Ollama local
+  provider-factory.ts   # Provider instantiation
+  provider-cache.ts     # Model caching
+  fallback-chain.ts     # Provider fallback logic
+db/                     # Database layer
+  schema.ts             # Drizzle schema definitions
+drizzle/                # Generated migrations
+types/                  # TypeScript type definitions
+  provider.types.ts     # Provider-related types
+  chat.types.ts         # Chat-related types
+  store.types.ts        # Store-related types
+lib/                    # Utilities and constants
+  polyfills.ts          # Required polyfills for AI SDK
+  constants.ts          # App constants
+  error-messages.ts     # User-facing error messages
+assets/                 # Static assets
+  fonts/                # Custom fonts
+  images/               # Images
+```
 
-When you need to search docs, use `context7` tools.
+### Key Patterns
+
+#### Provider System
+- Providers implement a common interface via `provider-factory.ts`
+- Use `getCachedModel()` for model instances
+- Fallback chain for provider failures
+- Provider IDs: `"apple" | "openai" | "openrouter" | "ollama"`
+
+#### Database
+- Drizzle ORM with SQLite via `expo-sqlite`
+- Schema in `db/schema.ts`
+- Access via `useDatabase()` hook
+- Migrations auto-run on app start
+
+#### Chat Flow
+- `useChat` hook orchestrates messaging
+- Streaming via `useChatStreaming`
+- Title generation via `useTitleGeneration`
+- Retry/fallback via `useErrorRecovery`
+
+## Key Dependencies
+| Package | Version | Purpose |
+|---------|---------|---------|
+| expo | ^54.0.30 | Framework |
+| react-native | 0.81.4 | Mobile runtime |
+| react | 19.1.0 | UI library |
+| typescript | ~5.9.2 | Type system |
+| expo-router | ~6.0.7 | File-based routing |
+| drizzle-orm | ^0.44.5 | Database ORM |
+| zustand | ^5.0.9 | State management |
+| ai | ^6.0.9 | Vercel AI SDK |
+| @react-native-ai/apple | ^0.11.0 | Apple Intelligence |
+| @shopify/flash-list | 2.0.2 | Performant lists |
+| react-native-reanimated | ~4.1.0 | Animations |
+| tailwindcss | ^4.0.0 | Styling |
+| uniwind | ^1.0.0 | Tailwind for RN |
+
+## Documentation
+When you need to search external docs, use `context7` tools.
+When you need to search the internet, use `searxng` tools.
+When you need to search github, use `gh_grep` tools.
+
+## External tool
+When you need to access to the ios simulator, use `ios-simulator` tools.
+
+## Important when using the apps chat feature
+Make sure to use only the apple ai provider and model. Never use the other provider unless told too.

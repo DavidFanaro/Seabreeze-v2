@@ -1,2 +1,101 @@
 @import "tailwindcss";
 @import "uniwind";
+@import "heroui-native/styles";
+
+@layer theme {
+    @variant nord-dark {
+        --background: oklch(0.42 0.04 230);
+        --foreground: oklch(0.95 0.005 230);
+        --muted: oklch(70.5% 0.015 286.067);
+        --overlay: oklch(0.55 0.05 230);
+        --overlay-foreground: oklch(0.90 0.015 230);
+        --default: oklch(0.49 0.05 230);
+        --default-foreground: oklch(0.90 0.015 230);
+        --accent: oklch(0.71 0.12 230);
+        --accent-foreground: oklch(0.95 0.005 230);
+        --field-background: oklch(0.49 0.05 230);
+        --field-foreground: oklch(0.90 0.015 230);
+        --field-placeholder: oklch(70.5% 0.015 286.067);
+        --field-border: oklch(0.25 0.04 230 / 30%);
+        --success: oklch(0.7329 0.1935 150.81);
+        --success-foreground: oklch(0.30 0.045 230);
+        --warning: oklch(0.7819 0.1585 72.33);
+        --warning-foreground: oklch(0.30 0.045 230);
+        --danger: oklch(0.7329 0.10 25);
+        --danger-foreground: oklch(0.95 0.005 230);
+        --surface: oklch(0.49 0.05 230);
+        --surface-foreground: oklch(0.90 0.015 230);
+        --border: oklch(0.5 0.05 230 / 30%);
+        --divider: oklch(0.5 0.05 230 / 50%);
+        --link: oklch(0.71 0.12 230);
+        --segment: oklch(0.45 0.04 230);
+        --segment-foreground: oklch(0.90 0.015 230);
+        --surface-shadow: 0 0 0 0 transparent inset;
+        --overlay-shadow: 0 0 0 0 transparent inset;
+        --field-shadow: 0 0 0 0 transparent inset;
+    }
+
+    @variant catppuccin-dark {
+        --background: oklch(0.30 0.06 260);
+        --foreground: oklch(0.95 0.01 260);
+        --muted: oklch(70.5% 0.015 286.067);
+        --overlay: oklch(0.45 0.06 260);
+        --overlay-foreground: oklch(0.90 0.015 260);
+        --default: oklch(0.40 0.06 260);
+        --default-foreground: oklch(0.90 0.015 260);
+        --accent: oklch(0.70 0.14 250);
+        --accent-foreground: oklch(0.15 0.04 260);
+        --field-background: oklch(0.40 0.06 260);
+        --field-foreground: oklch(0.90 0.015 260);
+        --field-placeholder: oklch(70.5% 0.015 286.067);
+        --field-border: oklch(0.35 0.06 260 / 30%);
+        --success: oklch(0.7329 0.1935 150.81);
+        --success-foreground: oklch(0.15 0.04 260);
+        --warning: oklch(0.8203 0.1388 76.34);
+        --warning-foreground: oklch(0.15 0.04 260);
+        --danger: oklch(0.6532 0.2328 25.74);
+        --danger-foreground: oklch(0.90 0.015 260);
+        --surface: oklch(0.40 0.06 260);
+        --surface-foreground: oklch(0.90 0.015 260);
+        --border: oklch(0.45 0.06 260 / 30%);
+        --divider: oklch(0.45 0.06 260 / 50%);
+        --link: oklch(0.70 0.14 250);
+        --segment: oklch(0.35 0.06 260);
+        --segment-foreground: oklch(0.90 0.015 260);
+        --surface-shadow: 0 0 0 0 transparent inset;
+        --overlay-shadow: 0 0 0 0 transparent inset;
+        --field-shadow: 0 0 0 0 transparent inset;
+    }
+
+    @variant tokyo-night-dark {
+        --background: oklch(0.26 0.05 250);
+        --foreground: oklch(0.95 0.01 250);
+        --muted: oklch(70.5% 0.015 286.067);
+        --overlay: oklch(0.40 0.06 250);
+        --overlay-foreground: oklch(0.90 0.015 250);
+        --default: oklch(0.33 0.06 250);
+        --default-foreground: oklch(0.90 0.015 250);
+        --accent: oklch(0.65 0.13 250);
+        --accent-foreground: oklch(0.15 0.04 250);
+        --field-background: oklch(0.33 0.06 250);
+        --field-foreground: oklch(0.90 0.015 250);
+        --field-placeholder: oklch(70.5% 0.015 286.067);
+        --field-border: oklch(0.30 0.06 250 / 30%);
+        --success: oklch(0.7329 0.1935 150.81);
+        --success-foreground: oklch(0.15 0.04 250);
+        --warning: oklch(0.8203 0.1388 76.34);
+        --warning-foreground: oklch(0.15 0.04 250);
+        --danger: oklch(0.594 0.1967 24.63);
+        --danger-foreground: oklch(0.90 0.015 250);
+        --surface: oklch(0.33 0.06 250);
+        --surface-foreground: oklch(0.90 0.015 250);
+        --border: oklch(0.35 0.06 250 / 30%);
+        --divider: oklch(0.35 0.06 250 / 50%);
+        --link: oklch(0.65 0.13 250);
+        --segment: oklch(0.28 0.05 250);
+        --segment-foreground: oklch(0.90 0.015 250);
+        --surface-shadow: 0 0 0 0 transparent inset;
+        --overlay-shadow: 0 0 0 0 transparent inset;
+        --field-shadow: 0 0 0 0 transparent inset;
+    }
+}

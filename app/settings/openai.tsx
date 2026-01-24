@@ -48,6 +48,7 @@ export default function OpenAISettings() {
                 options={{
                     headerTitle: "OpenAI",
                     headerTransparent: true,
+                    headerTintColor: theme.colors.text,
                     headerRight: () => (
                         <IconButton
                             icon="xmark"

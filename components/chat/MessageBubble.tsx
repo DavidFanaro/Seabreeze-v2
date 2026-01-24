@@ -1,49 +1,46 @@
-import React from "react";
-import { View, Text, ViewStyle } from "react-native";
-import { ThemedMarkdown } from "./ThemedMarkdown";
+import React, { memo } from "react";
+import { View, ViewStyle } from "react-native";
+import { CustomMarkdown } from "./CustomMarkdown";
 import { useTheme } from "@/components/ui/ThemeProvider";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 
 interface MessageBubbleProps {
-    content: string;
-    isUser: boolean;
-    style?: ViewStyle;
+  content: string;
+  isUser: boolean;
+  isStreaming?: boolean;
+  style?: ViewStyle;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({
-    content,
-    isUser,
-    style,
-}) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = memo(
+  ({ content, isUser, isStreaming = false, style }) => {
     const { theme } = useTheme();
-
-    if (isUser) {
-        return (
-            <View
-                className="items-end px-4 my-1"
-                style={style}
-            >
-                <View
-                    className="rounded-lg max-w-[85%]"
-                    style={{ backgroundColor: theme.colors.surface }}
-                >
-                    <Text
-                        selectable
-                        className="px-4 py-3 text-base leading-[22px]"
-                        style={{ color: theme.colors.text }}
-                    >
-                        {content}
-                    </Text>
-                </View>
-            </View>
-        );
-    }
+    const showCodeLineNumbers = useSettingsStore(
+      (state) => state.showCodeLineNumbers,
+    );
 
     return (
+      <View className="my-1 px-4" style={style}>
         <View
-            className="my-1"
-            style={style}
+          style={{
+            alignSelf: isUser ? "flex-end" : "flex-start",
+            maxWidth: isUser ? "85%" : "100%",
+            backgroundColor: isUser ? theme.colors.surface : "transparent",
+            borderRadius: theme.borderRadius.md,
+            paddingVertical: 4,
+            paddingHorizontal: isUser ? 8 : 2,
+          }}
         >
-            <ThemedMarkdown content={content} />
+          <CustomMarkdown
+            content={content}
+            isStreaming={isStreaming}
+            showLineNumbers={showCodeLineNumbers}
+            showCopyAll={!isStreaming && !isUser}
+            isUser={isUser}
+          />
         </View>
+      </View>
     );
-};
+  },
+);
+
+MessageBubble.displayName = "MessageBubble";

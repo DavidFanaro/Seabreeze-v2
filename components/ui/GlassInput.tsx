@@ -24,20 +24,26 @@ export const GlassInput: React.FC<GlassInputProps> = ({
     style,
     testID,
 }) => {
+    const inputProps: any = {
+        placeholder,
+        value,
+        onChangeText,
+        secureTextEntry,
+        testID,
+    };
+
+    if (multiline) {
+        inputProps.multiline = true;
+        inputProps.numberOfLines = 4;
+    }
+
     return (
         <HeroUITextField
             isDisabled={disabled}
+            style={style}
         >
-            <HeroUITextField.Label>{placeholder}</HeroUITextField.Label>
-            <HeroUITextField.Input
-                placeholder={placeholder}
-                value={value}
-                onChangeText={onChangeText}
-                secureTextEntry={secureTextEntry}
-                multiline={multiline}
-                numberOfLines={multiline ? 4 : 1}
-                testID={testID}
-            />
+            {placeholder && <HeroUITextField.Label>{placeholder}</HeroUITextField.Label>}
+            <HeroUITextField.Input {...inputProps} />
         </HeroUITextField>
     );
 };

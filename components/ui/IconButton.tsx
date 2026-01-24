@@ -1,6 +1,7 @@
 import React from "react";
 import { SymbolView } from "expo-symbols";
 import { Button as HeroUIButton } from "heroui-native";
+import { useTheme } from "./ThemeProvider";
 
 interface IconButtonProps {
     icon: string;
@@ -14,11 +15,14 @@ interface IconButtonProps {
 export const IconButton: React.FC<IconButtonProps> = ({
     icon,
     size = 24,
-    color = "#007AFF",
+    color,
     onPress,
     disabled = false,
     style,
 }) => {
+    const { theme } = useTheme();
+    const iconColor = color ?? theme.colors.accent;
+
     return (
         <HeroUIButton
             variant="ghost"
@@ -26,11 +30,12 @@ export const IconButton: React.FC<IconButtonProps> = ({
             onPress={onPress}
             isDisabled={disabled}
             isIconOnly
+            style={style}
         >
             <SymbolView
                 name={icon as any}
                 size={size}
-                tintColor={color}
+                tintColor={iconColor}
             />
         </HeroUIButton>
     );

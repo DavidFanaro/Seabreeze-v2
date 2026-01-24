@@ -24,7 +24,11 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
             isDisabled={disabled || loading}
             testID={testID}
         >
-            {loading ? <Spinner /> : title}
+            {loading ? (
+                <Spinner color="accent-foreground" />
+            ) : (
+                <HeroUIButton.Label>{title}</HeroUIButton.Label>
+            )}
         </HeroUIButton>
     );
 };

@@ -7,7 +7,7 @@ export { GlassButton } from "./ui/GlassButton";
 export { IconButton } from "./ui/IconButton";
 export { GlassInput } from "./ui/GlassInput";
 export { SaveButton } from "./ui/SaveButton";
-export { ThemedMarkdown } from "./chat/ThemedMarkdown";
+export { CustomMarkdown } from "./chat/CustomMarkdown/CustomMarkdown";
 
 // Chat Components
 export { ChatListItem } from "./chat/ChatListItem";
