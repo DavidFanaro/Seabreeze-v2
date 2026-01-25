@@ -14,23 +14,47 @@ import { ChatContextMenu } from "../ChatContextMenu";
 import { useProviderStore } from "@/stores";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
 import { useTheme } from "@/components/ui/ThemeProvider";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 
 // Mock dependencies
 jest.mock("@/stores");
 jest.mock("@/hooks/useHapticFeedback");
 jest.mock("@/components/ui/ThemeProvider");
+jest.mock("@/stores/useSettingsStore");
+jest.mock("expo-haptics", () => ({
+  impactAsync: jest.fn(),
+  notificationAsync: jest.fn(),
+  selectionAsync: jest.fn(),
+  ImpactFeedbackStyle: {
+    Light: "light",
+    Medium: "medium",
+    Heavy: "heavy",
+  },
+  NotificationFeedbackType: {
+    Success: "success",
+    Warning: "warning",
+    Error: "error",
+  },
+}));
 
 jest.mock("@expo/ui/swift-ui", () => {
-  const Button = ({ children, onPress, systemImage, ...props }: any) => (
-    <button onClick={onPress} data-testid={`button-${children}`} {...props}>
-      {systemImage && <span data-testid={`icon-${systemImage}`}>{systemImage}</span>}
-      {children}
-    </button>
-  );
+  const React = jest.requireActual("react");
+  const { Pressable, View, Text } = jest.requireActual("react-native");
 
-  const Items = ({ children }: any) => <>{children}</>;
-  const Trigger = ({ children }: any) => <>{children}</>;
-  const ContextMenuComponent = ({ children }: any) => <>{children}</>;
+  const Button = ({ children, onPress, systemImage, ...props }: any) => {
+    const label = typeof children === "string" ? children : "button";
+
+    return (
+      <Pressable testID={`button-${label}`} onPress={onPress} {...props}>
+        {systemImage && <Text testID={`icon-${systemImage}`}>{systemImage}</Text>}
+        <Text>{children}</Text>
+      </Pressable>
+    );
+  };
+
+  const Items = ({ children }: any) => <View>{children}</View>;
+  const Trigger = ({ children }: any) => <View>{children}</View>;
+  const ContextMenuComponent = ({ children }: any) => <View>{children}</View>;
 
   ContextMenuComponent.Items = Items;
   ContextMenuComponent.Trigger = Trigger;
@@ -38,37 +62,35 @@ jest.mock("@expo/ui/swift-ui", () => {
   return {
     ContextMenu: ContextMenuComponent,
     Submenu: ({ button, children }: any) => (
-      <>
+      <View>
         {button}
         {children}
-      </>
+      </View>
     ),
     Button,
-    Host: ({ children }: any) => <>{children}</>,
+    Host: ({ children }: any) => <View>{children}</View>,
   };
 });
 
-jest.mock("expo-symbols", () => ({
-  SymbolView: ({ name, size, tintColor }: any) => (
-    <div data-testid={`symbol-${name}`} style={{ fontSize: size, color: tintColor }}>
-      {name}
-    </div>
-  ),
-}));
+jest.mock("expo-symbols", () => {
+  const React = jest.requireActual("react");
+  const { Text } = jest.requireActual("react-native");
 
-jest.mock("react-native", () => ({
-  View: ({ children, className }: any) => (
-    <div className={className} data-testid="view">
-      {children}
-    </div>
-  ),
-}));
+  return {
+    SymbolView: ({ name, size, tintColor }: any) => (
+      <Text testID={`symbol-${name}`} style={{ fontSize: size, color: tintColor }}>
+        {name}
+      </Text>
+    ),
+  };
+});
 
 describe("ChatContextMenu", () => {
   const mockTriggerPress = jest.fn();
   const mockSetSelectedProvider = jest.fn();
   const mockSetSelectedModel = jest.fn();
   const mockOnReset = jest.fn();
+  const mockSetThinkingEnabled = jest.fn();
 
   const mockTheme = {
     colors: {
@@ -86,8 +108,15 @@ describe("ChatContextMenu", () => {
     setSelectedModel: mockSetSelectedModel,
   };
 
+  const mockSettingsStore = {
+    thinkingEnabled: true,
+    setThinkingEnabled: mockSetThinkingEnabled,
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    mockSettingsStore.thinkingEnabled = true;
 
     (useHapticFeedback as jest.Mock).mockReturnValue({
       triggerPress: mockTriggerPress,
@@ -98,6 +127,9 @@ describe("ChatContextMenu", () => {
     });
 
     (useProviderStore as unknown as jest.Mock).mockReturnValue(mockProviderStore);
+    (useSettingsStore as unknown as jest.Mock).mockImplementation((selector) =>
+      selector(mockSettingsStore)
+    );
   });
 
   describe("Component Rendering", () => {
@@ -142,6 +174,23 @@ describe("ChatContextMenu", () => {
       fireEvent.press(resetButton);
 
       expect(mockTriggerPress).toHaveBeenCalledWith("medium");
+    });
+  });
+
+  describe("Thinking Output Toggle", () => {
+    it("should render the thinking output toggle", () => {
+      render(<ChatContextMenu onReset={mockOnReset} />);
+      expect(screen.getByTestId("button-Thinking Output")).toBeTruthy();
+    });
+
+    it("should toggle thinking output when pressed", () => {
+      render(<ChatContextMenu onReset={mockOnReset} />);
+
+      const toggleButton = screen.getByTestId("button-Thinking Output");
+      fireEvent.press(toggleButton);
+
+      expect(mockTriggerPress).toHaveBeenCalledWith("light");
+      expect(mockSetThinkingEnabled).toHaveBeenCalledWith(false);
     });
   });
 

@@ -108,6 +108,14 @@ interface SettingsState {
    * for new chat conversations based on the initial messages.
    */
   autoGenerateTitles: boolean;
+
+  /**
+   * Controls whether the app captures and displays model thinking output
+   *
+   * When enabled, streaming reasoning details are recorded and shown
+   * alongside assistant messages when available.
+   */
+  thinkingEnabled: boolean;
   
   /**
    * Controls the font size for chat messages in pixels
@@ -167,6 +175,13 @@ interface SettingsActions {
    * @param enabled - Whether titles should be auto-generated
    */
   setAutoGenerateTitles: (enabled: boolean) => void;
+
+  /**
+   * Enables or disables model thinking output capture
+   *
+   * @param enabled - Whether thinking output should be captured
+   */
+  setThinkingEnabled: (enabled: boolean) => void;
   
   /**
    * Updates the message font size
@@ -214,6 +229,11 @@ const DEFAULT_SETTINGS: SettingsState = {
    * and user navigation between conversations.
    */
   autoGenerateTitles: true,
+
+  /**
+   * Thinking output enabled to surface reasoning details when available.
+   */
+  thinkingEnabled: true,
   
   /**
    * 16px font size provides good readability on most devices
@@ -256,6 +276,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       setTheme: (theme) => set({ theme }),
       setHapticEnabled: (enabled) => set({ hapticEnabled: enabled }),
       setAutoGenerateTitles: (enabled) => set({ autoGenerateTitles: enabled }),
+      setThinkingEnabled: (enabled) => set({ thinkingEnabled: enabled }),
       setMessageFontSize: (size) => set({ messageFontSize: size }),
       setShowCodeLineNumbers: (enabled) => set({ showCodeLineNumbers: enabled }),
       resetSettings: () => set(DEFAULT_SETTINGS),

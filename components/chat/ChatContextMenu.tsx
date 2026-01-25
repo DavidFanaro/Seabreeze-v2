@@ -9,6 +9,7 @@ import { ContextMenu, Submenu, Host, Button } from "@expo/ui/swift-ui";
 import { SymbolView } from "expo-symbols";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { useProviderStore, isProviderConfigured } from "@/stores";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import {
   ProviderId,
   PROVIDERS,
@@ -99,6 +100,9 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
     setSelectedModel,
   } = useProviderStore();
 
+  const thinkingEnabled = useSettingsStore((state) => state.thinkingEnabled);
+  const setThinkingEnabled = useSettingsStore((state) => state.setThinkingEnabled);
+
   // ============================================================================
   // CONSTANTS
   // ============================================================================
@@ -167,6 +171,14 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
     onReset();
   };
 
+  /**
+   * Toggle model thinking output capture
+   */
+  const handleThinkingToggle = () => {
+    triggerPress("light");
+    setThinkingEnabled(!thinkingEnabled);
+  };
+
   // ============================================================================
   // HELPER FUNCTIONS
   // ============================================================================
@@ -204,6 +216,14 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
           {/* Button to reset the current chat session */}
           <Button systemImage="arrow.clockwise" onPress={handleReset}>
             Reset Chat
+          </Button>
+
+          {/* Button to toggle model thinking output capture */}
+          <Button
+            systemImage={thinkingEnabled ? "checkmark" : undefined}
+            onPress={handleThinkingToggle}
+          >
+            Thinking Output
           </Button>
 
           {/* ====================================================================

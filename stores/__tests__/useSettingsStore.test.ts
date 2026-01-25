@@ -45,6 +45,7 @@ describe("useSettingsStore", () => {
       expect(result.current.theme).toBe("dark");
       expect(result.current.hapticEnabled).toBe(true);
       expect(result.current.autoGenerateTitles).toBe(true);
+      expect(result.current.thinkingEnabled).toBe(true);
       expect(result.current.messageFontSize).toBe(16);
       expect(result.current.showCodeLineNumbers).toBe(false);
     });
@@ -55,6 +56,7 @@ describe("useSettingsStore", () => {
       expect(typeof result.current.setTheme).toBe("function");
       expect(typeof result.current.setHapticEnabled).toBe("function");
       expect(typeof result.current.setAutoGenerateTitles).toBe("function");
+      expect(typeof result.current.setThinkingEnabled).toBe("function");
       expect(typeof result.current.setMessageFontSize).toBe("function");
       expect(typeof result.current.setShowCodeLineNumbers).toBe("function");
       expect(typeof result.current.resetSettings).toBe("function");
@@ -190,6 +192,28 @@ describe("useSettingsStore", () => {
     });
   });
 
+  describe("Thinking Output Settings", () => {
+    it("should enable thinking output", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.setThinkingEnabled(true);
+      });
+
+      expect(result.current.thinkingEnabled).toBe(true);
+    });
+
+    it("should disable thinking output", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.setThinkingEnabled(false);
+      });
+
+      expect(result.current.thinkingEnabled).toBe(false);
+    });
+  });
+
   describe("Message Font Size Settings", () => {
     it("should set message font size", () => {
       const { result } = createStore();
@@ -278,6 +302,7 @@ describe("useSettingsStore", () => {
         result.current.setTheme("light");
         result.current.setHapticEnabled(false);
         result.current.setAutoGenerateTitles(false);
+        result.current.setThinkingEnabled(false);
         result.current.setMessageFontSize(24);
         result.current.setShowCodeLineNumbers(true);
       });
@@ -286,6 +311,7 @@ describe("useSettingsStore", () => {
       expect(result.current.theme).toBe("light");
       expect(result.current.hapticEnabled).toBe(false);
       expect(result.current.autoGenerateTitles).toBe(false);
+      expect(result.current.thinkingEnabled).toBe(false);
       expect(result.current.messageFontSize).toBe(24);
       expect(result.current.showCodeLineNumbers).toBe(true);
 
@@ -298,6 +324,7 @@ describe("useSettingsStore", () => {
       expect(result.current.theme).toBe("dark");
       expect(result.current.hapticEnabled).toBe(true);
       expect(result.current.autoGenerateTitles).toBe(true);
+      expect(result.current.thinkingEnabled).toBe(true);
       expect(result.current.messageFontSize).toBe(16);
       expect(result.current.showCodeLineNumbers).toBe(false);
     });
@@ -488,6 +515,12 @@ describe("useSettingsStore", () => {
       });
       expect(result.current.showCodeLineNumbers).toBe(true);
       expect(typeof result.current.showCodeLineNumbers).toBe("boolean");
+
+      act(() => {
+        result.current.setThinkingEnabled(true);
+      });
+      expect(result.current.thinkingEnabled).toBe(true);
+      expect(typeof result.current.thinkingEnabled).toBe("boolean");
     });
 
     it("should maintain number type for font size", () => {

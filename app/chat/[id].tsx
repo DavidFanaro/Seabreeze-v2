@@ -2,6 +2,7 @@ import { chat } from "@/db/schema";
 import useChat from "@/hooks/chat/useChat";
 import useDatabase from "@/hooks/useDatabase";
 import { useChatState } from "@/hooks/useChatState";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import { eq } from "drizzle-orm";
 import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -15,6 +16,7 @@ import { ProviderId } from "@/types/provider.types";
 export default function Chat() {
     const db = useDatabase();
     const { theme } = useTheme();
+    const thinkingEnabled = useSettingsStore((state) => state.thinkingEnabled);
     const params = useLocalSearchParams<{ id?: string | string[] }>();
     
     // Get chat ID from params (or "new" for new chats)
@@ -50,6 +52,7 @@ export default function Chat() {
         canRetry,
     } = useChat({ 
         chatId: chatIdParam,
+        enableThinking: thinkingEnabled,
         onFallback: (from, to, reason) => {
         },
         onError: (error) => {
