@@ -17,6 +17,7 @@ describe("Database Schema - Unit Tests", () => {
             expect(chat.id).toBeDefined();
             expect(chat.title).toBeDefined();
             expect(chat.messages).toBeDefined();
+            expect(chat.thinkingOutput).toBeDefined();
             expect(chat.providerId).toBeDefined();
             expect(chat.modelId).toBeDefined();
             expect(chat.providerMetadata).toBeDefined();
@@ -35,6 +36,7 @@ describe("Database Schema - Unit Tests", () => {
 
         it("should require all other fields", () => {
             expect(chat.messages.notNull).toBe(true);
+            expect(chat.thinkingOutput.notNull).toBe(true);
             expect(chat.providerId.notNull).toBe(true);
             expect(chat.modelId.notNull).toBe(true);
             expect(chat.providerMetadata.notNull).toBe(true);
@@ -55,6 +57,7 @@ describe("Database Schema - Unit Tests", () => {
         it("should have proper column types configured", () => {
             // Check that columns exist and have basic properties
             expect(chat.messages).toBeDefined();
+            expect(chat.thinkingOutput).toBeDefined();
             expect(chat.providerMetadata).toBeDefined();
             expect(chat.createdAt).toBeDefined();
             expect(chat.updatedAt).toBeDefined();
@@ -64,7 +67,7 @@ describe("Database Schema - Unit Tests", () => {
     describe("schema structure validation", () => {
         it("should have correct column names", () => {
             const expectedColumns = [
-                'id', 'title', 'messages', 'providerId', 
+                'id', 'title', 'messages', 'thinkingOutput', 'providerId', 
                 'modelId', 'providerMetadata', 'createdAt', 'updatedAt'
             ];
             
@@ -104,6 +107,7 @@ describe("Database Schema - Unit Tests", () => {
             expect(chat).toHaveProperty('id');
             expect(chat).toHaveProperty('title');
             expect(chat).toHaveProperty('messages');
+            expect(chat).toHaveProperty('thinkingOutput');
             expect(chat).toHaveProperty('providerId');
             expect(chat).toHaveProperty('modelId');
             expect(chat).toHaveProperty('providerMetadata');
@@ -148,6 +152,7 @@ describe("Database Schema Documentation", () => {
         expect(chat.id.name).toBe('id');
         expect(chat.title.name).toBe('title');
         expect(chat.messages.name).toBe('messages');
+        expect(chat.thinkingOutput.name).toBe('thinkingOutput');
         expect(chat.providerId.name).toBe('providerId');
         expect(chat.modelId.name).toBe('modelId');
         expect(chat.providerMetadata.name).toBe('providerMetadata');

@@ -42,6 +42,7 @@ import { ProviderId } from "@/types/provider.types";
  * Data Notes:
  * - messages stored as JSON array of message objects with role/content structure
  * - providerMetadata stores provider-specific configuration (tokens, settings, etc.)
+ * - thinkingOutput stores model reasoning output when available
  * - Timestamps use Unix epoch format for SQLite compatibility
  */
 export const chat = sqliteTable("chat", {
@@ -53,6 +54,9 @@ export const chat = sqliteTable("chat", {
     
     /** Message history - JSON array containing all messages in the conversation */
     messages: text({ mode: "json" }).notNull(),
+
+    /** Model thinking output - JSON array of reasoning chunks aligned with messages */
+    thinkingOutput: text({ mode: "json" }).notNull(),
     
     /** AI provider used - Enum constraint ensures valid provider selection */
     providerId: text({ enum: ["apple", "openai", "openrouter", "ollama"] }).$type<ProviderId>().notNull(),

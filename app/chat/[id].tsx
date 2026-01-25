@@ -80,6 +80,7 @@ export default function Chat() {
                                 .insert(chat)
                                 .values({
                                     messages: messages,
+                                    thinkingOutput: [],
                                     title: null,
                                     // Use current active provider/model (may be fallback)
                                     providerId: currentProvider,
