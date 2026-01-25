@@ -1,19 +1,50 @@
+/**
+ * @file useErrorRecovery.ts
+ * @purpose Comprehensive error recovery system for handling failed operations with intelligent retry logic,
+ * exponential backoff, and React state management. Provides both utility functions and a React hook
+ * for managing retry attempts in UI components.
+ * 
+ * Key Features:
+ * - Exponential backoff with jitter to prevent thundering herd problems
+ * - Configurable retry policies by error category
+ * - React state management for real-time retry feedback
+ * - Countdown timers and abort capabilities
+ * - Automatic error classification and fallback handling
+ */
+
 import { useCallback, useRef, useState } from "react";
 import { classifyError, ErrorClassification, ErrorCategory } from "@/providers/fallback-chain";
 
 /**
- * Configuration for retry behavior
+ * ============================================================================
+ * INTERFACES AND CONFIGURATION
+ * ============================================================================
+ */
+
+/**
+ * Configuration interface for retry behavior and policies.
+ * Defines how the retry system should behave when encountering errors.
  */
 export interface RetryConfig {
+  /** Maximum number of retry attempts before giving up */
   maxRetries: number;
+  /** Base delay in milliseconds for the first retry attempt */
   baseDelayMs: number;
+  /** Maximum delay cap in milliseconds to prevent excessively long waits */
   maxDelayMs: number;
+  /** Multiplier for exponential backoff (e.g., 2 = double delay each attempt) */
   backoffMultiplier: number;
+  /** Array of error categories that are eligible for retry */
   retryableCategories: ErrorCategory[];
 }
 
 /**
- * Default retry configuration
+ * Default retry configuration used throughout the application.
+ * Provides sensible defaults for most retry scenarios:
+ * - 3 retry attempts balances reliability with responsiveness
+ * - 1 second base delay with 2x multiplier = 1s, 2s, 4s delays
+ * - 10 second cap prevents excessively long waits
+ * - Focus on transient errors that typically resolve themselves
  */
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,
@@ -24,28 +55,55 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 };
 
 /**
- * State of retry attempts
+ * Interface representing the current state of retry attempts.
+ * Used by the React hook to provide real-time feedback to the UI.
  */
 export interface RetryState {
+  /** Current attempt number (0-based, increments with each retry) */
   attemptNumber: number;
+  /** The last error that triggered a retry attempt */
   lastError: ErrorClassification | null;
+  /** Whether a retry is currently in progress */
   isRetrying: boolean;
+  /** Seconds remaining until the next retry attempt (null if not counting down) */
   nextRetryIn: number | null;
 }
 
 /**
- * Result of a retry attempt
+ * Result interface returned after a retry operation completes.
+ * Provides comprehensive information about what happened during the retry process.
  */
 export interface RetryResult<T> {
+  /** Whether the operation ultimately succeeded */
   success: boolean;
+  /** The successful result data (only present when success=true) */
   data?: T;
+  /** The final error that caused failure (only present when success=false) */
   error?: ErrorClassification;
+  /** Total number of attempts made (including initial attempt) */
   attempts: number;
+  /** Whether the system should fallback to an alternative approach */
   shouldFallback: boolean;
 }
 
 /**
- * Calculate delay for exponential backoff with jitter
+ * ============================================================================
+ * UTILITY FUNCTIONS
+ * ============================================================================
+ */
+
+/**
+ * Calculates the delay for a retry attempt using exponential backoff with jitter.
+ * This prevents the "thundering herd" problem where multiple clients retry simultaneously.
+ * 
+ * @param attemptNumber - Current attempt number (0-based)
+ * @param config - Retry configuration containing backoff parameters
+ * @returns Delay in milliseconds until the next retry should be attempted
+ * 
+ * Example with baseDelayMs=1000, backoffMultiplier=2:
+ * - Attempt 0: 1000ms + jitter
+ * - Attempt 1: 2000ms + jitter  
+ * - Attempt 2: 4000ms + jitter
  */
 export function calculateBackoffDelay(
   attemptNumber: number,
@@ -57,24 +115,44 @@ export function calculateBackoffDelay(
   // Add jitter (0-25% of delay) to prevent thundering herd
   const jitter = exponentialDelay * 0.25 * Math.random();
   
-  // Cap at max delay
+  // Cap at max delay to prevent excessively long waits
   return Math.min(exponentialDelay + jitter, config.maxDelayMs);
 }
 
 /**
- * Sleep for a specified duration
+ * Simple utility function to pause execution for a specified duration.
+ * Used to implement the delay between retry attempts.
+ * 
+ * @param ms - Duration to sleep in milliseconds
+ * @returns Promise that resolves after the specified duration
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * Execute an operation with automatic retry logic
+ * Core retry function that executes an operation with automatic retry logic.
+ * This is the heart of the error recovery system and can be used standalone
+ * or through the React hook interface.
  * 
- * @param operation - The async operation to execute
- * @param config - Retry configuration
- * @param onRetry - Callback called before each retry attempt
- * @returns RetryResult with the outcome
+ * @param operation - The async operation to execute and potentially retry
+ * @param config - Retry configuration (uses defaults if not provided)
+ * @param onRetry - Optional callback called before each retry attempt for UI updates
+ * @returns Promise<RetryResult<T>> with the final outcome including success state and metadata
+ * 
+ * @example
+ * ```typescript
+ * const result = await executeWithRetry(
+ *   () => api.fetchData(),
+ *   { maxRetries: 2, retryableCategories: ['network'] },
+ *   (attempt, delay, error) => console.log(`Retry ${attempt} in ${delay}ms`)
+ * );
+ * if (result.success) {
+ *   console.log('Success:', result.data);
+ * } else {
+ *   console.log('Failed after', result.attempts, 'attempts');
+ * }
+ * ```
  */
 export async function executeWithRetry<T>(
   operation: () => Promise<T>,
@@ -126,7 +204,44 @@ export async function executeWithRetry<T>(
 }
 
 /**
- * Hook for managing retry state in React components
+ * ============================================================================
+ * REACT HOOK
+ * ============================================================================
+ */
+
+/**
+ * React hook for managing retry state and error recovery in components.
+ * Provides a complete interface for handling failed operations with real-time
+ * UI feedback, countdown timers, and manual control over retry behavior.
+ * 
+ * Features:
+ * - Automatic retry state management with React state
+ * - Real-time countdown timers showing seconds until next retry
+ * - Manual abort and reset capabilities
+ * - Error recording and classification
+ * - Integration with React lifecycle for proper cleanup
+ * 
+ * @param config - Partial retry configuration to override defaults
+ * @returns Object containing state, actions, utilities, and final configuration
+ * 
+ * @example
+ * ```typescript
+ * const {
+ *   retryState,
+ *   executeWithRecovery,
+ *   abortRetry,
+ *   canRetry
+ * } = useErrorRecovery({ maxRetries: 2 });
+ * 
+ * const handleSubmit = async () => {
+ *   const result = await executeWithRecovery(() => 
+ *     api.submitData(formData)
+ *   );
+ *   if (result.success) {
+ *     // Handle success
+ *   }
+ * };
+ * ```
  */
 export function useErrorRecovery(config: Partial<RetryConfig> = {}) {
   const mergedConfig: RetryConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
