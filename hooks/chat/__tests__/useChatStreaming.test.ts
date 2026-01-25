@@ -91,8 +91,12 @@ describe('useChatStreaming', () => {
     it('should trigger fallback when error is fallback-worthy and fallback is enabled', async () => {
       const { result } = renderHook(() => useChatStreaming());
       
-      const mockOnFallback = jest.fn();
-      const mockOnProviderChange = jest.fn();
+      const mockOnFallback = jest.fn<
+        (from: ProviderId, to: ProviderId, reason: string) => void
+      >();
+      const mockOnProviderChange = jest.fn<
+        (providerId: ProviderId, modelId: string, isFallback: boolean) => void
+      >();
 
       mockGetNextFallbackProvider.mockReturnValue({
         provider: 'apple' as ProviderId,
@@ -122,7 +126,9 @@ describe('useChatStreaming', () => {
       const { result } = renderHook(() => useChatStreaming());
       
       const mockOnError = jest.fn();
-      const mockOnFallback = jest.fn();
+      const mockOnFallback = jest.fn<
+        (from: ProviderId, to: ProviderId, reason: string) => void
+      >();
 
       const errorResult = await act(async () => {
         return await result.current.handleStreamingError(
