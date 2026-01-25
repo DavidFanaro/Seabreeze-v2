@@ -7,7 +7,7 @@
 import React, { useRef, useCallback } from "react";
 import { FlashList } from "@shopify/flash-list";
 import type { FlashListRef } from "@shopify/flash-list";
-import { View, ViewStyle } from "react-native";
+import { ActivityIndicator, View, ViewStyle } from "react-native";
 import { ModelMessage } from "ai";
 import { MessageBubble } from "./MessageBubble";
 import { useTheme } from "@/components/ui/ThemeProvider";
@@ -49,6 +49,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     const flashListRef = useRef<FlashListRef<ModelMessage>>(null);
     // Theme object containing spacing, colors, and other design tokens
     const { theme } = useTheme();
+    const emptyStateColor = theme.colors.textSecondary ?? theme.colors.text;
 
     // ============================================================================
     // RENDER ITEM SECTION
@@ -107,8 +108,10 @@ export const MessageList: React.FC<MessageListProps> = ({
      * providing a clean appearance before any messages are added to the chat
      */
     const listEmptyComponent = useCallback(() => (
-        <View className="flex-1" />
-    ), []);
+        <View className="flex-1 items-center justify-center" testID="message-list-empty">
+            <ActivityIndicator color={emptyStateColor} testID="message-list-loading" />
+        </View>
+    ), [emptyStateColor]);
 
     // ============================================================================
     // LIST CONTAINER SECTION

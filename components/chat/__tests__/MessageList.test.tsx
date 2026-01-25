@@ -5,42 +5,51 @@
 
 import React from "react";
 import { render } from "@testing-library/react-native";
-import { View, Text } from "react-native";
 import type { ModelMessage } from "ai";
 import { MessageList } from "../MessageList";
 
 // Mock FlashList component
-jest.mock("@shopify/flash-list", () => ({
-  FlashList: ({ data, renderItem, ListEmptyComponent }: any) => {
-    if (!data || data.length === 0) {
-      return <ListEmptyComponent />;
-    }
+jest.mock("@shopify/flash-list", () => {
+  const React = jest.requireActual("react");
+  const { View } = jest.requireActual("react-native");
 
-    return (
-      <View>
-        {data.map((item: any, index: number) =>
-          renderItem({ item, index })
-        )}
-      </View>
-    );
-  },
-}));
+  return {
+    FlashList: ({ data, renderItem, ListEmptyComponent }: any) => {
+      if (!data || data.length === 0) {
+        return <ListEmptyComponent />;
+      }
+
+      return (
+        <View>
+          {data.map((item: any, index: number) =>
+            renderItem({ item, index })
+          )}
+        </View>
+      );
+    },
+  };
+});
 
 // Mock MessageBubble component
-jest.mock("../MessageBubble", () => ({
-  MessageBubble: function MockMessageBubble({
-    content,
-    isUser,
-    isStreaming,
-  }: any) {
-    return (
-      <Text testID={`message-${isUser ? "user" : "ai"}`}>
-        {content}
-        {isStreaming && " (streaming)"}
-      </Text>
-    );
-  },
-}));
+jest.mock("../MessageBubble", () => {
+  const React = jest.requireActual("react");
+  const { Text } = jest.requireActual("react-native");
+
+  return {
+    MessageBubble: function MockMessageBubble({
+      content,
+      isUser,
+      isStreaming,
+    }: any) {
+      return (
+        <Text testID={`message-${isUser ? "user" : "ai"}`}>
+          {content}
+          {isStreaming && " (streaming)"}
+        </Text>
+      );
+    },
+  };
+});
 
 // Mock useTheme hook
 jest.mock("@/components/ui/ThemeProvider", () => ({
@@ -95,11 +104,11 @@ describe("MessageList Component", () => {
    * Test: Empty message list shows empty component
    */
   it("renders empty state when message list is empty", () => {
-    const { queryByTestId } = render(
+    const { getByTestId, queryByTestId } = render(
       <MessageList messages={[]} isStreaming={false} />
     );
 
-    // The FlashList empty component renders a View with flex-1
+    expect(getByTestId("message-list-loading")).toBeDefined();
     expect(queryByTestId("message-user")).toBeNull();
   });
 
