@@ -109,7 +109,19 @@ describe("MessageList Component", () => {
     );
 
     expect(getByTestId("message-list-loading")).toBeDefined();
+    expect(queryByTestId("message-list-thinking")).toBeNull();
     expect(queryByTestId("message-user")).toBeNull();
+  });
+
+  /**
+   * Test: Thinking indicator appears alongside loading spinner
+   */
+  it("shows thinking text when model is thinking", () => {
+    const { getByTestId } = render(
+      <MessageList messages={[]} isStreaming={false} isThinking={true} />
+    );
+
+    expect(getByTestId("message-list-thinking")).toBeDefined();
   });
 
   /**

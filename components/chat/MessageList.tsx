@@ -7,7 +7,7 @@
 import React, { useRef, useCallback } from "react";
 import { FlashList } from "@shopify/flash-list";
 import type { FlashListRef } from "@shopify/flash-list";
-import { ActivityIndicator, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Text, View, ViewStyle } from "react-native";
 import { ModelMessage } from "ai";
 import { MessageBubble } from "./MessageBubble";
 import { useTheme } from "@/components/ui/ThemeProvider";
@@ -25,6 +25,7 @@ interface MessageListProps {
     contentContainerStyle?: ViewStyle;
     thinkingOutput?: string[];
     isStreaming?: boolean;
+    isThinking?: boolean;
 }
 
 /**
@@ -43,6 +44,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     contentContainerStyle,
     thinkingOutput = [],
     isStreaming = false,
+    isThinking = false,
 }) => {
     // ============================================================================
     // STATE & REFS SECTION
@@ -113,9 +115,23 @@ export const MessageList: React.FC<MessageListProps> = ({
      */
     const listEmptyComponent = useCallback(() => (
         <View className="flex-1 items-center justify-center" testID="message-list-empty">
-            <ActivityIndicator color={emptyStateColor} testID="message-list-loading" />
+            <View className="flex-row items-center">
+                <ActivityIndicator color={emptyStateColor} testID="message-list-loading" />
+                {isThinking && (
+                    <Text
+                        style={{
+                            color: emptyStateColor,
+                            marginLeft: theme.spacing.sm,
+                            fontSize: 14,
+                        }}
+                        testID="message-list-thinking"
+                    >
+                        Thinking...
+                    </Text>
+                )}
+            </View>
         </View>
-    ), [emptyStateColor]);
+    ), [emptyStateColor, isThinking, theme.spacing.sm]);
 
     // ============================================================================
     // LIST CONTAINER SECTION

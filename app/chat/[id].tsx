@@ -41,6 +41,7 @@ export default function Chat() {
         thinkingOutput,
         sendMessage,
         reset,
+        isThinking,
         isStreaming,
         setMessages,
         setThinkingOutput,
@@ -267,6 +268,7 @@ export default function Chat() {
                       <MessageList
                         messages={messages}
                         thinkingOutput={thinkingOutput}
+                        isThinking={isThinking}
                         isStreaming={isStreaming}
                       />
                      
