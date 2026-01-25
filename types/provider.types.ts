@@ -141,3 +141,23 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability> = {
     supportsSystemMessages: true,
   },
 };
+
+const THINKING_MODEL_PREFIXES: Record<ProviderId, string[]> = {
+  apple: [],
+  openai: ["gpt-4", "gpt-5"],
+  openrouter: ["openai/gpt-4", "openai/gpt-5"],
+  ollama: [],
+};
+
+export const isThinkingCapableModel = (
+  providerId: ProviderId,
+  modelId: string,
+): boolean => {
+  const prefixes = THINKING_MODEL_PREFIXES[providerId];
+  if (!modelId || prefixes.length === 0) {
+    return false;
+  }
+
+  const normalizedModelId = modelId.toLowerCase();
+  return prefixes.some((prefix) => normalizedModelId.startsWith(prefix));
+};

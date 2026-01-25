@@ -294,6 +294,36 @@ describe('useChatStreaming', () => {
       );
     });
 
+    it('should skip thinking options for non-thinking models', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const mockOnThinkingChunk = jest.fn();
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            model: {
+              ...mockModel,
+              modelId: 'gpt-3.5-turbo',
+            },
+            thinkingLevel: 'high',
+            onThinkingChunk: mockOnThinkingChunk,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockStreamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerOptions: undefined,
+        })
+      );
+      expect(mockOnThinkingChunk).not.toHaveBeenCalled();
+    });
+
     it('should handle streaming with retry when enabled and retry fails', async () => {
       const { result } = renderHook(() => useChatStreaming());
       

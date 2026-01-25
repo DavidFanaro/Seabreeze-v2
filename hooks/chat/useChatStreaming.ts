@@ -104,7 +104,7 @@ import { useCallback } from "react";
 // AI SDK for streaming text generation and type definitions
 import { streamText, type LanguageModel, type ModelMessage } from "ai";
 // Provider type definitions for the fallback system
-import { ProviderId } from "@/types/provider.types";
+import { isThinkingCapableModel, type ProviderId } from "@/types/provider.types";
 import type { ThinkingLevel } from "@/types/chat.types";
 // Fallback chain utilities for provider switching and error classification
 import { getModelWithFallback, getNextFallbackProvider, classifyError, hasFallbackAvailable, type FallbackResult } from "@/providers/fallback-chain";
@@ -271,13 +271,18 @@ export function useChatStreaming() {
          * This function processes the text stream and updates the UI in real-time
          */
         const streamOperation = async () => {
-            const providerOptions = thinkingLevel
+            const canModelThink = isThinkingCapableModel(
+                currentModel.provider,
+                currentModel.modelId ?? "",
+            );
+            const providerOptions = thinkingLevel && canModelThink
                 ? {
                     openai: {
                         reasoningEffort: thinkingLevel,
                     },
                 }
                 : undefined;
+            const thinkingChunkHandler = canModelThink ? onThinkingChunk : undefined;
             // Initialize the streaming text generation
             const result = streamText({
                 model: currentModel.model!,
@@ -288,8 +293,11 @@ export function useChatStreaming() {
             if (result.fullStream) {
                 for await (const part of result.fullStream) {
                     if (part.type === "reasoning-delta") {
+                        if (!canModelThink) {
+                            continue;
+                        }
                         reasoningAccumulated += part.text;
-                        onThinkingChunk?.(part.text, reasoningAccumulated);
+                        thinkingChunkHandler?.(part.text, reasoningAccumulated);
                         continue;
                     }
 
