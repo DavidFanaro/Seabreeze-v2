@@ -1,3 +1,7 @@
+/**
+ * @file ModelListManager.tsx
+ * @purpose Manages model list display, addition, editing, deletion, and search functionality for AI providers.
+ */
 import React, { useState, useCallback, useMemo } from "react";
 import {
     View,
@@ -30,28 +34,41 @@ export function ModelListManager({
     onModelSelect,
     disabled = false,
 }: ModelListManagerProps) {
+    // ========================================
+    // HOOKS AND STATE MANAGEMENT
+    // ========================================
+    
+    // Theme and store hooks
     const { theme } = useTheme();
     const { customModels, hiddenModels, addCustomModel, editCustomModel, deleteModel } =
         useProviderStore();
 
-    const [isAdding, setIsAdding] = useState(false);
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [newModelName, setNewModelName] = useState("");
-    const [editingModel, setEditingModel] = useState<string | null>(null);
-    const [editedName, setEditedName] = useState("");
-    const [searchQuery, setSearchQuery] = useState("");
+    // UI State management
+    const [isAdding, setIsAdding] = useState(false);              // Controls add model input visibility
+    const [isEditMode, setIsEditMode] = useState(false);         // Toggles edit mode for deletion
+    const [newModelName, setNewModelName] = useState("");         // Text for new model input
+    const [editingModel, setEditingModel] = useState<string | null>(null); // Model being edited
+    const [editedName, setEditedName] = useState("");             // Edited text for current model
+    const [searchQuery, setSearchQuery] = useState("");           // Search filter query
 
+    // ========================================
+    // COMPUTED VALUES
+    // ========================================
+    
+    // Get custom models for current provider, fallback to empty array
     const providerCustomModels = useMemo(
         () => customModels[providerId] ?? [],
         [customModels, providerId]
     );
+    
+    // Get hidden models for current provider, fallback to empty array
     const providerHiddenModels = useMemo(
         () => hiddenModels[providerId] ?? [],
         [hiddenModels, providerId]
     );
 
-    // Use dynamic models if available (e.g., Ollama), otherwise use predefined
-    // Filter out hidden models from predefined/dynamic
+    // Base models: Use dynamic models if available (e.g., Ollama), otherwise use predefined
+    // Filter out any hidden models from the base list
     const baseModels = useMemo(
         () =>
             (dynamicModels?.length ? dynamicModels : predefinedModels).filter(
@@ -60,26 +77,33 @@ export function ModelListManager({
         [dynamicModels, predefinedModels, providerHiddenModels]
     );
 
-    // Combine base models with custom models
+    // All models: Combine provider base models with custom user-added models
     const allModels = useMemo(
         () => [...baseModels, ...providerCustomModels],
         [baseModels, providerCustomModels]
     );
 
-    // Filter models based on search query
+    // Filtered models: Apply search query filter if present
     const filteredModels = useMemo(() => {
         if (!searchQuery.trim()) return allModels;
         const query = searchQuery.toLowerCase();
         return allModels.filter((model) => model.toLowerCase().includes(query));
     }, [allModels, searchQuery]);
 
-    const hasModels = allModels.length > 0;
-    const showSearch = allModels.length > 5; // Only show search if there are many models
+    // UI logic flags
+    const hasModels = allModels.length > 0;                        // Whether any models exist
+    const showSearch = allModels.length > 5;                       // Only show search if many models
 
+    // ========================================
+    // EVENT HANDLERS
+    // ========================================
+    
+    // Add new custom model after validation
     const handleAddModel = useCallback(() => {
         const trimmed = newModelName.trim();
         if (!trimmed) return;
 
+        // Prevent duplicate model names
         if (allModels.includes(trimmed)) {
             Alert.alert("Duplicate", "This model already exists.");
             return;
@@ -91,22 +115,26 @@ export function ModelListManager({
         setIsAdding(false);
     }, [newModelName, allModels, addCustomModel, providerId, onModelSelect]);
 
+    // Start editing a model by populating edit state
     const handleStartEdit = useCallback((model: string) => {
         setEditingModel(model);
         setEditedName(model);
-        setIsEditMode(false);
+        setIsEditMode(false); // Exit edit mode when editing specific model
     }, []);
 
+    // Save edited model name after validation
     const handleSaveEdit = useCallback(() => {
         const trimmed = editedName.trim();
         if (!trimmed || !editingModel) return;
 
+        // Prevent duplicate names unless it's the same model
         if (trimmed !== editingModel && allModels.includes(trimmed)) {
             Alert.alert("Duplicate", "This model name already exists.");
             return;
         }
 
         editCustomModel(providerId, editingModel, trimmed);
+        // Update selection if the edited model was currently selected
         if (selectedModel === editingModel) {
             onModelSelect(trimmed);
         }
@@ -122,10 +150,11 @@ export function ModelListManager({
         onModelSelect,
     ]);
 
+    // Delete a model and exit edit mode if no models remain
     const handleDelete = useCallback(
         (model: string) => {
             deleteModel(providerId, model);
-            // Exit edit mode if no more models
+            // Exit edit mode if this was the last model
             if (allModels.length <= 1) {
                 setIsEditMode(false);
             }
@@ -133,23 +162,33 @@ export function ModelListManager({
         [deleteModel, providerId, allModels.length]
     );
 
+    // Cancel adding new model and reset state
     const handleCancelAdd = useCallback(() => {
         setIsAdding(false);
         setNewModelName("");
     }, []);
 
+    // Cancel editing and reset edit state
     const handleCancelEdit = useCallback(() => {
         setEditingModel(null);
         setEditedName("");
     }, []);
 
+    // Toggle bulk edit mode for deleting multiple custom models
     const toggleEditMode = useCallback(() => {
         setIsEditMode((prev) => !prev);
     }, []);
 
     return (
         <View className="gap-2">
-            {/* Header with Add and Edit buttons */}
+            {/* ========================================
+                 SECTION: HEADER CONTROLS
+                 ========================================
+                 Purpose: Displays section title and action buttons
+                 Contains: "Models" title, Edit/Done toggle, Add model button
+                 Visibility: Always visible
+                 Interaction: Edit mode toggle, Add model initiation
+            */}
             <View className="flex-row justify-between items-center px-4">
                 <Text className="text-[13px] font-bold uppercase tracking-wide" style={{ color: theme.colors.textSecondary }}>
                     Models
@@ -187,7 +226,15 @@ export function ModelListManager({
                 </View>
             </View>
 
-            {/* Add new model input */}
+            {/* ========================================
+                 SECTION: ADD MODEL INPUT
+                 ========================================
+                 Purpose: Text input for adding new custom models
+                 Contains: Text field, Cancel button, Save button
+                 Visibility: Shown when isAdding = true
+                 Interaction: Type model name, cancel, or save
+                 Features: Auto-focus, validation, duplicate prevention
+            */}
             {isAdding && (
                 <View
                     className="flex-row items-center mx-4 rounded-md border px-3 pr-1 py-1"
@@ -234,7 +281,15 @@ export function ModelListManager({
                 </View>
             )}
 
-            {/* Edit model input */}
+            {/* ========================================
+                 SECTION: EDIT MODEL INPUT
+                 ========================================
+                 Purpose: Text input for editing existing model names
+                 Contains: Text field with current name, Cancel button, Save button
+                 Visibility: Shown when editingModel is not null
+                 Interaction: Edit model name, cancel, or save changes
+                 Features: Auto-focus, validation, duplicate prevention
+            */}
             {editingModel && (
                 <View
                     className="flex-row items-center mx-4 rounded-md border px-3 pr-1 py-1"
@@ -281,7 +336,15 @@ export function ModelListManager({
                 </View>
             )}
 
-            {/* Search input */}
+            {/* ========================================
+                 SECTION: SEARCH BAR
+                 ========================================
+                 Purpose: Filter models by name search
+                 Contains: Search icon, text input, clear button
+                 Visibility: Shown when >5 models exist and not editing/adding
+                 Interaction: Type to filter, clear to reset
+                 Features: Case-insensitive search, real-time filtering
+            */}
             {showSearch && !isEditMode && !isAdding && !editingModel && (
                 <View
                     className="flex-row items-center mx-4 rounded-md border px-3 py-2"
@@ -318,7 +381,15 @@ export function ModelListManager({
                 </View>
             )}
 
-            {/* Model list */}
+            {/* ========================================
+                 SECTION: MODEL LIST CONTAINER
+                 ========================================
+                 Purpose: Display all available models with interactions
+                 Contains: Individual ModelRow components for each model
+                 States: Empty state, no results state, or populated list
+                 Interaction: Select model, edit (in edit mode), delete custom models
+                 Features: Separators, selection highlighting, custom model indicators
+            */}
             <View
                 className="mx-4 rounded-lg border overflow-hidden"
                 style={{
@@ -327,6 +398,7 @@ export function ModelListManager({
                 }}
             >
                 {allModels.length === 0 ? (
+                    // Empty state: No models exist at all
                     <View className="p-6 items-center">
                         <Text
                             className="text-[14px] text-center"
@@ -336,6 +408,7 @@ export function ModelListManager({
                         </Text>
                     </View>
                 ) : filteredModels.length === 0 ? (
+                    // No results state: Models exist but don't match search
                     <View className="p-6 items-center">
                         <Text
                             className="text-[14px] text-center"
@@ -345,6 +418,7 @@ export function ModelListManager({
                         </Text>
                     </View>
                 ) : (
+                    // Populated list: Display filtered models
                     filteredModels.map((model, index) => {
                         const isCustom = providerCustomModels.includes(model);
                         const isLast = index === filteredModels.length - 1;
