@@ -1,10 +1,16 @@
 # Ralphy Progress Log
-- [✓] 2026-01-21 19:42 - install heroui-native
-- [✓] 2026-01-21 19:47 - replace any current ui with heroui-native components if possible.
-- [✓] 2026-01-21 19:50 - move the general setting on to the main page of the settings route.
-- [✓] 2026-01-21 19:51 - remove dupicate settings in the setting route.
-- [✓] 2026-01-21 20:00 - set up testing with expo test. use this url for reference: https://docs.expo.dev/develop/unit-testing/.
-- [✓] 2026-01-21 20:19 - add a device check for apple intelligence capable devices. here is the site for refenence: https://www.apple.com/apple-intelligence/. only include iphones and ipads.
-- [✓] 2026-01-21 20:45 - generate testing for providers.
-- [✓] 2026-01-21 20:58 - cleanup any deep linking warnings.
-- [✓] 2026-01-21 21:05 - add more themes like nord, catppuccin and toyko night.
+-[]
+- [✓] 2026-01-24 20:02 - add detailed comments about each ui section and label with comments in each ui section in app/settings/appearance.tsx
+- [✓] 2026-01-24 20:05 - add detailed comments about each ui section and label with comments in each ui section in app/settings/apple.tsx
+- [✓] 2026-01-24 20:10 - add detailed comments about each ui section and label with comments in each ui section in app/settings/index.tsx
+- [✓] 2026-01-24 20:16 - add detailed comments about each ui section and label with comments in each ui section in app/settings/ollama.tsx
+- [✓] 2026-01-24 20:35 - add detailed comments about each ui section and label with comments in each ui section in app/settings/openai.tsx
+- [✓] 2026-01-25 00:00 - add detailed comments about each ui section and label with comments in each ui section in app/settings/openrouter.tsx
+- [✓] 2026-01-25 00:05 - add detailed comments about each ui section and label with comments in each ui section in app/_layout.tsx
+- [✓] 2026-01-25 00:09 - add detailed comments about each ui section and label with comments in each ui section in app/index.tsx
+- [✓] 2026-01-25 00:12 - add detailed comments about each ui section and label with comments in each ui section in app/chat/[id].tsx
+- [✓] 2026-01-25 00:16 - add detailed comments about each ui section and label with comments in each ui section in components/chat/ChatContextMenu.tsx
+- [✓] 2026-01-25 00:24 - add detailed comments about each ui section and label with comments in each ui section in components/chat/ChatListItem.tsx
+- [✓] 2026-01-25 00:31 - add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageBubble.tsx
+- [✓] 2026-01-25 00:36 - add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageInput.tsx
+- [✓] 2026-01-25 00:41 - add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageList.tsx

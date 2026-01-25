@@ -1,10 +1,46 @@
 ## Tasks
-- [x] install heroui-native
-- [x] replace any current ui with heroui-native components if possible.
-- [x] move the general setting on to the main page of the settings route.
-- [x] remove dupicate settings in the setting route.
-- [x] set up testing with expo test. use this url for reference: https://docs.expo.dev/develop/unit-testing/.
-- [x] add a device check for apple intelligence capable devices. here is the site for refenence: https://www.apple.com/apple-intelligence/. only include iphones and ipads.
-- [x] generate testing for providers.
-- [x] cleanup any deep linking warnings.
-- [x] add more themes like nord, catppuccin and toyko night.
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/settings/appearance.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/settings/apple.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/settings/index.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/settings/ollama.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/settings/openai.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/settings/openrouter.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/_layout.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/index.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in app/chat/[id].tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/ChatContextMenu.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/ChatListItem.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageBubble.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageInput.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageList.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/chat/RetryBanner.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/chat/ThemedMarkdown.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/settings/ModelListManager.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/settings/ModelRow.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/settings/ModelSelector.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/settings/ProviderSelector.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/settings/SettingInput.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/ui/GlassButton.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/ui/GlassInput.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/ui/IconButton.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/ui/HeroUIThemeProvider.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/ui/ProviderIcons.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/ui/SaveButton.tsx
+- [ ] add detailed comments about each ui section and label with comments in each ui section in components/ui/ThemeProvider.tsx
+- [ ] add detailed comments about each database section and create a comment section on the db layout in db/schema.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the hook in hooks/chat/useChat.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the hook in hooks/chat/useChatStreaming.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the hook in hooks/chat/useTitleGeneration.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the hook in hooks/useChatState.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the hook in hooks/useDatabase.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the hook in hooks/useErrorRecovery.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the hook in hooks/useHapticFeedback.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the store in stores/useAuthStore.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the store in stores/useProviderStore.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the store in stores/useSettingsStore.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the provider in providers/apple-provider.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the provider in providers/fallback-chain.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the provider in providers/ollama-provider.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the provider in providers/openrouter-provider.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the provider in providers/provider-cache.ts
+- [ ] add detailed comments about each section and in a comment section give a detailed explanation of the provider in providers/provider-factory.ts
