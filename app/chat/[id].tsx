@@ -206,41 +206,72 @@ export default function Chat() {
         // Only run when params.id changes to load a different chat
     }, [chatIdParam, db, setMessages, setTitle, syncFromDatabase, clearOverride]);
 
-    return (
-        <>
-            <Stack.Screen
-                options={{
-                    headerTitle: title,
-                    headerTransparent: true,
-                    headerTintColor: theme.colors.text,
-                    headerRight: () => (
-                        <ChatContextMenu 
-                            onReset={handleReset}
-                        />
-                    ),
-                }}
-            />
-            <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-                <KeyboardAvoidingView
-                    behavior={"padding"}
-                    keyboardVerticalOffset={-30}
-                    className="flex-1"
-                >
-                    <MessageList messages={messages} isStreaming={isStreaming} />
-                    <RetryBanner 
-                        canRetry={canRetry}
-                        onRetry={retryLastMessage}
-                    />
-                    <SafeAreaView edges={["bottom"]}>
-                        <MessageInput
-                            value={text}
-                            onChangeText={setText}
-                            onSend={sendChatMessages}
-                            disabled={isStreaming}
-                        />
-                    </SafeAreaView>
-                </KeyboardAvoidingView>
-            </View>
-        </>
-    );
-}
+     return (
+         <>
+             {/* ============================================================================ */}
+             {/* HEADER SECTION */}
+             {/* Configures the navigation stack screen header with the chat title and menu */}
+             {/* ============================================================================ */}
+             <Stack.Screen
+                 options={{
+                     /* Display the current chat title in the header */
+                     headerTitle: title,
+                     /* Use transparent header to blend with app background */
+                     headerTransparent: true,
+                     /* Apply theme color to header text and back button */
+                     headerTintColor: theme.colors.text,
+                     /* Right header button: context menu with reset functionality */
+                     headerRight: () => (
+                         <ChatContextMenu 
+                             onReset={handleReset}
+                         />
+                     ),
+                 }}
+             />
+             
+             {/* ============================================================================ */}
+             {/* MAIN CONTAINER */}
+             {/* Root view that fills the screen with themed background color */}
+             {/* ============================================================================ */}
+             <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+                 {/* ====================================================================== */}
+                 {/* KEYBOARD AVOIDING VIEW */}
+                 {/* Handles keyboard presentation on iOS, adjusts content to prevent overlap */}
+                 {/* ====================================================================== */}
+                 <KeyboardAvoidingView
+                     behavior={"padding"}
+                     keyboardVerticalOffset={-30}
+                     className="flex-1"
+                 >
+                     {/* ================================================================== */}
+                     {/* MESSAGE LIST SECTION */}
+                     {/* Displays all messages in the conversation, auto-scrolls during stream */}
+                     {/* ================================================================== */}
+                     <MessageList messages={messages} isStreaming={isStreaming} />
+                     
+                     {/* ================================================================== */}
+                     {/* RETRY BANNER SECTION */}
+                     {/* Shows retry button when last message fails, allows re-sending failed msg */}
+                     {/* ================================================================== */}
+                     <RetryBanner 
+                         canRetry={canRetry}
+                         onRetry={retryLastMessage}
+                     />
+                     
+                     {/* ================================================================== */}
+                     {/* INPUT SECTION */}
+                     {/* User text input area with send button, respects safe area on notch devices */}
+                     {/* ================================================================== */}
+                     <SafeAreaView edges={["bottom"]}>
+                         <MessageInput
+                             value={text}
+                             onChangeText={setText}
+                             onSend={sendChatMessages}
+                             disabled={isStreaming}
+                         />
+                     </SafeAreaView>
+                 </KeyboardAvoidingView>
+             </View>
+         </>
+     );
+ }
