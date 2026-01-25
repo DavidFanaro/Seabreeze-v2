@@ -9,6 +9,8 @@ import type { ProviderId } from "./provider.types";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
 
+export type ThinkingLevel = "low" | "medium" | "high";
+
 export interface UseChatOptions {
   initialMessages?: ModelMessage[];
   initialText?: string;
@@ -25,6 +27,8 @@ export interface UseChatOptions {
   onThinkingChunk?: ChunkHandler;
   /** Enable streaming thinking output updates */
   enableThinking?: boolean;
+  /** Control reasoning effort for supported providers */
+  thinkingLevel?: ThinkingLevel;
   onError?: (error: unknown) => void;
   onComplete?: () => void;
   onFallback?: (from: ProviderId, to: ProviderId, reason: string) => void;

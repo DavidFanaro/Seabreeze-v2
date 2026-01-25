@@ -237,6 +237,22 @@ describe('useChat', () => {
       });
       expect(result.current.text).toBe('Original text'); // Should not clear when using override
     });
+
+    it('should pass thinking level to streaming options', async () => {
+      const { result } = renderHook(() => useChat({ thinkingLevel: 'high' }));
+
+      act(() => {
+        result.current.setText('Hello, world!');
+      });
+
+      await act(async () => {
+        await result.current.sendMessage();
+      });
+
+      expect(mockExecuteStreaming).toHaveBeenCalled();
+      const [options] = mockExecuteStreaming.mock.calls[0] as [{ thinkingLevel?: string }];
+      expect(options.thinkingLevel).toBe('high');
+    });
   });
 
   describe('state management', () => {

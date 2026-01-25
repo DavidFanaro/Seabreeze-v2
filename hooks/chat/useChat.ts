@@ -142,6 +142,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         onChunk,                          // Callback for streaming chunks
         onThinkingChunk,                  // Callback for streaming thinking chunks
         enableThinking = true,            // Enable thinking output updates
+        thinkingLevel,                    // Control reasoning effort when supported
         onError,                          // Error handling callback
         onComplete,                       // Completion callback
         onFallback,                       // Provider fallback notification
@@ -443,6 +444,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 enableFallback,
                 activeProvider,
                 effectiveProviderId,
+                thinkingLevel,
                 onChunk,
                 onThinkingChunk: handleThinkingChunk,
                 onError,
@@ -502,6 +504,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             onFallback,
             effectiveProviderId,
             enableThinking,
+            thinkingLevel,
             onThinkingChunk
         ],
     );

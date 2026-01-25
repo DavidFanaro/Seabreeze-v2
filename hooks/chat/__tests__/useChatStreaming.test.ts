@@ -267,6 +267,33 @@ describe('useChatStreaming', () => {
       expect(mockOnThinkingChunk).toHaveBeenCalledWith('Thinking', 'Thinking');
     });
 
+    it('should pass thinking level as provider options', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            thinkingLevel: 'high',
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockStreamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerOptions: {
+            openai: {
+              reasoningEffort: 'high',
+            },
+          },
+        })
+      );
+    });
+
     it('should handle streaming with retry when enabled and retry fails', async () => {
       const { result } = renderHook(() => useChatStreaming());
       

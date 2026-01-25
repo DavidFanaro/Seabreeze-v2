@@ -105,6 +105,7 @@ import { useCallback } from "react";
 import { streamText, type LanguageModel, type ModelMessage } from "ai";
 // Provider type definitions for the fallback system
 import { ProviderId } from "@/types/provider.types";
+import type { ThinkingLevel } from "@/types/chat.types";
 // Fallback chain utilities for provider switching and error classification
 import { getModelWithFallback, getNextFallbackProvider, classifyError, hasFallbackAvailable, type FallbackResult } from "@/providers/fallback-chain";
 // Error message formatting utilities for user-friendly error display
@@ -132,6 +133,8 @@ interface StreamingOptions {
     onChunk?: (chunk: string, accumulated: string) => void;
     /** Callback fired when a new thinking/reasoning chunk is received */
     onThinkingChunk?: (chunk: string, accumulated: string) => void;
+    /** Control reasoning effort for supported providers */
+    thinkingLevel?: ThinkingLevel;
     /** Callback fired when an error occurs during streaming */
     onError?: (error: unknown) => void;
     /** Callback fired when falling back to another provider */
@@ -247,6 +250,7 @@ export function useChatStreaming() {
             effectiveProviderId,
             onChunk,
             onThinkingChunk,
+            thinkingLevel,
             onError,
             onFallback,
             onProviderChange,
@@ -267,10 +271,18 @@ export function useChatStreaming() {
          * This function processes the text stream and updates the UI in real-time
          */
         const streamOperation = async () => {
+            const providerOptions = thinkingLevel
+                ? {
+                    openai: {
+                        reasoningEffort: thinkingLevel,
+                    },
+                }
+                : undefined;
             // Initialize the streaming text generation
             const result = streamText({
                 model: currentModel.model!,
                 messages: messages,
+                providerOptions,
             });
 
             if (result.fullStream) {
