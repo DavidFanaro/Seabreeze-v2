@@ -2,31 +2,26 @@
 import "@/lib/polyfills";
 import "@/global.css";
 
-import { Stack } from "expo-router";
-import { Text, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   DarkTheme,
   DefaultTheme,
   ThemeContext,
 } from "@react-navigation/native";
-import { drizzle } from "drizzle-orm/expo-sqlite";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
-import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
+import { Stack } from "expo-router";
+import { SQLiteProvider } from "expo-sqlite";
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import { Suspense } from "react";
+import { Text, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { HeroUINativeProvider } from "heroui-native";
 
 import migrations from "../drizzle/migrations";
-import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import { ThemeProvider, useTheme } from "@/components";
 import { HeroUIThemeProvider } from "@/components/ui/HeroUIThemeProvider";
-
-const dbname = "seabreeze";
-
-const expoDb = openDatabaseSync(dbname);
-const db = drizzle(expoDb);
+import useDatabase, { dbname } from "@/hooks/useDatabase";
 const queryClient = new QueryClient();
 
 export const unstable_settings = {
@@ -62,83 +57,74 @@ function NavigationContent() {
   };
 
   return (
-    // Suspense boundary: Loading fallback while database provider initializes
-    <Suspense fallback={<Text>Loading</Text>}>
-      {/* SQLiteProvider: Database connection provider with change listener enabled for reactive updates */}
-      <SQLiteProvider
-        databaseName={dbname}
-        useSuspense={true}
-        options={{ enableChangeListener: true }}
-      >
-        {/* KeyboardProvider: Handles keyboard interactions and positioning across the app */}
-        <KeyboardProvider>
-          {/* ThemeContext: Supplies navigation theme to React Navigation components */}
-          <ThemeContext value={navigationTheme}>
-            {/* QueryClientProvider: React Query cache provider for API state management */}
-            <QueryClientProvider client={queryClient}>
-              {/* Stack Navigator: Root navigation stack containing all app screens */}
-              <Stack>
-                {/* Home Screen: Main chat interface (freezeOnBlur preserves state when switching apps) */}
-                <Stack.Screen
-                  name="index"
-                  options={{
-                    freezeOnBlur: true,
-                  }}
-                />
-                {/* Settings Section: Provider configuration and general settings screens (card presentation for modal appearance) */}
-                {/* Settings - Main: Primary settings interface hub */}
-                <Stack.Screen
-                  name="settings/index"
-                  options={{
-                    presentation: "card",
-                  }}
-                />
-                {/* Settings - OpenAI: OpenAI provider API key and model configuration */}
-                <Stack.Screen
-                  name="settings/openai"
-                  options={{
-                    presentation: "card",
-                  }}
-                />
-                {/* Settings - OpenRouter: OpenRouter provider API key and model configuration */}
-                <Stack.Screen
-                  name="settings/openrouter"
-                  options={{
-                    presentation: "card",
-                  }}
-                />
-                {/* Settings - Ollama: Ollama local provider connection and model settings */}
-                <Stack.Screen
-                  name="settings/ollama"
-                  options={{
-                    presentation: "card",
-                  }}
-                />
-                {/* Settings - Apple: Apple Intelligence provider configuration and permissions */}
-                <Stack.Screen
-                  name="settings/apple"
-                  options={{
-                    presentation: "card",
-                  }}
-                />
-                {/* Settings - Appearance: Theme and visual preferences (light/dark mode, accent colors) */}
-                <Stack.Screen
-                  name="settings/appearance"
-                  options={{
-                    presentation: "card",
-                  }}
-                />
-              </Stack>
-            </QueryClientProvider>
-          </ThemeContext>
-        </KeyboardProvider>
-      </SQLiteProvider>
-    </Suspense>
+    <KeyboardProvider>
+      {/* ThemeContext: Supplies navigation theme to React Navigation components */}
+      <ThemeContext value={navigationTheme}>
+        {/* QueryClientProvider: React Query cache provider for API state management */}
+        <QueryClientProvider client={queryClient}>
+          {/* Stack Navigator: Root navigation stack containing all app screens */}
+          <Stack>
+            {/* Home Screen: Main chat interface (freezeOnBlur preserves state when switching apps) */}
+            <Stack.Screen
+              name="index"
+              options={{
+                freezeOnBlur: true,
+              }}
+            />
+            {/* Settings Section: Provider configuration and general settings screens (card presentation for modal appearance) */}
+            {/* Settings - Main: Primary settings interface hub */}
+            <Stack.Screen
+              name="settings/index"
+              options={{
+                presentation: "card",
+              }}
+            />
+            {/* Settings - OpenAI: OpenAI provider API key and model configuration */}
+            <Stack.Screen
+              name="settings/openai"
+              options={{
+                presentation: "card",
+              }}
+            />
+            {/* Settings - OpenRouter: OpenRouter provider API key and model configuration */}
+            <Stack.Screen
+              name="settings/openrouter"
+              options={{
+                presentation: "card",
+              }}
+            />
+            {/* Settings - Ollama: Ollama local provider connection and model settings */}
+            <Stack.Screen
+              name="settings/ollama"
+              options={{
+                presentation: "card",
+              }}
+            />
+            {/* Settings - Apple: Apple Intelligence provider configuration and permissions */}
+            <Stack.Screen
+              name="settings/apple"
+              options={{
+                presentation: "card",
+              }}
+            />
+            {/* Settings - Appearance: Theme and visual preferences (light/dark mode, accent colors) */}
+            <Stack.Screen
+              name="settings/appearance"
+              options={{
+                presentation: "card",
+              }}
+            />
+          </Stack>
+        </QueryClientProvider>
+      </ThemeContext>
+    </KeyboardProvider>
   );
 }
 
-export default function RootLayout() {
-  const { error } = useMigrations(db, migrations);
+function DatabaseGate() {
+  const db = useDatabase();
+  const { error, success } = useMigrations(db, migrations);
+
   useDrizzleStudio(db.$client);
 
   // Error state: Display migration error message if database migrations fail
@@ -151,6 +137,18 @@ export default function RootLayout() {
     );
   }
 
+  if (!success) {
+    return (
+      <View>
+        <Text>Running migrations...</Text>
+      </View>
+    );
+  }
+
+  return <NavigationContent />;
+}
+
+export default function RootLayout() {
   // Main layout UI hierarchy with nested providers and theme configuration
   return (
     // GestureHandlerRootView: Root container for gesture handling (flex: 1 makes it fill available space)
@@ -161,8 +159,18 @@ export default function RootLayout() {
         <ThemeProvider defaultTheme="dark">
           {/* HeroUIThemeProvider: Integrates HeroUI components with custom theme */}
           <HeroUIThemeProvider>
-            {/* NavigationContent: Main content container with navigation stack, query client, keyboard, and database providers */}
-            <NavigationContent />
+            {/* Suspense boundary: Loading fallback while database provider initializes */}
+            <Suspense fallback={<Text>Loading</Text>}>
+              {/* SQLiteProvider: Database connection provider with change listener enabled for reactive updates */}
+              <SQLiteProvider
+                databaseName={dbname}
+                useSuspense={true}
+                options={{ enableChangeListener: true }}
+              >
+                {/* DatabaseGate: Runs migrations before rendering navigation content */}
+                <DatabaseGate />
+              </SQLiteProvider>
+            </Suspense>
           </HeroUIThemeProvider>
         </ThemeProvider>
       </HeroUINativeProvider>

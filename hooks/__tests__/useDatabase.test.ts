@@ -3,37 +3,46 @@
  * @purpose Test suite for useDatabase hook ensuring proper database initialization and configuration.
  */
 
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { renderHook } from '@testing-library/react-native';
+import { drizzle } from 'drizzle-orm/expo-sqlite';
+import { useSQLiteContext } from 'expo-sqlite';
 import useDatabase, { dbname } from '../useDatabase';
+
+const mockSQLiteClient = {
+  execSync: jest.fn(),
+  transaction: jest.fn(),
+  closeSync: jest.fn(),
+};
+
+const mockDrizzleDb = {
+  select: jest.fn(),
+  insert: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+};
 
 // Mock the entire module after imports
 jest.mock('expo-sqlite', () => ({
-  openDatabaseSync: jest.fn(() => ({
-    execSync: jest.fn(),
-    transaction: jest.fn(),
-    closeSync: jest.fn(),
-  })),
+  useSQLiteContext: jest.fn(),
 }));
 
 jest.mock('drizzle-orm/expo-sqlite', () => ({
-  drizzle: jest.fn(() => ({
-    select: jest.fn(),
-    insert: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-  })),
+  drizzle: jest.fn(),
 }));
-
-jest.mock('drizzle-orm/expo-sqlite/migrator', () => ({
-  migrate: jest.fn(),
-}));
-
-jest.mock('../../drizzle/migrations', () => ({}));
 
 jest.mock('@/db/schema', () => ({
   chat: jest.fn(),
 }));
+
+const mockUseSQLiteContext = jest.mocked(useSQLiteContext);
+const mockDrizzle = jest.mocked(drizzle);
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockUseSQLiteContext.mockReturnValue(mockSQLiteClient as any);
+  mockDrizzle.mockReturnValue(mockDrizzleDb as any);
+});
 
 describe('useDatabase', () => {
   describe('database name configuration', () => {
@@ -69,7 +78,7 @@ describe('useDatabase', () => {
 
       const firstInstance = result.current;
       
-      rerender();
+      rerender(undefined);
       
       expect(result.current).toBe(firstInstance);
     });

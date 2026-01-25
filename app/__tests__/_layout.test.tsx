@@ -5,21 +5,17 @@
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { render } from '@testing-library/react-native';
+import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import React from 'react';
 import RootLayout from '../_layout';
 
-// Mock drizzle database and migrations
-jest.mock('drizzle-orm/expo-sqlite', () => ({
-  drizzle: jest.fn(() => ({})),
-}));
-
+// Mock drizzle migrations
 jest.mock('drizzle-orm/expo-sqlite/migrator', () => ({
-  useMigrations: jest.fn(() => ({ error: null })),
+  useMigrations: jest.fn(),
 }));
 
 // Mock expo-sqlite
 jest.mock('expo-sqlite', () => ({
-  openDatabaseSync: jest.fn(() => ({})),
   SQLiteProvider: ({ children }: any) => children,
 }));
 
@@ -29,11 +25,17 @@ jest.mock('expo-drizzle-studio-plugin', () => ({
 }));
 
 // Mock expo-router
-jest.mock('expo-router', () => ({
-  Stack: {
-    Screen: () => null,
-  },
-}));
+jest.mock('expo-router', () => {
+  function Stack({ children }: any) {
+    return children;
+  }
+  function StackScreen() {
+    return null;
+  }
+  StackScreen.displayName = 'Stack.Screen';
+  Stack.Screen = StackScreen;
+  return { Stack };
+});
 
 // Mock react-native-gesture-handler
 jest.mock('react-native-gesture-handler', () => ({
@@ -106,6 +108,15 @@ jest.mock('@/components/ui/HeroUIThemeProvider', () => ({
   HeroUIThemeProvider: ({ children }: any) => children,
 }));
 
+// Mock useDatabase
+jest.mock('@/hooks/useDatabase', () => ({
+  __esModule: true,
+  default: jest.fn(() => ({ $client: {} })),
+  dbname: 'seabreeze',
+}));
+
+const useMigrationsMock = jest.mocked(useMigrations);
+
 // Mock global CSS
 jest.mock('@/global.css', () => ({}));
 
@@ -115,12 +126,28 @@ jest.mock('@/lib/polyfills', () => ({}));
 describe('RootLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    useMigrationsMock.mockReturnValue({ error: undefined, success: true });
   });
 
   it('renders successfully without throwing errors', () => {
     render(<RootLayout />);
     // Should render without errors
     expect(true).toBe(true);
+  });
+
+  it('renders migration error when migrations fail', () => {
+    useMigrationsMock.mockReturnValueOnce({
+      error: new Error('Migration failed'),
+      success: false,
+    });
+    const { getByText } = render(<RootLayout />);
+    expect(getByText('Migration error: Migration failed')).toBeTruthy();
+  });
+
+  it('renders migration progress while migrations run', () => {
+    useMigrationsMock.mockReturnValueOnce({ error: undefined, success: false });
+    const { getByText } = render(<RootLayout />);
+    expect(getByText('Running migrations...')).toBeTruthy();
   });
 
   it('wraps content in GestureHandlerRootView for gesture handling', () => {
@@ -163,6 +190,7 @@ describe('RootLayout', () => {
 describe('NavigationContent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    useMigrationsMock.mockReturnValue({ error: undefined, success: true });
   });
 
   it('renders Stack navigation component', () => {

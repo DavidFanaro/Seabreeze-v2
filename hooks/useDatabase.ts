@@ -12,9 +12,8 @@
  * operations.
  * 
  * Key Responsibilities:
- * - Initialize SQLite database connection with proper configuration
+ * - Access SQLite database connection from the SQLiteProvider
  * - Set up Drizzle ORM with schema definitions
- * - Run database migrations on startup
  * - Provide consistent database instance across the application
  * - Enable real-time change notifications for reactive updates
  * 
@@ -26,11 +25,11 @@
  *    and shared across all hook invocations, ensuring connection efficiency
  *    and preventing multiple database connections.
  * 
- * 2. Synchronous Migration: Migrations run synchronously on import to ensure
- *    the database schema is always up-to-date before any operations occur.
+ * 2. Provider-backed Connection: The hook relies on SQLiteProvider context
+ *    to ensure a single, configured connection is used throughout the app.
  * 
- * 3. Change Listeners: Enabled for future reactive UI updates when chat
- *    data changes (potential integration with React Query or state management).
+ * 3. Change Listeners: Enabled via SQLiteProvider configuration for reactive
+ *    UI updates when chat data changes.
  * 
  * 4. Type Safety: Full TypeScript integration with Drizzle schema for
  *    compile-time type checking and IntelliSense support.
@@ -41,10 +40,9 @@
 // =============================================================================
 
 import { drizzle } from "drizzle-orm/expo-sqlite";
-import { openDatabaseSync } from "expo-sqlite";
-import { migrate } from "drizzle-orm/expo-sqlite/migrator";
-import migrations from "../drizzle/migrations";
-import * as schema from "../db/schema";
+import { useSQLiteContext } from "expo-sqlite";
+
+import * as schema from "@/db/schema";
 
 // =============================================================================
 // CONFIGURATION
@@ -57,57 +55,10 @@ export const dbname = "seabreeze";
 // DATABASE INITIALIZATION
 // =============================================================================
 
-/**
- * SQLite Database Connection
- * 
- * Creates a synchronous connection to the SQLite database using expo-sqlite.
- * The database file will be stored in the app's documents directory.
- * 
- * Configuration:
- * - enableChangeListener: true - Allows subscription to database change events
- *   for reactive UI updates and cache invalidation
- * 
- * Performance Notes:
- * - Synchronous connection ensures database is ready before any operations
- * - Single connection reused across the application for efficiency
- * - SQLite handles concurrent operations through internal locking
- */
-const expoDb = openDatabaseSync(dbname, {
-  enableChangeListener: true,
-});
+type SQLiteClient = ReturnType<typeof useSQLiteContext>;
 
-/**
- * Drizzle ORM Instance
- * 
- * Wraps the SQLite connection with Drizzle ORM providing:
- * - Type-safe query building with auto-completion
- * - Schema validation and constraints
- * - Migration management
- * - Query optimization and prepared statements
- * 
- * The schema object imports all table definitions from db/schema.ts,
- * enabling full type safety for all database operations.
- */
-const db = drizzle(expoDb, { schema });
-
-/**
- * Database Migration
- * 
- * Automatically runs pending migrations on application startup to ensure
- * the database schema matches the current code expectations.
- * 
- * Migration Process:
- * 1. Scans drizzle/migrations directory for migration files
- * 2. Tracks applied migrations in __drizzle_migrations table
- * 3. Executes only pending migrations in order
- * 4. Updates migration tracking table on success
- * 
- * Error Handling:
- * - Migration failures will throw and prevent app startup
- * - This ensures database consistency before any data operations
- * - Manual intervention required for migration conflicts
- */
-migrate(db, migrations);
+let cachedClient: SQLiteClient | null = null;
+let cachedDb: ReturnType<typeof drizzle> | null = null;
 
 // =============================================================================
 // HOOK EXPORT
@@ -141,6 +92,17 @@ migrate(db, migrations);
  * Zero-overhead hook - returns the same database instance on every call
  * to maintain connection efficiency while following React patterns.
  */
-export default function useDatabase() {
-  return db;
+export default function useDatabase(): ReturnType<typeof drizzle> {
+  const expoDb = useSQLiteContext();
+
+  if (!cachedDb || cachedClient !== expoDb) {
+    cachedClient = expoDb;
+    cachedDb = drizzle(expoDb, { schema });
+  }
+
+  if (!cachedDb) {
+    throw new Error("Database initialization failed.");
+  }
+
+  return cachedDb;
 }
