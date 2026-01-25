@@ -81,6 +81,8 @@ export interface UseChatReturn {
     thinkingOutput: string[];
     /** Function to update the thinking output array */
     setThinkingOutput: React.Dispatch<React.SetStateAction<string[]>>;
+    /** Whether the AI is currently streaming reasoning text */
+    isThinking: boolean;
     /** Whether the AI is currently streaming a response */
     isStreaming: boolean;
     /** Send a message to the AI (optionally override current text) */
@@ -177,6 +179,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     const [thinkingOutput, setThinkingOutput] = useState<string[]>(
         () => initialMessages.map(() => "")
     );
+    const [isThinking, setIsThinking] = useState<boolean>(false);
     const [isStreaming, setIsStreaming] = useState<boolean>(false);  // Streaming status
     
     // =============================================================================
@@ -303,6 +306,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         setText("");                              // Clear input field
         setMessages([]);                          // Clear message history
         setThinkingOutput([]);                    // Clear reasoning output
+        setIsThinking(false);                     // Clear thinking state
         setTitle("Chat");                         // Reset to default title
         setActiveProvider(effectiveProviderId);   // Reset to intended provider
         setActiveModel(effectiveModelId);        // Reset to intended model
@@ -360,6 +364,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // STATE INITIALIZATION
             // ────────────────────────────────────────────────────────────────
             setIsStreaming(true);                    // Start streaming state
+            setIsThinking(false);                    // Reset thinking state
             canceledRef.current = false;            // Clear cancellation flag
             setCanRetry(false);                     // Disable retry until needed
             lastUserMessageRef.current = content;   // Store for retry capability
@@ -404,6 +409,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 
                 onError?.(new Error("No AI provider configured"));
                 setIsStreaming(false);
+                setIsThinking(false);
                 onComplete?.();
                 return;
             }
@@ -426,6 +432,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 effectiveProviderId,
                 onChunk,
                 onThinkingChunk: (chunk: string, accumulated: string) => {
+                    setIsThinking(true);
                     setThinkingOutput((prev) => {
                         const next = [...prev];
                         next[assistantIndex] = accumulated;
@@ -458,6 +465,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // ────────────────────────────────────────────────────────────────
             if (result.shouldRetryWithFallback && !canceledRef.current) {
                 setIsStreaming(false);
+                setIsThinking(false);
                 // Small delay to ensure clean state transition
                 await new Promise(resolve => setTimeout(resolve, 100));
                 await sendMessage(content);
@@ -468,6 +476,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // COMPLETION
             // ────────────────────────────────────────────────────────────────
             setIsStreaming(false);
+            setIsThinking(false);
             onComplete?.();
         },
         [
@@ -562,6 +571,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         setMessages,                    // Update message history
         thinkingOutput,                 // Reasoning output
         setThinkingOutput,              // Update reasoning output
+        isThinking,                     // Thinking status
         isStreaming,                    // Streaming status
         
         // ────────────────────────────────────────────────────────────────

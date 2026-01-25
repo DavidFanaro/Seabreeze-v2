@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { renderHook, act } from '@testing-library/react-native';
 import useChat from '../useChat';
 
+const mockExecuteStreaming = jest.fn();
+
 // Mock all dependencies with simpler mocks
 jest.mock('@/hooks/useChatState', () => ({
   useChatState: jest.fn(() => ({
@@ -32,14 +34,7 @@ jest.mock('../useTitleGeneration', () => {
 
 jest.mock('../useChatStreaming', () => ({
   useChatStreaming: jest.fn(() => ({
-    executeStreaming: jest.fn(async (options: { onThinkingChunk?: (chunk: string, accumulated: string) => void }) => {
-      options.onThinkingChunk?.('Thinking', 'Thinking');
-      return {
-        success: true,
-        shouldRetryWithFallback: false,
-        accumulated: 'Test response',
-      };
-    }),
+    executeStreaming: (...args: any[]) => mockExecuteStreaming(...args),
     handleStreamingError: jest.fn(),
   })),
 }));
@@ -54,6 +49,15 @@ jest.mock('@/providers/provider-cache', () => ({
 describe('useChat', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockExecuteStreaming.mockImplementation(async (options: any) => {
+      const onThinkingChunk = options?.onThinkingChunk as ((chunk: string, accumulated: string) => void) | undefined;
+      onThinkingChunk?.('Thinking', 'Thinking');
+      return {
+        success: true,
+        shouldRetryWithFallback: false,
+        accumulated: 'Test response',
+      };
+    });
   });
 
   describe('basic functionality', () => {
@@ -63,6 +67,7 @@ describe('useChat', () => {
       expect(result.current.text).toBe('');
       expect(result.current.messages).toEqual([]);
       expect(result.current.thinkingOutput).toEqual([]);
+      expect(result.current.isThinking).toBe(false);
       expect(result.current.isStreaming).toBe(false);
       expect(result.current.title).toBe('Test Chat');
       expect(result.current.currentProvider).toBe('apple');
@@ -137,7 +142,44 @@ describe('useChat', () => {
       });
       expect(result.current.thinkingOutput).toEqual(['', 'Thinking']);
       expect(result.current.text).toBe('');
+      expect(result.current.isThinking).toBe(false);
       expect(result.current.isStreaming).toBe(false); // Streaming completes after act
+    });
+
+    it('should set isThinking while reasoning streams', async () => {
+      let resolveStreaming: (() => void) | null = null;
+      mockExecuteStreaming.mockImplementation(async (options: any) => {
+        const onThinkingChunk = options?.onThinkingChunk as ((chunk: string, accumulated: string) => void) | undefined;
+        onThinkingChunk?.('Thinking', 'Thinking');
+        await new Promise<void>((resolve) => {
+          resolveStreaming = resolve;
+        });
+        return {
+          success: true,
+          shouldRetryWithFallback: false,
+          accumulated: 'Test response',
+        };
+      });
+
+      const { result } = renderHook(() => useChat({}));
+
+      act(() => {
+        result.current.setText('Hello, world!');
+      });
+
+      let sendPromise = Promise.resolve();
+      act(() => {
+        sendPromise = result.current.sendMessage();
+      });
+
+      expect(result.current.isThinking).toBe(true);
+
+      await act(async () => {
+        resolveStreaming?.();
+        await sendPromise;
+      });
+
+      expect(result.current.isThinking).toBe(false);
     });
 
     it('should skip placeholder text when disabled', async () => {
@@ -194,6 +236,7 @@ describe('useChat', () => {
       expect(result.current.text).toBe('');
       expect(result.current.messages).toEqual([]);
       expect(result.current.thinkingOutput).toEqual([]);
+      expect(result.current.isThinking).toBe(false);
       expect(result.current.isUsingFallback).toBe(false);
       expect(result.current.canRetry).toBe(false);
     });
