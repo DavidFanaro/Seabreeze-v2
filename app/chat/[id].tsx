@@ -84,6 +84,7 @@ export default function Chat() {
                                     // Use current active provider/model (may be fallback)
                                     providerId: currentProvider,
                                     modelId: currentModel,
+                                    providerMetadata: {},
                                     createdAt: now,
                                     updatedAt: now,
                                 })
