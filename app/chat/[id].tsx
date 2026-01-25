@@ -6,8 +6,8 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { eq } from "drizzle-orm";
 import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { View } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { Platform, View } from "react-native";
+import { KeyboardAvoidingView, KeyboardStickyView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ModelMessage } from "ai";
 import { MessageList, MessageInput, useTheme, ChatContextMenu, RetryBanner } from "@/components";
@@ -23,6 +23,8 @@ export default function Chat() {
     // Get chat ID from params (or "new" for new chats)
     const rawChatId = Array.isArray(params.id) ? params.id[0] : params.id;
     const chatIdParam = rawChatId || "new";
+    
+    const isIos = Platform.OS === "ios";
     
     // Use unified chat state management
     const { clearOverride, syncFromDatabase } = useChatState(chatIdParam);
@@ -256,11 +258,11 @@ export default function Chat() {
                  {/* KEYBOARD AVOIDING VIEW */}
                  {/* Handles keyboard presentation on iOS, adjusts content to prevent overlap */}
                  {/* ====================================================================== */}
-                 <KeyboardAvoidingView
-                     behavior={"padding"}
-                     keyboardVerticalOffset={-30}
-                     className="flex-1"
-                 >
+                <KeyboardAvoidingView
+                    behavior={isIos ? "translate-with-padding" : "padding"}
+                    keyboardVerticalOffset={-30}
+                    className="flex-1"
+                >
                      {/* ================================================================== */}
                      {/* MESSAGE LIST SECTION */}
                      {/* Displays all messages in the conversation, auto-scrolls during stream */}
@@ -280,21 +282,34 @@ export default function Chat() {
                          canRetry={canRetry}
                          onRetry={retryLastMessage}
                      />
-                     
-                     {/* ================================================================== */}
-                     {/* INPUT SECTION */}
-                     {/* User text input area with send button, respects safe area on notch devices */}
-                     {/* ================================================================== */}
-                     <SafeAreaView edges={["bottom"]}>
-                         <MessageInput
-                             value={text}
-                             onChangeText={setText}
-                             onSend={sendChatMessages}
-                             disabled={isStreaming}
-                         />
-                     </SafeAreaView>
-                 </KeyboardAvoidingView>
-             </View>
-         </>
-     );
- }
+                </KeyboardAvoidingView>
+                
+                {/* ================================================================== */}
+                {/* INPUT SECTION */}
+                {/* User text input area with send button, respects safe area on notch devices */}
+                {/* ================================================================== */}
+                {isIos ? (
+                    <KeyboardStickyView>
+                        <SafeAreaView edges={["bottom"]}>
+                            <MessageInput
+                                value={text}
+                                onChangeText={setText}
+                                onSend={sendChatMessages}
+                                disabled={isStreaming}
+                            />
+                        </SafeAreaView>
+                    </KeyboardStickyView>
+                ) : (
+                    <SafeAreaView edges={["bottom"]}>
+                        <MessageInput
+                            value={text}
+                            onChangeText={setText}
+                            onSend={sendChatMessages}
+                            disabled={isStreaming}
+                        />
+                    </SafeAreaView>
+                )}
+            </View>
+        </>
+    );
+}

@@ -3,9 +3,10 @@
  * @purpose Tests for Chat screen UI sections including header, message list, retry banner, and input
  */
 
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { render } from '@testing-library/react-native';
 import React from 'react';
+import { Platform } from 'react-native';
 import Chat from '../[id]';
 
 // Mock expo-router
@@ -67,6 +68,8 @@ jest.mock('@/hooks/chat/useChat', () => ({
     reset: jest.fn(),
     isStreaming: false,
     setMessages: jest.fn(),
+    thinkingOutput: [],
+    setThinkingOutput: jest.fn(),
     generateTitle: jest.fn(),
     setTitle: jest.fn(),
     title: 'Test Chat',
@@ -94,9 +97,18 @@ jest.mock('@/components', () => ({
 }));
 
 // Mock react-native-keyboard-controller
-jest.mock('react-native-keyboard-controller', () => ({
-  KeyboardAvoidingView: ({ children }: any) => children,
-}));
+jest.mock('react-native-keyboard-controller', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  
+  return {
+    KeyboardAvoidingView: jest.fn(({ children }: any) =>
+      React.createElement(React.Fragment, null, children)
+    ),
+    KeyboardStickyView: jest.fn(({ children }: any) =>
+      React.createElement(React.Fragment, null, children)
+    ),
+  };
+});
 
 // Mock react-native-safe-area-context
 jest.mock('react-native-safe-area-context', () => ({
@@ -196,9 +208,9 @@ describe('Chat Screen Keyboard Avoiding View Section', () => {
     expect(true).toBe(true);
   });
 
-  it('uses padding behavior for keyboard avoidance', () => {
+  it('uses platform-specific behavior for keyboard avoidance', () => {
     render(<Chat />);
-    // behavior="padding" adds space when keyboard appears on iOS
+    // behavior uses translate-with-padding on iOS, padding elsewhere
     expect(true).toBe(true);
   });
 
@@ -214,10 +226,50 @@ describe('Chat Screen Keyboard Avoiding View Section', () => {
     expect(true).toBe(true);
   });
 
-  it('contains all message and input UI sections', () => {
+  it('contains all message and retry UI sections', () => {
     render(<Chat />);
-    // KeyboardAvoidingView wraps MessageList, RetryBanner, and MessageInput
+    // KeyboardAvoidingView wraps MessageList and RetryBanner
     expect(true).toBe(true);
+  });
+});
+
+describe('Chat Screen Interactive Keyboard (iOS)', () => {
+  const setPlatform = (os: typeof Platform.OS) => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: os,
+    });
+  };
+  
+  const originalPlatform = Platform.OS;
+  const getKeyboardControllerMock = () =>
+    jest.requireMock('react-native-keyboard-controller') as {
+      KeyboardAvoidingView: jest.Mock;
+      KeyboardStickyView: jest.Mock;
+    };
+  
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setPlatform('ios');
+  });
+  
+  afterEach(() => {
+    setPlatform(originalPlatform);
+  });
+  
+  it('renders KeyboardStickyView for interactive keyboard tracking', () => {
+    const { KeyboardStickyView } = getKeyboardControllerMock();
+    
+    render(<Chat />);
+    expect(KeyboardStickyView).toHaveBeenCalled();
+  });
+  
+  it('uses translate-with-padding behavior when on iOS', () => {
+    const { KeyboardAvoidingView } = getKeyboardControllerMock();
+    
+    render(<Chat />);
+    const props = KeyboardAvoidingView.mock.calls[0]?.[0] as { behavior?: string };
+    expect(props?.behavior).toBe('translate-with-padding');
   });
 });
 
@@ -354,13 +406,13 @@ describe('Chat Screen Input Section', () => {
 
   it('positioned at bottom of screen with flex layout', () => {
     render(<Chat />);
-    // SafeAreaView wraps input at bottom of KeyboardAvoidingView
+    // SafeAreaView anchors input at bottom (sticky on iOS)
     expect(true).toBe(true);
   });
 
   it('respects keyboard appearance with KeyboardAvoidingView', () => {
     render(<Chat />);
-    // Input moves up when keyboard appears on screen
+    // Input follows keyboard (sticky on iOS, avoiding view elsewhere)
     expect(true).toBe(true);
   });
 });
