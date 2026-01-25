@@ -12,7 +12,8 @@ type ChunkHandler = (chunk: string, accumulated: string) => void;
 export interface UseChatOptions {
   initialMessages?: ModelMessage[];
   initialText?: string;
-  placeholder?: string;
+  /** Enable placeholder text for assistant responses */
+  placeholder?: boolean;
   /** @deprecated Use chatId instead for unified state management */
   providerId?: ProviderId;
   /** @deprecated Use chatId instead for unified state management */

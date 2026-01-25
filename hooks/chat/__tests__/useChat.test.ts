@@ -140,6 +140,24 @@ describe('useChat', () => {
       expect(result.current.isStreaming).toBe(false); // Streaming completes after act
     });
 
+    it('should skip placeholder text when disabled', async () => {
+      const { result } = renderHook(() => useChat({ placeholder: false }));
+
+      act(() => {
+        result.current.setText('Hello, world!');
+      });
+
+      await act(async () => {
+        await result.current.sendMessage();
+      });
+
+      expect(result.current.messages).toHaveLength(2);
+      expect(result.current.messages[1]).toEqual({
+        role: 'assistant',
+        content: '',
+      });
+    });
+
     it('should handle message with override text', async () => {
       const { result } = renderHook(() => useChat({}));
 

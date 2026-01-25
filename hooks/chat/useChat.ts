@@ -52,6 +52,8 @@ import type { UseChatOptions } from "@/types/chat.types";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
 
+const DEFAULT_PLACEHOLDER_TEXT = "...";
+
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
@@ -130,7 +132,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     const {
         initialMessages = [],              // Start with empty message history
         initialText = "",                  // Start with empty input field
-        placeholder = "...",               // Placeholder for AI responses
+        placeholder = true,                // Enable placeholder for AI responses
         providerId: legacyProviderId,      // Deprecated: use chatId instead
         modelId: legacyModelId,           // Deprecated: use chatId instead
         chatId,                           // Modern unified state management
@@ -210,6 +212,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     // the final configuration used throughout the hook.
     
     const mergedRetryConfig: RetryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+    const placeholderText = placeholder ? DEFAULT_PLACEHOLDER_TEXT : "";
 
         // =============================================================================
     // MODEL RESOLUTION AND CACHING
@@ -380,7 +383,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 ...prev,
                 {
                     role: "assistant",
-                    content: placeholder,
+                    content: placeholderText,
                 },
             ]);
             setThinkingOutput((prev) => [...prev, ""]);
@@ -470,7 +473,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         [
             messages, 
             text, 
-            placeholder, 
+            placeholderText, 
             model, 
             activeProvider, 
             activeModel, 
