@@ -62,16 +62,17 @@ describe('useChatStreaming', () => {
     mockGetProviderErrorHint.mockReturnValue('Check your internet connection');
 
     // Mock streaming implementation
-    const mockTextStream = {
+    const mockFullStream = {
       [Symbol.asyncIterator]: async function* () {
-        yield 'Hello';
-        yield ' there';
-        yield '!';
+        yield { type: 'reasoning-delta', text: 'Thinking' };
+        yield { type: 'text-delta', text: 'Hello' };
+        yield { type: 'text-delta', text: ' there' };
+        yield { type: 'text-delta', text: '!' };
       },
     };
 
     mockStreamText.mockReturnValue({
-      textStream: mockTextStream,
+      fullStream: mockFullStream,
     } as any);
   });
 
@@ -236,6 +237,28 @@ describe('useChatStreaming', () => {
 
       // Verify messages were updated
       expect(setMessagesMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('should stream reasoning chunks when provided', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      const mockOnThinkingChunk = jest.fn();
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            onThinkingChunk: mockOnThinkingChunk,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockOnThinkingChunk).toHaveBeenCalledTimes(1);
+      expect(mockOnThinkingChunk).toHaveBeenCalledWith('Thinking', 'Thinking');
     });
 
     it('should handle streaming with retry when enabled and retry fails', async () => {

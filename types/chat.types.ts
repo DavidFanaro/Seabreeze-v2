@@ -21,6 +21,7 @@ export interface UseChatOptions {
   chatId?: string;
   model?: LanguageModel;
   onChunk?: ChunkHandler;
+  onThinkingChunk?: ChunkHandler;
   onError?: (error: unknown) => void;
   onComplete?: () => void;
   onFallback?: (from: ProviderId, to: ProviderId, reason: string) => void;

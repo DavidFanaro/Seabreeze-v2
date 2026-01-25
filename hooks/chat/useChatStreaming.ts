@@ -130,6 +130,8 @@ interface StreamingOptions {
     effectiveProviderId: ProviderId;
     /** Callback fired when a new text chunk is received */
     onChunk?: (chunk: string, accumulated: string) => void;
+    /** Callback fired when a new thinking/reasoning chunk is received */
+    onThinkingChunk?: (chunk: string, accumulated: string) => void;
     /** Callback fired when an error occurs during streaming */
     onError?: (error: unknown) => void;
     /** Callback fired when falling back to another provider */
@@ -244,6 +246,7 @@ export function useChatStreaming() {
             activeProvider,
             effectiveProviderId,
             onChunk,
+            onThinkingChunk,
             onError,
             onFallback,
             onProviderChange,
@@ -251,6 +254,8 @@ export function useChatStreaming() {
 
         // Accumulator for the complete response text
         let accumulated = "";
+        // Accumulator for the complete reasoning output
+        let reasoningAccumulated = "";
         // Flag indicating whether we should retry with a different provider
         let shouldRetryWithFallback = false;
 
@@ -268,12 +273,36 @@ export function useChatStreaming() {
                 messages: messages,
             });
 
-            // Process each text chunk as it arrives
+            if (result.fullStream) {
+                for await (const part of result.fullStream) {
+                    if (part.type === "reasoning-delta") {
+                        reasoningAccumulated += part.text;
+                        onThinkingChunk?.(part.text, reasoningAccumulated);
+                        continue;
+                    }
+
+                    if (part.type === "text-delta") {
+                        accumulated += part.text;
+
+                        setMessages((prev) => {
+                            const next = [...prev];
+                            next[assistantIndex] = {
+                                role: "assistant",
+                                content: accumulated,
+                            };
+                            return next;
+                        });
+
+                        onChunk?.(part.text, accumulated);
+                    }
+                }
+                return;
+            }
+
+            // Fallback for older SDKs without fullStream
             for await (const chunk of result.textStream) {
-                // Accumulate the complete response
                 accumulated += chunk;
 
-                // Update the UI with the partial response
                 setMessages((prev) => {
                     const next = [...prev];
                     next[assistantIndex] = {
@@ -283,7 +312,6 @@ export function useChatStreaming() {
                     return next;
                 });
 
-                // Notify caller of the new chunk
                 onChunk?.(chunk, accumulated);
             }
         };

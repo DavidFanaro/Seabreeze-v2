@@ -17,21 +17,28 @@ jest.mock('@/hooks/useChatState', () => ({
   })),
 }));
 
-jest.mock('../useTitleGeneration', () => ({
-  useTitleGeneration: jest.fn(() => ({
+jest.mock('../useTitleGeneration', () => {
+  const mockTitleState = {
     title: 'Test Chat',
     setTitle: jest.fn(),
-    generateTitle: jest.fn().mockResolvedValue('Generated Title'),
+    generateTitle: jest.fn(async () => 'Generated Title'),
     resetTitle: jest.fn(),
-  })),
-}));
+  };
+
+  return {
+    useTitleGeneration: jest.fn(() => mockTitleState),
+  };
+});
 
 jest.mock('../useChatStreaming', () => ({
   useChatStreaming: jest.fn(() => ({
-    executeStreaming: jest.fn().mockResolvedValue({
-      success: true,
-      shouldRetryWithFallback: false,
-      accumulated: 'Test response',
+    executeStreaming: jest.fn(async (options: { onThinkingChunk?: (chunk: string, accumulated: string) => void }) => {
+      options.onThinkingChunk?.('Thinking', 'Thinking');
+      return {
+        success: true,
+        shouldRetryWithFallback: false,
+        accumulated: 'Test response',
+      };
     }),
     handleStreamingError: jest.fn(),
   })),
@@ -55,6 +62,7 @@ describe('useChat', () => {
 
       expect(result.current.text).toBe('');
       expect(result.current.messages).toEqual([]);
+      expect(result.current.thinkingOutput).toEqual([]);
       expect(result.current.isStreaming).toBe(false);
       expect(result.current.title).toBe('Test Chat');
       expect(result.current.currentProvider).toBe('apple');
@@ -127,6 +135,7 @@ describe('useChat', () => {
         role: 'assistant',
         content: '...',
       });
+      expect(result.current.thinkingOutput).toEqual(['', 'Thinking']);
       expect(result.current.text).toBe('');
       expect(result.current.isStreaming).toBe(false); // Streaming completes after act
     });
@@ -166,6 +175,7 @@ describe('useChat', () => {
 
       expect(result.current.text).toBe('');
       expect(result.current.messages).toEqual([]);
+      expect(result.current.thinkingOutput).toEqual([]);
       expect(result.current.isUsingFallback).toBe(false);
       expect(result.current.canRetry).toBe(false);
     });

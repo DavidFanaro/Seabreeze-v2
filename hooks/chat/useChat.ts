@@ -75,6 +75,10 @@ export interface UseChatReturn {
     messages: ModelMessage[];
     /** Function to update the messages array */
     setMessages: React.Dispatch<React.SetStateAction<ModelMessage[]>>;
+    /** Array of reasoning output aligned with messages */
+    thinkingOutput: string[];
+    /** Function to update the thinking output array */
+    setThinkingOutput: React.Dispatch<React.SetStateAction<string[]>>;
     /** Whether the AI is currently streaming a response */
     isStreaming: boolean;
     /** Send a message to the AI (optionally override current text) */
@@ -132,6 +136,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         chatId,                           // Modern unified state management
         model: providedModel,             // Direct model injection (testing)
         onChunk,                          // Callback for streaming chunks
+        onThinkingChunk,                  // Callback for streaming thinking chunks
         onError,                          // Error handling callback
         onComplete,                       // Completion callback
         onFallback,                       // Provider fallback notification
@@ -167,6 +172,9 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     
     const [text, setText] = useState<string>(initialText);           // Input field content
     const [messages, setMessages] = useState<ModelMessage[]>(initialMessages); // Message history
+    const [thinkingOutput, setThinkingOutput] = useState<string[]>(
+        () => initialMessages.map(() => "")
+    );
     const [isStreaming, setIsStreaming] = useState<boolean>(false);  // Streaming status
     
     // =============================================================================
@@ -291,6 +299,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     const reset = useCallback(() => {
         setText("");                              // Clear input field
         setMessages([]);                          // Clear message history
+        setThinkingOutput([]);                    // Clear reasoning output
         setTitle("Chat");                         // Reset to default title
         setActiveProvider(effectiveProviderId);   // Reset to intended provider
         setActiveModel(effectiveModelId);        // Reset to intended model
@@ -358,6 +367,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             const userMessage: ModelMessage = { role: "user", content };
             const updatedMessages = [...messages, userMessage];
             setMessages(updatedMessages);
+            setThinkingOutput((prev) => [...prev, ""]);
 
             // Clear input field if we're using the current text (not override)
             if (overrideText === undefined) {
@@ -373,6 +383,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                     content: placeholder,
                 },
             ]);
+            setThinkingOutput((prev) => [...prev, ""]);
 
             // ────────────────────────────────────────────────────────────────
             // MODEL VALIDATION
@@ -411,6 +422,14 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 activeProvider,
                 effectiveProviderId,
                 onChunk,
+                onThinkingChunk: (chunk: string, accumulated: string) => {
+                    setThinkingOutput((prev) => {
+                        const next = [...prev];
+                        next[assistantIndex] = accumulated;
+                        return next;
+                    });
+                    onThinkingChunk?.(chunk, accumulated);
+                },
                 onError,
                 onFallback,
                 onProviderChange: (provider: ProviderId, model: string, isFallback: boolean) => {
@@ -460,6 +479,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             mergedRetryConfig,
             executeStreaming,
             onChunk, 
+            onThinkingChunk,
             onComplete, 
             onError, 
             onFallback,
@@ -495,10 +515,22 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             }
             return prev;
         });
+        setThinkingOutput((prev) => {
+            if (prev.length >= 1) {
+                return prev.slice(0, -1);
+            }
+            return prev;
+        });
 
         // Remove the original user message (we'll resend it fresh)
         setMessages((prev) => {
             if (prev.length >= 1 && prev[prev.length - 1].role === "user") {
+                return prev.slice(0, -1);
+            }
+            return prev;
+        });
+        setThinkingOutput((prev) => {
+            if (prev.length >= 1) {
                 return prev.slice(0, -1);
             }
             return prev;
@@ -525,6 +557,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         setText,                        // Update input text
         messages,                       // Message history
         setMessages,                    // Update message history
+        thinkingOutput,                 // Reasoning output
+        setThinkingOutput,              // Update reasoning output
         isStreaming,                    // Streaming status
         
         // ────────────────────────────────────────────────────────────────

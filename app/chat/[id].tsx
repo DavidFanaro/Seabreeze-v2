@@ -35,10 +35,12 @@ export default function Chat() {
         text,
         setText,
         messages,
+        thinkingOutput,
         sendMessage,
         reset,
         isStreaming,
         setMessages,
+        setThinkingOutput,
         generateTitle,
         setTitle,
         title,
@@ -80,7 +82,7 @@ export default function Chat() {
                                 .insert(chat)
                                 .values({
                                     messages: messages,
-                                    thinkingOutput: [],
+                                    thinkingOutput: thinkingOutput,
                                     title: null,
                                     // Use current active provider/model (may be fallback)
                                     providerId: currentProvider,
@@ -100,6 +102,7 @@ export default function Chat() {
                         .update(chat)
                         .set({
                             messages: messages,
+                            thinkingOutput: thinkingOutput,
                             providerId: currentProvider,
                             modelId: currentModel,
                             updatedAt: now
@@ -149,11 +152,12 @@ export default function Chat() {
         }
         setIsInitializing(true);
         setMessages([]);
+        setThinkingOutput([]);
         setTitle("Chat");
         setText("");
         setChatID(0);
         clearOverride();
-    }, [chatIdParam, setMessages, setTitle, setText, clearOverride]);
+    }, [chatIdParam, setMessages, setThinkingOutput, setTitle, setText, clearOverride]);
 
     // Load existing chat data
     useEffect(() => {
@@ -173,7 +177,11 @@ export default function Chat() {
 
                     if (data) {
                         const messages = data.messages as ModelMessage[];
+                        const thinkingOutput = Array.isArray(data.thinkingOutput)
+                            ? (data.thinkingOutput as string[])
+                            : [];
                         setMessages(messages);
+                        setThinkingOutput(thinkingOutput);
                         setTitle(data.title as string);
                         setChatID(id);
                         currentChatIdRef.current = chatIdParam;
@@ -187,6 +195,7 @@ export default function Chat() {
                         }
                     } else {
                         setMessages([]);
+                        setThinkingOutput([]);
                         setTitle("Chat");
                         setChatID(0);
                         clearOverride();
@@ -201,12 +210,13 @@ export default function Chat() {
                 }
             } else {
                 currentChatIdRef.current = "new";
+                setThinkingOutput([]);
                 setIsInitializing(false);
             }
         };
         setupChat();
         // Only run when params.id changes to load a different chat
-    }, [chatIdParam, db, setMessages, setTitle, syncFromDatabase, clearOverride]);
+    }, [chatIdParam, db, setMessages, setThinkingOutput, setTitle, syncFromDatabase, clearOverride]);
 
      return (
          <>
