@@ -81,13 +81,13 @@ describe('OpenAISettings Component', () => {
 
   describe('Rendering', () => {
     it('should render without crashing', () => {
-      const { getByTestId } = render(<OpenAISettings />);
+      render(<OpenAISettings />);
       // Component renders successfully if we reach here
       expect(true).toBe(true);
     });
 
     it('should render with valid structure', () => {
-      const { getByTestId } = render(<OpenAISettings />);
+      render(<OpenAISettings />);
       // Component successfully renders without errors
       expect(true).toBe(true);
     });
@@ -100,7 +100,7 @@ describe('OpenAISettings Component', () => {
     });
 
     it('should use themed background color', () => {
-      const { getByTestId } = render(<OpenAISettings />);
+      render(<OpenAISettings />);
       // The component receives and applies theme colors from useTheme hook
       expect(true).toBe(true);
     });

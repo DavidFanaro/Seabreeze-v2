@@ -17,6 +17,7 @@ export default function Chat() {
     const db = useDatabase();
     const { theme } = useTheme();
     const thinkingEnabled = useSettingsStore((state) => state.thinkingEnabled);
+    const thinkingLevel = useSettingsStore((state) => state.thinkingLevel);
     const params = useLocalSearchParams<{ id?: string | string[] }>();
     
     // Get chat ID from params (or "new" for new chats)
@@ -53,6 +54,7 @@ export default function Chat() {
     } = useChat({ 
         chatId: chatIdParam,
         enableThinking: thinkingEnabled,
+        thinkingLevel,
         onFallback: (from, to, reason) => {
         },
         onError: (error) => {

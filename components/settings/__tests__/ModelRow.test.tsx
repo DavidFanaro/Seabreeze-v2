@@ -5,6 +5,8 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { render, fireEvent, screen } from '@testing-library/react-native';
 import React from 'react';
+import * as Haptics from 'expo-haptics';
+import { Text } from 'react-native';
 
 import { ModelRow } from '../ModelRow';
 import type { Theme } from '@/components/ui/ThemeProvider';
@@ -23,11 +25,8 @@ jest.mock('expo-haptics', () => ({
 
 // Mock expo-symbols - return proper React element with Text wrapper
 jest.mock('expo-symbols', () => {
-    const React = require('react');
-    const { Text } = require('react-native');
-    
     return {
-        SymbolView: ({ name, size, tintColor }: any) => 
+        SymbolView: ({ name, size, tintColor }: any) =>
             React.createElement(Text, {}, `SymbolView-${name}-${size}-${tintColor}`),
     };
 });
@@ -273,8 +272,6 @@ describe('ModelRow', () => {
         });
 
         it('should call onEdit with haptic feedback when edit button is pressed', async () => {
-            const { impactAsync } = require('expo-haptics');
-
             render(
                 <TestWrapper>
                     <ModelRow {...defaultProps} isCustom={true} isEditMode={true} />
@@ -284,13 +281,11 @@ describe('ModelRow', () => {
             const editButton = screen.getByText('SymbolView-pencil-14-#F5F5F5');
             fireEvent.press(editButton);
 
-            expect(impactAsync).toHaveBeenCalledWith('Light');
+            expect(Haptics.impactAsync).toHaveBeenCalledWith('Light');
             expect(defaultProps.onEdit).toHaveBeenCalledTimes(1);
         });
 
         it('should call onDelete with haptic feedback when delete button is pressed', async () => {
-            const { notificationAsync } = require('expo-haptics');
-
             render(
                 <TestWrapper>
                     <ModelRow {...defaultProps} isEditMode={true} />
@@ -300,7 +295,7 @@ describe('ModelRow', () => {
             const deleteButton = screen.getByText('SymbolView-trash-14-#F5F5F5');
             fireEvent.press(deleteButton);
 
-            expect(notificationAsync).toHaveBeenCalledWith('Error');
+            expect(Haptics.notificationAsync).toHaveBeenCalledWith('Error');
             expect(defaultProps.onDelete).toHaveBeenCalledTimes(1);
         });
 

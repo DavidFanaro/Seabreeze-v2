@@ -5,7 +5,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { render, fireEvent, screen } from '@testing-library/react-native';
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { ModelListManager } from '../ModelListManager';
 import { ThemeProvider } from '@/components/ui/ThemeProvider';
@@ -17,9 +17,8 @@ jest.mock('@/stores');
 // Mock ModelRow component  
 jest.mock('../ModelRow', () => ({
     ModelRow: ({ model, isSelected, isCustom, isEditMode, onSelect, onEdit, onDelete, theme, disabled }: any) => {
-        const { View, Text, Pressable } = require('react-native');
         return (
-            <View 
+            <Pressable 
                 testID={`model-row-${model}`}
                 onPress={onSelect}
                 disabled={disabled || isEditMode}
@@ -33,7 +32,7 @@ jest.mock('../ModelRow', () => ({
                     </View>
                 )}
                 {isSelected && !isEditMode && <Text testID="selected-indicator">✓</Text>}
-            </View>
+            </Pressable>
         );
     },
 }));

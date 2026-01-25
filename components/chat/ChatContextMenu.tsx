@@ -10,12 +10,14 @@ import { SymbolView } from "expo-symbols";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { useProviderStore, isProviderConfigured } from "@/stores";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import type { ThinkingLevel } from "@/types/chat.types";
 import {
   ProviderId,
   PROVIDERS,
   OPENAI_MODELS,
   OPENROUTER_MODELS,
   OLLAMA_MODELS,
+  isThinkingCapableModel,
 } from "@/types/provider.types";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
 
@@ -102,6 +104,8 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
 
   const thinkingEnabled = useSettingsStore((state) => state.thinkingEnabled);
   const setThinkingEnabled = useSettingsStore((state) => state.setThinkingEnabled);
+  const thinkingLevel = useSettingsStore((state) => state.thinkingLevel);
+  const setThinkingLevel = useSettingsStore((state) => state.setThinkingLevel);
 
   // ============================================================================
   // CONSTANTS
@@ -109,6 +113,11 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
 
   /** List of all available AI providers in the application */
   const providers: ProviderId[] = ["apple", "openai", "openrouter", "ollama"];
+  const thinkingLevels: { label: string; value: ThinkingLevel }[] = [
+    { label: "Low", value: "low" },
+    { label: "Medium", value: "medium" },
+    { label: "High", value: "high" },
+  ];
 
   // ============================================================================
   // COMPUTED STATE
@@ -179,6 +188,14 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
     setThinkingEnabled(!thinkingEnabled);
   };
 
+  /**
+   * Update reasoning effort level for supported models
+   */
+  const handleThinkingLevelSelect = (level: ThinkingLevel) => {
+    triggerPress("light");
+    setThinkingLevel(level);
+  };
+
   // ============================================================================
   // HELPER FUNCTIONS
   // ============================================================================
@@ -198,6 +215,11 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
     }
     return selectedModel === model;
   };
+
+  const isThinkingLevelAvailable = isThinkingCapableModel(
+    selectedProvider,
+    selectedModel ?? "",
+  );
 
   // ============================================================================
   // RENDER
@@ -225,6 +247,26 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
           >
             Thinking Output
           </Button>
+
+          {isThinkingLevelAvailable && (
+            <Submenu
+              button={(
+                <Button>
+                  Thinking Level
+                </Button>
+              )}
+            >
+              {thinkingLevels.map((level) => (
+                <Button
+                  key={level.value}
+                  systemImage={thinkingLevel === level.value ? "checkmark" : undefined}
+                  onPress={() => handleThinkingLevelSelect(level.value)}
+                >
+                  {level.label}
+                </Button>
+              ))}
+            </Submenu>
+          )}
 
           {/* ====================================================================
               PROVIDER & MODEL SELECTION SECTION

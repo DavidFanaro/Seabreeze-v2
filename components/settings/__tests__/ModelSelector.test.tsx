@@ -7,7 +7,7 @@ import { render, fireEvent, screen } from '@testing-library/react-native';
 import React from 'react';
 
 import { ModelSelector } from '../ModelSelector';
-import { ProviderId, PROVIDERS } from '@/types/provider.types';
+import { ProviderId } from '@/types/provider.types';
 import type { Theme } from '@/components/ui/ThemeProvider';
 
 // Mock ThemeContext to avoid loading state issues
@@ -191,8 +191,6 @@ describe('ModelSelector', () => {
 
     describe('Model Name Display', () => {
         it('should truncate long model names', () => {
-            const longModelName = 'very-long-model-name-that-should-be-truncated';
-            
             render(<ModelSelector {...defaultProps} />);
             
             const modelText = screen.getByText('gpt-4');

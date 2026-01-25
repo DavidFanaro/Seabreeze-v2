@@ -6,7 +6,6 @@
 import React from "react";
 import { render, fireEvent } from "@testing-library/react-native";
 import { ProviderSelector } from "../ProviderSelector";
-import { ProviderId } from "@/types/provider.types";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { isProviderConfigured } from "@/stores";
 

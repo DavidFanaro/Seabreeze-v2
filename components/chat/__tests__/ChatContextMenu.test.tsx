@@ -91,6 +91,7 @@ describe("ChatContextMenu", () => {
   const mockSetSelectedModel = jest.fn();
   const mockOnReset = jest.fn();
   const mockSetThinkingEnabled = jest.fn();
+  const mockSetThinkingLevel = jest.fn();
 
   const mockTheme = {
     colors: {
@@ -111,12 +112,15 @@ describe("ChatContextMenu", () => {
   const mockSettingsStore = {
     thinkingEnabled: true,
     setThinkingEnabled: mockSetThinkingEnabled,
+    thinkingLevel: "medium",
+    setThinkingLevel: mockSetThinkingLevel,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
 
     mockSettingsStore.thinkingEnabled = true;
+    mockSettingsStore.thinkingLevel = "medium";
 
     (useHapticFeedback as jest.Mock).mockReturnValue({
       triggerPress: mockTriggerPress,
@@ -191,6 +195,41 @@ describe("ChatContextMenu", () => {
 
       expect(mockTriggerPress).toHaveBeenCalledWith("light");
       expect(mockSetThinkingEnabled).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe("Thinking Level Selection", () => {
+    it("should render thinking level options for thinking-capable models", () => {
+      const storeWithThinkingModel = {
+        ...mockProviderStore,
+        selectedProvider: "openai" as const,
+        selectedModel: "gpt-4o",
+      };
+      (useProviderStore as unknown as jest.Mock).mockReturnValue(storeWithThinkingModel);
+
+      render(<ChatContextMenu onReset={mockOnReset} />);
+
+      expect(screen.getByTestId("button-Thinking Level")).toBeTruthy();
+      expect(screen.getByTestId("button-Low")).toBeTruthy();
+      expect(screen.getByTestId("button-Medium")).toBeTruthy();
+      expect(screen.getByTestId("button-High")).toBeTruthy();
+    });
+
+    it("should update thinking level when an option is selected", () => {
+      const storeWithThinkingModel = {
+        ...mockProviderStore,
+        selectedProvider: "openai" as const,
+        selectedModel: "gpt-4o",
+      };
+      (useProviderStore as unknown as jest.Mock).mockReturnValue(storeWithThinkingModel);
+
+      render(<ChatContextMenu onReset={mockOnReset} />);
+
+      const highButton = screen.getByTestId("button-High");
+      fireEvent.press(highButton);
+
+      expect(mockTriggerPress).toHaveBeenCalledWith("light");
+      expect(mockSetThinkingLevel).toHaveBeenCalledWith("high");
     });
   });
 
@@ -372,8 +411,8 @@ describe("ChatContextMenu", () => {
 
     it("should handle empty provider store gracefully", () => {
       const emptyStore = {
-        selectedProvider: null,
-        selectedModel: null,
+        selectedProvider: "apple" as const,
+        selectedModel: "",
         customModels: {},
         hiddenModels: {},
         availableModels: {},

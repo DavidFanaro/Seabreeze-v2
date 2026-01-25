@@ -8,6 +8,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import * as SecureStore from "expo-secure-store";
 
+import type { ThinkingLevel } from "@/types/chat.types";
+
 /**
  * Custom secure storage adapter for Zustand persistence
  * 
@@ -116,6 +118,13 @@ interface SettingsState {
    * alongside assistant messages when available.
    */
   thinkingEnabled: boolean;
+
+  /**
+   * Controls reasoning effort for supported models
+   *
+   * Applies to providers/models that support adjustable thinking levels.
+   */
+  thinkingLevel: ThinkingLevel;
   
   /**
    * Controls the font size for chat messages in pixels
@@ -182,6 +191,13 @@ interface SettingsActions {
    * @param enabled - Whether thinking output should be captured
    */
   setThinkingEnabled: (enabled: boolean) => void;
+
+  /**
+   * Updates reasoning effort for supported models
+   *
+   * @param level - The thinking level to apply
+   */
+  setThinkingLevel: (level: ThinkingLevel) => void;
   
   /**
    * Updates the message font size
@@ -234,6 +250,11 @@ const DEFAULT_SETTINGS: SettingsState = {
    * Thinking output enabled to surface reasoning details when available.
    */
   thinkingEnabled: true,
+
+  /**
+   * Default thinking effort level for supported models.
+   */
+  thinkingLevel: "medium",
   
   /**
    * 16px font size provides good readability on most devices
@@ -277,6 +298,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       setHapticEnabled: (enabled) => set({ hapticEnabled: enabled }),
       setAutoGenerateTitles: (enabled) => set({ autoGenerateTitles: enabled }),
       setThinkingEnabled: (enabled) => set({ thinkingEnabled: enabled }),
+      setThinkingLevel: (level) => set({ thinkingLevel: level }),
       setMessageFontSize: (size) => set({ messageFontSize: size }),
       setShowCodeLineNumbers: (enabled) => set({ showCodeLineNumbers: enabled }),
       resetSettings: () => set(DEFAULT_SETTINGS),
