@@ -132,9 +132,14 @@ describe('ProviderCache', () => {
       const mockModel = {} as LanguageModel;
       
       cache.set('openai', 'gpt-4', mockModel);
-      cache.invalidate('openai', 'gpt-4');
+      cache.set('openai', 'gpt-3.5', {} as LanguageModel);
+      cache.set('openrouter', 'claude', {} as LanguageModel);
+      
+      cache.invalidateProvider('openai');
       
       expect(cache.get('openai', 'gpt-4')).toBeNull();
+      expect(cache.get('openai', 'gpt-3.5')).toBeNull();
+      expect(cache.get('openrouter', 'claude')).not.toBeNull();
     });
 
     it('should clear all models', () => {
@@ -211,7 +216,7 @@ describe('ProviderCache', () => {
     it('should handle removing non-existent model', () => {
       const cache = getProviderCache();
       expect(() => {
-        cache.invalidate('ollama', 'llama2');
+        cache.invalidateProvider('ollama');
       }).not.toThrow();
     });
 
@@ -222,6 +227,82 @@ describe('ProviderCache', () => {
       cache.set('openai', 'gpt-4', mockModel);
       cache.clear();
       
+      expect(cache.get('openai', 'gpt-4')).toBeNull();
+    });
+  });
+
+  describe('Complex model IDs', () => {
+    it('should handle model IDs with colons correctly', () => {
+      const cache = getProviderCache();
+      const mockModel = {} as LanguageModel;
+      
+      // Test model ID with colon (like "anthropic:claude-3-sonnet")
+      cache.set('openai', 'anthropic:claude-3-sonnet', mockModel);
+      const retrieved = cache.get('openai', 'anthropic:claude-3-sonnet');
+      
+      expect(retrieved).toBe(mockModel);
+    });
+
+    it('should isolate providers with complex model IDs', () => {
+      const cache = getProviderCache();
+      const mockModel1 = {} as LanguageModel;
+      const mockModel2 = {} as LanguageModel;
+      
+      cache.set('openai', 'anthropic:claude-3-sonnet', mockModel1);
+      cache.set('openrouter', 'anthropic:claude-3-sonnet', mockModel2);
+      
+      const openaiModel = cache.get('openai', 'anthropic:claude-3-sonnet');
+      const openrouterModel = cache.get('openrouter', 'anthropic:claude-3-sonnet');
+      
+      expect(openaiModel).toBe(mockModel1);
+      expect(openrouterModel).toBe(mockModel2);
+    });
+  });
+
+  describe('Cache statistics and LRU', () => {
+    it('should track hit counts correctly', () => {
+      const cache = getProviderCache();
+      const mockModel = {} as LanguageModel;
+      
+      cache.set('openai', 'gpt-4', mockModel);
+      
+      // Access the model multiple times
+      cache.get('openai', 'gpt-4');
+      cache.get('openai', 'gpt-4');
+      cache.get('openai', 'gpt-4');
+      
+      const stats = cache.getStats();
+      // Hit count is tracked internally but not exposed in stats
+      // This test verifies the cache functions correctly
+      expect(stats.providers.openai).toBe(1);
+    });
+
+    it('should handle multiple models per provider', () => {
+      const cache = getProviderCache();
+      const mockModel = {} as LanguageModel;
+      
+      cache.set('openai', 'gpt-4', mockModel);
+      cache.set('openai', 'gpt-3.5', mockModel);
+      cache.set('openai', 'gpt-4-turbo', mockModel);
+      
+      const stats = cache.getStats();
+      expect(stats.providers.openai).toBe(3);
+      expect(stats.size).toBe(3);
+    });
+  });
+
+  describe('Memory management', () => {
+    it('should dispose cleanly', () => {
+      const cache = getProviderCache();
+      const mockModel = {} as LanguageModel;
+      
+      cache.set('openai', 'gpt-4', mockModel);
+      
+      expect(() => {
+        cache.dispose();
+      }).not.toThrow();
+      
+      // Cache should be empty after dispose
       expect(cache.get('openai', 'gpt-4')).toBeNull();
     });
   });

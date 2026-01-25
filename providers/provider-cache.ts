@@ -2,24 +2,106 @@ import { LanguageModel } from "ai";
 import { ProviderId } from "@/types/provider.types";
 
 /**
- * Cache entry with metadata
+ * @file provider-cache.ts
+ * @purpose AI Provider Model Caching System
+ * 
+ * This module implements a sophisticated caching system for AI language models
+ * that optimizes performance in chat applications by re expensive model recreation.
+ * 
+ * ## Key Features
+ * 
+ * ### Performance Optimization
+ * - **Model Reuse**: Caches initialized model instances to avoid repeated setup costs
+ * - **Memory Management**: LRU eviction prevents memory bloat
+ * - **Automatic Cleanup**: Time-based expiration ensures fresh model instances
+ * 
+ * ### Provider Isolation
+ * - **Separate Caches**: Each provider maintains independent cache entries
+ * - **Selective Invalidation**: Clear specific provider caches without affecting others
+ * - **Credential Safety**: Automatic cache invalidation when provider keys change
+ * 
+ * ### Usage Analytics
+ * - **Hit Rate Tracking**: Monitor cache effectiveness
+ * - **Access Patterns**: LRU algorithm keeps frequently used models
+ * - **Statistics**: Entry age and hit count for performance monitoring
+ * 
+ * ## Architecture
+ * 
+ * The cache uses a singleton pattern to ensure consistent caching across
+ * the application. Each entry contains:
+ * 
+ * - **Model Instance**: The actual AI model object
+ * - **Creation Timestamp**: For TTL enforcement
+ * - **Last Used**: For LRU eviction decisions  
+ * - **Hit Count**: For usage statistics
+ * 
+ * ## Usage Examples
+ * 
+ * ```typescript
+ * // Cache a model
+ * providerCache.set('openai', 'gpt-4', model);
+ * 
+ * // Retrieve from cache
+ * const cached = providerCache.get('openai', 'gpt-4');
+ * 
+ * // Invalidate provider (e.g., after API key change)
+ * providerCache.invalidateProvider('openai');
+ * 
+ * // Get usage statistics
+ * const stats = providerCache.getStats();
+ * ```
+ * 
+ * ## Configuration
+ * 
+ * Default settings balance performance and memory usage:
+ * - Maximum entries: 10 models
+ * - TTL: 5 minutes  
+ * - Cleanup interval: 1 minute
+ * 
+ * These can be customized per deployment requirements.
+ */
+
+/**
+ * Cache entry with metadata for tracking usage patterns
+ * 
+ * This interface defines the structure of each cached item, including
+ * the actual model instance and metadata for cache management.
  */
 interface CacheEntry {
-  model: LanguageModel;
-  createdAt: number;
-  lastUsed: number;
-  hitCount: number;
+  model: LanguageModel;           // The cached AI language model instance
+  createdAt: number;              // Timestamp when entry was created (ms since epoch)
+  lastUsed: number;               // Timestamp of last access (ms since epoch)
+  hitCount: number;               // Number of times this entry has been accessed
 }
 
 /**
- * Cache key format: providerId:modelId
+ * Internal cache key format: providerId:modelId
+ * 
+ * Uses a simple string format to uniquely identify cached models
+ * across different providers and model types.
  */
 type CacheKey = string;
 
+/**
+ * Creates a cache key from provider and model identifiers
+ * 
+ * @param providerId - The AI provider (apple, openai, openrouter, ollama)
+ * @param modelId - The specific model identifier
+ * @returns A unique cache key string
+ */
 function createCacheKey(providerId: ProviderId, modelId: string): CacheKey {
   return `${providerId}:${modelId}`;
 }
 
+/**
+ * Parses a cache key back into provider and model components
+ * 
+ * Handles model IDs that may contain colons (e.g., "anthropic:claude-3-sonnet")
+ * by joining all parts after the first colon.
+ * 
+ * @param key - The cache key to parse
+ * @returns Object with providerId and modelId, or null if invalid format
+ */
 function parseCacheKey(key: CacheKey): { providerId: ProviderId; modelId: string } | null {
   const parts = key.split(":");
   if (parts.length < 2) return null;
@@ -30,14 +112,24 @@ function parseCacheKey(key: CacheKey): { providerId: ProviderId; modelId: string
 }
 
 /**
- * Configuration for the provider cache
+ * Configuration interface for the provider cache system
+ * 
+ * Allows customization of cache behavior for different use cases
+ * and deployment environments.
  */
 export interface ProviderCacheConfig {
-  maxEntries: number;
-  maxAgeMs: number;
-  cleanupIntervalMs: number;
+  maxEntries: number;          // Maximum number of cached models to store
+  maxAgeMs: number;            // Maximum age before automatic expiry (ms)
+  cleanupIntervalMs: number;   // Interval for periodic cleanup (ms)
 }
 
+/**
+ * Default cache configuration optimized for typical usage
+ * 
+ * - maxEntries: 10 models balances memory usage with performance
+ * - maxAgeMs: 5 minutes ensures models stay fresh while avoiding expensive recreations
+ * - cleanupIntervalMs: 1 minute provides responsive cleanup without excessive overhead
+ */
 const DEFAULT_CONFIG: ProviderCacheConfig = {
   maxEntries: 10,
   maxAgeMs: 5 * 60 * 1000, // 5 minutes
@@ -45,13 +137,30 @@ const DEFAULT_CONFIG: ProviderCacheConfig = {
 };
 
 /**
- * Singleton provider cache for reusing model instances
+ * Singleton provider cache for reusing AI model instances
+ * 
+ * This class implements a sophisticated caching system for AI language models
+ * with the following features:
+ * 
+ * 1. **Memory Management**: LRU (Least Recently Used) eviction strategy
+ * 2. **Time-based Expiry**: Automatic cleanup of stale cache entries
+ * 3. **Usage Statistics**: Track cache hit rates and access patterns
+ * 4. **Provider Isolation**: Separate cache invalidation per provider
+ * 5. **Configurable Limits**: Customizable cache size and TTL
+ * 
+ * The cache is designed to optimize performance in chat applications by
+ * avoiding expensive model recreation while managing memory constraints.
  */
 class ProviderCache {
-  private cache: Map<CacheKey, CacheEntry> = new Map();
-  private config: ProviderCacheConfig;
-  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+  private cache: Map<CacheKey, CacheEntry> = new Map();           // Main storage
+  private config: ProviderCacheConfig;                             // Cache settings
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null; // Periodic cleanup
 
+  /**
+   * Initialize the cache with optional configuration overrides
+   * 
+   * @param config - Partial configuration to override defaults
+   */
   constructor(config: Partial<ProviderCacheConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.startCleanupTimer();
@@ -59,6 +168,12 @@ class ProviderCache {
 
   /**
    * Start periodic cleanup of expired entries
+   * 
+   * Initializes a timer that runs the cleanup operation at the configured
+   * interval. This ensures stale entries are removed even without explicit
+   * access attempts.
+   * 
+   * The timer is cleared and restarted if called multiple times.
    */
   private startCleanupTimer(): void {
     if (this.cleanupTimer) {
@@ -70,7 +185,17 @@ class ProviderCache {
   }
 
   /**
-   * Get a cached model or null if not found/expired
+   * Retrieve a cached model instance
+   * 
+   * This method implements the core cache lookup logic with:
+   * - Cache hit detection
+   - TTL (Time To Live) validation
+   - Usage statistics tracking
+   * - Automatic cleanup of expired entries
+   * 
+   * @param providerId - The AI provider identifier
+   * @param modelId - The model identifier
+   * @returns The cached model or null if not found/expired
    */
   get(providerId: ProviderId, modelId: string): LanguageModel | null {
     const key = createCacheKey(providerId, modelId);
@@ -80,14 +205,14 @@ class ProviderCache {
       return null;
     }
 
-    // Check if expired
+    // Check if expired based on TTL
     const now = Date.now();
     if (now - entry.createdAt > this.config.maxAgeMs) {
       this.cache.delete(key);
       return null;
     }
 
-    // Update usage stats
+    // Update usage statistics for LRU tracking
     entry.lastUsed = now;
     entry.hitCount += 1;
 
@@ -96,12 +221,22 @@ class ProviderCache {
 
   /**
    * Cache a model instance
+   * 
+   * Stores the model in the cache with metadata. If the cache is at capacity
+   * and this is a new entry (not updating existing), it will evict the LRU entry.
+   * 
+   * This method is idempotent - calling it multiple times with the same key
+   * will update the entry without creating duplicates.
+   * 
+   * @param providerId - The AI provider identifier
+   * @param modelId - The model identifier  
+   * @param model - The model instance to cache
    */
   set(providerId: ProviderId, modelId: string, model: LanguageModel): void {
     const key = createCacheKey(providerId, modelId);
     const now = Date.now();
 
-    // Evict if at capacity
+    // Evict if at capacity (but not if updating existing entry)
     if (this.cache.size >= this.config.maxEntries && !this.cache.has(key)) {
       this.evictLeastRecentlyUsed();
     }
@@ -132,34 +267,46 @@ class ProviderCache {
     return true;
   }
 
-  /**
+/**
    * Invalidate all cached models for a specific provider
-   * Useful when API key changes
+   * 
+   * This method is crucial for scenarios where provider credentials change
+   * or when a provider needs to be reset. It efficiently removes all entries
+   * belonging to the specified provider without affecting other providers.
+   * 
+   * Common use cases:
+   * - API key rotation
+   * - Provider reinitialization
+   * - Provider-specific error recovery
+   * 
+   * @param providerId - The provider whose cached models should be invalidated
    */
   invalidateProvider(providerId: ProviderId): void {
     const keysToDelete: CacheKey[] = [];
     
+    // Collect keys that match the provider prefix
     for (const key of this.cache.keys()) {
       if (key.startsWith(`${providerId}:`)) {
         keysToDelete.push(key);
       }
     }
     
+    // Delete collected keys (separate collection to avoid iterator issues)
     for (const key of keysToDelete) {
       this.cache.delete(key);
     }
   }
 
-  /**
-   * Invalidate a specific model
-   */
-  invalidate(providerId: ProviderId, modelId: string): void {
-    const key = createCacheKey(providerId, modelId);
-    this.cache.delete(key);
-  }
-
-  /**
-   * Clear all cached models
+/**
+   * Clear the entire cache
+   * 
+   * Removes all cached models and resets the cache to its initial state.
+   * This is a destructive operation that affects all providers.
+   * 
+   * Use cases:
+   * - Memory cleanup in low-memory situations
+   * - Application logout/user switch
+   * - Complete cache reset after configuration changes
    */
   clear(): void {
     this.cache.clear();
@@ -206,45 +353,72 @@ class ProviderCache {
     };
   }
 
-  /**
-   * Remove expired entries
+/**
+   * Remove expired entries based on TTL
+   * 
+   * This method is called periodically by the cleanup timer and manually
+   * during cache operations. It efficiently removes stale entries that
+   * have exceeded their maximum age.
+   * 
+   * The two-pass approach (collect then delete) avoids iterator invalidation
+   * issues that can occur when modifying a Map during iteration.
    */
   private cleanup(): void {
     const now = Date.now();
     const keysToDelete: CacheKey[] = [];
 
-    for (const [key, entry] of this.cache.entries()) {
+    // First pass: identify expired entries
+    for (const [key, entry] of this.cache) {
       if (now - entry.createdAt > this.config.maxAgeMs) {
         keysToDelete.push(key);
       }
     }
 
+    // Second pass: remove identified entries
     for (const key of keysToDelete) {
       this.cache.delete(key);
     }
   }
 
-  /**
+/**
    * Evict the least recently used entry
+   * 
+   * Implements the LRU (Least Recently Used) eviction strategy by finding
+   * the entry with the oldest lastUsed timestamp. This ensures we keep
+   * the most frequently accessed models when the cache reaches capacity.
+   * 
+   * This method is called automatically when inserting a new entry would
+   * exceed the configured maxEntries limit.
    */
   private evictLeastRecentlyUsed(): void {
     let lruKey: CacheKey | null = null;
-    let lruTime = Infinity;
+    let oldestAccess = Date.now();
 
-    for (const [key, entry] of this.cache.entries()) {
-      if (entry.lastUsed < lruTime) {
-        lruTime = entry.lastUsed;
+    // Find entry with the oldest lastUsed timestamp
+    for (const [key, entry] of this.cache) {
+      if (entry.lastUsed < oldestAccess) {
+        oldestAccess = entry.lastUsed;
         lruKey = key;
       }
     }
 
+    // Remove the least recently used entry
     if (lruKey) {
       this.cache.delete(lruKey);
     }
   }
 
-  /**
-   * Stop the cleanup timer (for testing/cleanup)
+/**
+   * Dispose of the cache and clean up resources
+   * 
+   * This method should be called when the cache is no longer needed
+   * to prevent memory leaks. It stops the cleanup timer and clears all
+   * cached entries, releasing references to model instances.
+   * 
+   * Use cases:
+   * - Application shutdown
+   * - Memory cleanup during user logout
+   * - Cache reset after major configuration changes
    */
   dispose(): void {
     if (this.cleanupTimer) {
