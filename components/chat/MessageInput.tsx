@@ -15,7 +15,7 @@ import useHapticFeedback from "@/hooks/useHapticFeedback";
  * @property {function} onSend - Callback fired when the send button is pressed
  * @property {string} [placeholder] - Placeholder text displayed when input is empty
  * @property {boolean} [disabled] - Whether the input field and send button are disabled
- * @property {ViewStyle} [style] - Optional custom styles to merge with the container
+ * @property {ViewStyle} [style] - Optional custom styles to merge with the input container
  */
 interface MessageInputProps {
     value: string;
@@ -78,35 +78,34 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
     return (
         // ====================================================================
-        // SECTION: Container
+        // SECTION: Layout Wrapper
         // ====================================================================
-        // Main container view that acts as the background for the entire input area.
-        // Layout: flex-row with items aligned to bottom
-        // Styling: rounded corners (xl), horizontal margins, padding, and theme surface color
         <View
-            className="flex-row items-end mx-4 my-2 pl-4 pr-1 py-1 rounded-xl min-h-12"
-            style={[{ backgroundColor: theme.colors.surface }, style]}
+            testID="message-input-wrapper"
+            className="flex-row items-end mx-4 my-2"
         >
             {/* ================================================================
-                SECTION: Text Input Field
+                SECTION: Text Input Container
                 ================================================================
-                Multi-line text input that captures user message content.
-                - Flex: takes up available horizontal space (flex-1)
-                - Height: expands up to 120px max, then becomes scrollable
-                - Text styling: uses theme colors for text and placeholder
-                - Behavior: disabled state tied to component's disabled prop
-                - Content: supports multi-line text for longer messages
+                Visual container for the text input to keep it distinct from the
+                send button. Provides surface styling and padding.
             */}
-            <TextInput
-                className="flex-1 py-2 max-h-[120px] self-center text-base"
-                style={{ color: theme.colors.text }}
-                onChangeText={onChangeText}
-                value={value}
-                placeholder={placeholder}
-                placeholderTextColor={theme.colors.textSecondary}
-                editable={!disabled}
-                multiline
-            />
+            <View
+                testID="message-input-field"
+                className="flex-1 pl-4 pr-2 py-1 rounded-xl min-h-12"
+                style={[{ backgroundColor: theme.colors.surface }, style]}
+            >
+                <TextInput
+                    className="py-2 max-h-[120px] self-center text-base"
+                    style={{ color: theme.colors.text }}
+                    onChangeText={onChangeText}
+                    value={value}
+                    placeholder={placeholder}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    editable={!disabled}
+                    multiline
+                />
+            </View>
 
             {/* ================================================================
                 SECTION: Send Button
@@ -124,10 +123,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 - Spacing: left margin of 2 units, vertically centered
             */}
             <TouchableOpacity
+                testID="message-input-send"
                 onPress={handleSend}
                 disabled={!canSend}
                 activeOpacity={0.7}
-                className="w-9 h-9 rounded-full justify-center items-center ml-2 self-center"
+                className="w-9 h-9 rounded-full justify-center items-center ml-2"
                 style={{ backgroundColor: canSend ? theme.colors.accent : theme.colors.surface }}
             >
                 <SymbolView

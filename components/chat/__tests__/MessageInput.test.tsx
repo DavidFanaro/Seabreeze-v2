@@ -60,6 +60,30 @@ describe("MessageInput Component", () => {
   });
 
   /**
+   * Test: Input and send button are rendered as separate siblings
+   */
+  it("renders input and send button in separate containers", () => {
+    const { getByTestId } = render(
+      <MessageInput
+        value=""
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+      />
+    );
+
+    const wrapper = getByTestId("message-input-wrapper");
+    getByTestId("message-input-field");
+    getByTestId("message-input-send");
+
+    const wrapperChildren = React.Children.toArray(
+      wrapper.props.children
+    ) as React.ReactElement<{ testID?: string }>[];
+    expect(wrapperChildren).toHaveLength(2);
+    expect(wrapperChildren[0].props.testID).toBe("message-input-field");
+    expect(wrapperChildren[1].props.testID).toBe("message-input-send");
+  });
+
+  /**
    * Test: Component renders with custom placeholder
    */
   it("renders with custom placeholder text", () => {
