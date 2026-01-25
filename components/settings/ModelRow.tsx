@@ -34,6 +34,8 @@ export function ModelRow({
     disabled,
 }: ModelRowProps) {
     return (
+        // Main pressable container for the model row
+        // Handles selection interaction and visual feedback
         <Pressable
             onPress={onSelect}
             disabled={disabled || isEditMode}
@@ -44,7 +46,9 @@ export function ModelRow({
                     : theme.colors.background,
             })}
         >
+            {/* Left section: Model name and custom indicator */}
             <View className="flex-1 flex-row items-center gap-2 mr-2">
+                {/* Model name display with text styling */}
                 <Text
                     className="text-[16px] flex-shrink-0"
                     style={{ color: theme.colors.text }}
@@ -52,6 +56,7 @@ export function ModelRow({
                 >
                     {model}
                 </Text>
+                {/* Custom model indicator badge - shown only for custom models when not in edit mode */}
                 {isCustom && !isEditMode && (
                     <View
                         className="px-1.5 py-0.5 rounded"
@@ -67,8 +72,10 @@ export function ModelRow({
                 )}
             </View>
 
+            {/* Right section: Conditional edit/delete buttons or selection indicator */}
             {isEditMode ? (
                 <View className="flex-row gap-2">
+                    {/* Edit button - only shown for custom models */}
                     {isCustom && (
                         <Pressable
                             onPress={() => {
@@ -84,6 +91,7 @@ export function ModelRow({
                             <SymbolView name="pencil" size={14} tintColor={theme.colors.surface} />
                         </Pressable>
                     )}
+                    {/* Delete button - shown for all models in edit mode */}
                     <Pressable
                         onPress={() => {
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -99,13 +107,16 @@ export function ModelRow({
                     </Pressable>
                 </View>
             ) : (
-                isSelected && (
-                    <SymbolView
-                        name="checkmark"
-                        size={18}
-                        tintColor={theme.colors.accent}
-                    />
-                )
+                <>
+                    {/* Selection checkmark - shown when model is selected and not in edit mode */}
+                    {isSelected && (
+                        <SymbolView
+                            name="checkmark"
+                            size={18}
+                            tintColor={theme.colors.accent}
+                        />
+                    )}
+                </>
             )}
         </Pressable>
     );
