@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import { MessageBubble } from "../MessageBubble";
 
 // Mock CustomMarkdown component
@@ -386,6 +386,54 @@ describe("MessageBubble Component", () => {
         showCopyAll: false,
       })
     );
+  });
+
+  /**
+   * Test: Thinking output is collapsed by default
+   */
+  it("renders thinking output collapsed by default", () => {
+    const { getByTestId, queryByTestId } = render(
+      <MessageBubble
+        content="AI response"
+        isUser={false}
+        thinkingOutput="Reasoning details"
+      />
+    );
+
+    expect(getByTestId("thinking-output-toggle")).toBeDefined();
+    expect(queryByTestId("thinking-output-content")).toBeNull();
+  });
+
+  /**
+   * Test: Thinking output expands when toggled
+   */
+  it("expands thinking output when toggle is pressed", () => {
+    const { getByTestId, queryByTestId } = render(
+      <MessageBubble
+        content="AI response"
+        isUser={false}
+        thinkingOutput="Reasoning details"
+      />
+    );
+
+    fireEvent.press(getByTestId("thinking-output-toggle"));
+
+    expect(queryByTestId("thinking-output-content")).toBeDefined();
+  });
+
+  /**
+   * Test: Thinking output does not render for user messages
+   */
+  it("does not render thinking output for user messages", () => {
+    const { queryByTestId } = render(
+      <MessageBubble
+        content="User message"
+        isUser={true}
+        thinkingOutput="Should not show"
+      />
+    );
+
+    expect(queryByTestId("thinking-output-toggle")).toBeNull();
   });
 
   /**

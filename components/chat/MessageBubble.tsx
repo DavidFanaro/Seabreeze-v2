@@ -4,8 +4,8 @@
  * Handles both user and AI messages with different styling, streaming states, and markdown rendering.
  */
 
-import React, { memo } from "react";
-import { View, ViewStyle } from "react-native";
+import React, { memo, useCallback, useState } from "react";
+import { Pressable, Text, View, ViewStyle } from "react-native";
 import { CustomMarkdown } from "./CustomMarkdown";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -22,6 +22,7 @@ interface MessageBubbleProps {
   content: string;
   isUser: boolean;
   isStreaming?: boolean;
+  thinkingOutput?: string;
   style?: ViewStyle;
 }
 
@@ -39,7 +40,7 @@ interface MessageBubbleProps {
  * - Theme-aware styling with responsive width constraints
  */
 export const MessageBubble: React.FC<MessageBubbleProps> = memo(
-  ({ content, isUser, isStreaming = false, style }) => {
+  ({ content, isUser, isStreaming = false, thinkingOutput, style }) => {
     // ========== Hooks Section ==========
     // Retrieve theme colors and spacing values for consistent styling across the app
     const { theme } = useTheme();
@@ -48,6 +49,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
     const showCodeLineNumbers = useSettingsStore(
       (state) => state.showCodeLineNumbers,
     );
+
+    const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
+    const normalizedThinkingOutput = thinkingOutput?.trim() ?? "";
+    const hasThinkingOutput = !isUser && normalizedThinkingOutput.length > 0;
+
+    const toggleThinkingOutput = useCallback(() => {
+      setIsThinkingExpanded((prev) => !prev);
+    }, []);
 
     return (
       <View className="my-1 px-4" style={style}>
@@ -83,6 +92,61 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
             isUser={isUser}
           />
         </View>
+        {hasThinkingOutput && (
+          <View className="mt-2">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                isThinkingExpanded ? "Hide thinking output" : "Show thinking output"
+              }
+              onPress={toggleThinkingOutput}
+              className="flex-row items-center justify-between rounded-md px-2 py-1"
+              style={{
+                backgroundColor: theme.colors.glass ?? theme.colors.surface,
+                borderColor: theme.colors.border ?? theme.colors.textSecondary ?? theme.colors.text,
+                borderWidth: 1,
+              }}
+              testID="thinking-output-toggle"
+            >
+              <Text
+                style={{
+                  color: theme.colors.textSecondary ?? theme.colors.text,
+                  fontSize: 12,
+                  fontWeight: "600",
+                }}
+              >
+                Thinking
+              </Text>
+              <Text
+                style={{
+                  color: theme.colors.textSecondary ?? theme.colors.text,
+                  fontSize: 12,
+                }}
+              >
+                {isThinkingExpanded ? "Hide" : "Show"}
+              </Text>
+            </Pressable>
+            {isThinkingExpanded && (
+              <View
+                className="mt-2 rounded-md px-3 py-2"
+                style={{
+                  backgroundColor: theme.colors.glass ?? theme.colors.surface,
+                  borderColor: theme.colors.border ?? theme.colors.textSecondary ?? theme.colors.text,
+                  borderWidth: 1,
+                }}
+                testID="thinking-output-content"
+              >
+                <CustomMarkdown
+                  content={normalizedThinkingOutput}
+                  isStreaming={isStreaming}
+                  showLineNumbers={showCodeLineNumbers}
+                  showCopyAll={false}
+                  isUser={false}
+                />
+              </View>
+            )}
+          </View>
+        )}
       </View>
     );
   },

@@ -259,7 +259,11 @@ export default function Chat() {
                      {/* MESSAGE LIST SECTION */}
                      {/* Displays all messages in the conversation, auto-scrolls during stream */}
                      {/* ================================================================== */}
-                     <MessageList messages={messages} isStreaming={isStreaming} />
+                      <MessageList
+                        messages={messages}
+                        thinkingOutput={thinkingOutput}
+                        isStreaming={isStreaming}
+                      />
                      
                      {/* ================================================================== */}
                      {/* RETRY BANNER SECTION */}

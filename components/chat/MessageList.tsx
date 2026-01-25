@@ -23,6 +23,7 @@ interface MessageListProps {
     messages: ModelMessage[];
     style?: ViewStyle;
     contentContainerStyle?: ViewStyle;
+    thinkingOutput?: string[];
     isStreaming?: boolean;
 }
 
@@ -40,6 +41,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     messages,
     style,
     contentContainerStyle,
+    thinkingOutput = [],
     isStreaming = false,
 }) => {
     // ============================================================================
@@ -70,6 +72,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         const isLastMessage = index === messages.length - 1;
         // Only show streaming indicator for assistant's last message during active streaming
         const isStreamingThisMessage = isLastMessage && item.role === "assistant" && isStreaming;
+        const messageThinkingOutput = thinkingOutput[index] ?? "";
 
         return (
             <MessageBubble
@@ -77,9 +80,10 @@ export const MessageList: React.FC<MessageListProps> = ({
                 content={item.content as string}
                 isUser={item.role === "user"}
                 isStreaming={isStreamingThisMessage}
+                thinkingOutput={messageThinkingOutput}
             />
         );
-    }, [messages.length, isStreaming]);
+    }, [messages.length, isStreaming, thinkingOutput]);
 
     // ============================================================================
     // KEY EXTRACTOR SECTION
