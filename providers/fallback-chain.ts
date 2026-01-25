@@ -3,33 +3,60 @@ import { ProviderId } from "@/types/provider.types";
 import { getProviderModel, ProviderResult, isProviderAvailable } from "./provider-factory";
 import { getDefaultModelForProvider, isProviderConfigured } from "@/stores";
 
+// ============================================================================
+// PROVIDER FALLBACK CONFIGURATION
+// ============================================================================
+
 /**
  * Priority order for provider fallback
- * Apple is always first as it's always available and local
- * Then cloud providers in order of reliability
+ * 
+ * This array defines the fallback strategy when a preferred provider is unavailable.
+ * The order is carefully chosen based on availability, reliability, and user experience:
+ * 
+ * 1. Apple Intelligence - Always available on Apple devices, no API keys needed
+ * 2. OpenAI - Most reliable cloud provider with best uptime
+ * 3. OpenRouter - Access to multiple models/providers, good reliability
+ * 4. Ollama - Local models, requires user setup but provides offline capability
  */
 export const PROVIDER_FALLBACK_ORDER: ProviderId[] = [
-  "apple",      // Always available on Apple devices
-  "openai",     // Most reliable cloud provider
-  "openrouter", // Access to multiple providers
-  "ollama",     // Local backup (requires setup)
+  "apple",      // Always available on Apple devices, no configuration required
+  "openai",     // Most reliable cloud provider with proven uptime
+  "openrouter", // Access to multiple providers via single API
+  "ollama",     // Local backup option for privacy/offline use
 ];
+
+// ============================================================================
+// ERROR CLASSIFICATION SYSTEM
+// ============================================================================
 
 /**
  * Error categories for determining fallback behavior
+ * 
+ * Each category represents a different type of failure that may occur during
+ * provider communication. The classification determines whether the error is
+ * retryable and whether we should immediately fallback to another provider.
  */
 export type ErrorCategory = 
-  | "configuration"   // Missing API key, URL, etc.
-  | "network"         // Network connectivity issues
-  | "rate_limit"      // API rate limiting
-  | "authentication"  // Invalid credentials
-  | "model_not_found" // Model doesn't exist
-  | "server_error"    // Provider server errors
-  | "timeout"         // Request timeout
-  | "unknown";        // Uncategorized errors
+  | "configuration"   // Missing API key, URL, or setup issues
+  | "network"         // Network connectivity or DNS issues
+  | "rate_limit"      // API rate limiting or quota exceeded
+  | "authentication"  // Invalid credentials, expired tokens
+  | "model_not_found" // Requested model doesn't exist for provider
+  | "server_error"    // Provider server errors (5xx responses)
+  | "timeout"         // Request timeout or slow response
+  | "unknown";        // Uncategorized or unexpected errors
 
 /**
- * Determine if an error is retryable or requires fallback
+ * Error classification result
+ * 
+ * This interface provides structured information about an error to help the
+ * application make intelligent decisions about retrying, falling back, or
+ * providing user feedback.
+ * 
+ * @property category - The type of error that occurred
+ * @property isRetryable - Whether the same request might succeed on retry
+ * @property shouldFallback - Whether we should immediately try another provider
+ * @property message - User-friendly error message for display
  */
 export interface ErrorClassification {
   category: ErrorCategory;
@@ -39,7 +66,22 @@ export interface ErrorClassification {
 }
 
 /**
- * Classify an error to determine appropriate handling
+ * Classify an error to determine appropriate handling strategy
+ * 
+ * This function analyzes errors from API providers and determines the best
+ * response strategy. It examines error messages, HTTP status codes, and
+ * provider-specific error flags to categorize the failure and recommend
+ * retry/fallback behavior.
+ * 
+ * The classification logic follows this priority:
+ * 1. Configuration and authentication errors (permanent, require fallback)
+ * 2. Rate limiting (retryable, but fallback preferred for UX)
+ * 3. Network and server errors (retryable, fallback recommended)
+ * 4. Timeout errors (retryable, fallback recommended)
+ * 5. Unknown errors (fallback by default)
+ * 
+ * @param error - The error object or message from a provider
+ * @returns ErrorClassification with handling strategy
  */
 export function classifyError(error: unknown): ErrorClassification {
   if (!error) {
@@ -157,8 +199,24 @@ export function classifyError(error: unknown): ErrorClassification {
   };
 }
 
+// ============================================================================
+// FALLBACK RESULT TYPES
+// ============================================================================
+
 /**
- * Result of a fallback attempt
+ * Result of a provider fallback attempt
+ * 
+ * This interface represents the outcome of trying to obtain a language model,
+ * either from the preferred provider or through the fallback chain. It provides
+ * complete visibility into what was attempted and why.
+ * 
+ * @property model - The successfully obtained LanguageModel, or null if all failed
+ * @property provider - The provider that supplied the model
+ * @property modelId - The model identifier that was requested/used
+ * @property isOriginal - Whether this is the originally preferred provider
+ * @property fallbackReason - Human-readable explanation of why fallback occurred
+ * @property attemptedProviders - Complete list of providers that were tried in order
+ * @property error - Error message if no provider could be obtained
  */
 export interface FallbackResult {
   model: LanguageModel | null;
@@ -170,13 +228,28 @@ export interface FallbackResult {
   error?: string;
 }
 
+// ============================================================================
+// MAIN FALLBACK LOGIC
+// ============================================================================
+
 /**
  * Get a model with automatic fallback to other providers if the preferred one fails
  * 
- * @param preferredProvider - The provider to try first
- * @param preferredModel - The model to use (if provider is available)
- * @param excludeProviders - Providers to skip in fallback chain
- * @returns FallbackResult with the best available model
+ * This is the core function for provider resilience. It attempts to obtain a model
+ * from the preferred provider first, then systematically tries fallback providers
+ * in the defined priority order until a working model is found.
+ * 
+ * The algorithm works as follows:
+ * 1. Try the preferred provider with the specified model
+ * 2. If that fails, iterate through PROVIDER_FALLBACK_ORDER
+ * 3. Skip excluded providers, already-tried providers, and unavailable providers
+ * 4. For each fallback provider, use its default model (not the preferred model)
+ * 5. Return the first successful model or a failure result
+ * 
+ * @param preferredProvider - The provider the user or system prefers to use
+ * @param preferredModel - The specific model identifier to request
+ * @param excludeProviders - Optional list of providers to exclude from fallback
+ * @returns FallbackResult containing the model and metadata about the attempt
  */
 export function getModelWithFallback(
   preferredProvider: ProviderId,
@@ -248,10 +321,20 @@ export function getModelWithFallback(
 /**
  * Get the next available fallback provider after an error
  * 
- * @param currentProvider - The provider that just failed
- * @param failedProviders - List of providers that have already failed
- * @param error - The error that occurred
- * @returns The next provider to try, or null if none available
+ * This function is used during runtime error handling to determine the next
+ * provider to try when the current provider fails. It uses error classification
+ * to decide whether fallback is appropriate and then finds the next available
+ * provider in the fallback chain.
+ * 
+ * The function considers:
+ * - Whether the error type warrants fallback (via classifyError)
+ * - Which providers have already failed to avoid repeated failures
+ * - Provider availability to skip unavailable options
+ * 
+ * @param currentProvider - The provider that just experienced an error
+ * @param failedProviders - Array of providers that have previously failed in this session
+ * @param error - The error object that triggered the fallback request
+ * @returns Object with next provider and model, or null if no fallback available
  */
 export function getNextFallbackProvider(
   currentProvider: ProviderId,
@@ -285,6 +368,16 @@ export function getNextFallbackProvider(
 
 /**
  * Check if any fallback providers are available
+ * 
+ * This utility function helps the UI and logic determine whether fallback
+ * options exist before attempting operations. It's useful for:
+ * - Disabling retry buttons when no fallback exists
+ * - Showing appropriate error messages
+ * - Making proactive decisions about which provider to use
+ * 
+ * @param currentProvider - The provider currently in use
+ * @param failedProviders - List of providers that have already failed
+ * @returns True if at least one fallback provider is available
  */
 export function hasFallbackAvailable(
   currentProvider: ProviderId,
@@ -299,6 +392,15 @@ export function hasFallbackAvailable(
 
 /**
  * Get list of all available providers for user selection
+ * 
+ * This function provides a comprehensive view of all providers in the fallback
+ * chain along with their configuration status. It's primarily used by the UI
+ * to display provider selection options and status indicators.
+ * 
+ * The returned array maintains the fallback order and includes a boolean
+ * indicating whether each provider is properly configured and ready to use.
+ * 
+ * @returns Array of providers with their configuration status in fallback order
  */
 export function getAvailableProviders(): { provider: ProviderId; isConfigured: boolean }[] {
   return PROVIDER_FALLBACK_ORDER.map((provider) => ({
@@ -306,3 +408,92 @@ export function getAvailableProviders(): { provider: ProviderId; isConfigured: b
     isConfigured: isProviderConfigured(provider),
   }));
 }
+
+// ============================================================================
+// DETAILED PROVIDER EXPLANATION
+// ============================================================================
+
+/**
+ * Fallback Chain Provider System Overview
+ * 
+ * The fallback chain system is designed to provide maximum reliability and
+ * availability for AI model access across different providers. It implements
+ * a sophisticated error handling and provider selection strategy that ensures
+ * users can always access AI functionality, even when individual providers fail.
+ * 
+ * === PROVIDER STRATEGY ===
+ * 
+ * 1. Apple Intelligence (Primary)
+ *    - Always available on Apple devices running supported OS versions
+ *    - No configuration required, built into the OS
+ *    - Local processing, no network dependency
+ *    - Limited to supported models but most reliable option
+ * 
+ * 2. OpenAI (Secondary)
+ *    - Industry-leading reliability and uptime
+ *    - Supports the widest range of models
+ *    - Requires API key configuration
+ *    - Best for general-purpose AI tasks
+ * 
+ * 3. OpenRouter (Tertiary)
+ *    - Access to multiple model providers via single API
+ *    - Provider redundancy built-in (Claude, GPT, etc.)
+ *    - Requires API key and account setup
+ *    - Good fallback when OpenAI is unavailable
+ * 
+ * 4. Ollama (Local Backup)
+ *    - Local model hosting for privacy and offline use
+ *    - Requires user setup and local hardware
+ *    - Limited to locally installed models
+ *    - Ultimate fallback when all cloud options fail
+ * 
+ * === ERROR HANDLING PHILOSOPHY ===
+ * 
+ * The system categorizes errors to make intelligent decisions:
+ * 
+ * - Permanent Failures (Immediate Fallback):
+ *   * Configuration errors: Missing API keys, invalid setup
+ *   * Authentication errors: Invalid/expired credentials
+ *   * Model not found: Requested model unavailable
+ * 
+ * - Temporary Failures (Retry + Fallback):
+ *   * Rate limiting: Too many requests, quota exceeded
+ *   * Network issues: Connection problems, DNS failures
+ *   * Server errors: Provider downtime, 5xx responses
+ *   * Timeouts: Slow responses or network delays
+ * 
+ * === FALLBACK ALGORITHM ===
+ * 
+ * When a provider fails, the system:
+ * 
+ * 1. Classifies the error to determine if fallback is appropriate
+ * 2. Checks if the error is retryable for potential immediate retry
+ * 3. Selects the next provider in the priority order that:
+ *    - Has not been tried already
+ *    - Is not explicitly excluded
+ *    - Is available and configured
+ * 4. Uses the fallback provider's default model (not the preferred model)
+ * 5. Tracks all attempts for debugging and user feedback
+ * 
+ * === USER EXPERIENCE CONSIDERATIONS ===
+ * 
+ * - Seamless fallback: Users see minimal disruption during provider switches
+ * - Transparent feedback: Clear messages about why fallback occurred
+ * - Preference memory: System remembers user's preferred provider when available
+ * - Configuration guidance: Helpful error messages for setup issues
+ * - Performance awareness: Prioritizes fastest/most reliable options
+ * 
+ * === DEBUGGING AND MONITORING ===
+ * 
+ * The system provides comprehensive logging and tracking:
+ * 
+ * - Complete attempt history in FallbackResult.attemptedProviders
+ * - Clear fallback reasons for user display
+ * - Error classification for targeted debugging
+ * - Provider availability status for UI indicators
+ * - Configuration status checks for setup guidance
+ * 
+ * This architecture ensures that the application remains functional and
+ * responsive regardless of individual provider issues, providing users
+ * with consistent AI capabilities across different scenarios and environments.
+ */

@@ -422,3 +422,131 @@ describe('getAvailableProviders', () => {
     expect(ollamaProvider?.isConfigured).toBe(false);
   });
 });
+
+describe('Fallback Chain Integration', () => {
+  const mockModel = {} as LanguageModel;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetProviderModel.mockReturnValue({
+      model: mockModel,
+      isConfigured: true,
+    });
+    mockedIsProviderAvailable.mockReturnValue(true);
+    mockedGetDefaultModelForProvider.mockImplementation((provider: ProviderId) => {
+      const models: Record<ProviderId, string> = {
+        apple: 'gpt-4',
+        openai: 'gpt-4',
+        openrouter: 'claude-3',
+        ollama: 'llama2',
+      };
+      return models[provider];
+    });
+  });
+
+  it('should provide detailed fallback reason when switching providers', () => {
+    mockedGetProviderModel.mockImplementation((provider: ProviderId) => {
+      if (provider === 'openai') {
+        return { model: null, isConfigured: false };
+      }
+      return { model: mockModel, isConfigured: true };
+    });
+
+    const result = getModelWithFallback('openai', 'gpt-4');
+
+    expect(result.fallbackReason).toContain('openai unavailable');
+    expect(result.fallbackReason).toContain('using apple');
+  });
+
+  it('should track complete provider attempt history', () => {
+    mockedGetProviderModel.mockImplementation((provider: ProviderId) => {
+      // Only succeed with ollama
+      return { model: provider === 'ollama' ? mockModel : null, isConfigured: true };
+    });
+
+    const result = getModelWithFallback('openai', 'gpt-4');
+
+    expect(result.attemptedProviders).toEqual(['openai', 'apple', 'openrouter', 'ollama']);
+    expect(result.provider).toBe('ollama');
+    expect(result.isOriginal).toBe(false);
+  });
+
+  it('should handle edge case where preferred provider is excluded', () => {
+    const result = getModelWithFallback('openai', 'gpt-4', ['openai']);
+
+    expect(result.attemptedProviders).not.toContain('openai');
+    expect(result.isOriginal).toBe(false);
+    expect(result.provider).toBe('apple');
+  });
+
+  it('should return null model with error when all providers fail', () => {
+    mockedGetProviderModel.mockReturnValue({
+      model: null,
+      isConfigured: false,
+    });
+
+    const result = getModelWithFallback('openai', 'gpt-4');
+
+    expect(result.model).toBeNull();
+    expect(result.error).toContain('No configured providers');
+    expect(result.isOriginal).toBe(true);
+    expect(result.attemptedProviders).toHaveLength(4);
+  });
+
+  it('should skip providers that are not available', () => {
+    mockedGetProviderModel.mockImplementation((provider: ProviderId) => {
+      // Only succeed when provider is apple and available
+      return { model: provider === 'apple' ? mockModel : null, isConfigured: true };
+    });
+    mockedIsProviderAvailable.mockImplementation((provider: ProviderId) => {
+      // Only apple is available
+      return provider === 'apple';
+    });
+
+    const result = getModelWithFallback('openai', 'gpt-4');
+
+    expect(result.provider).toBe('apple');
+    expect(result.attemptedProviders).toEqual(['openai', 'apple']);
+  });
+});
+
+describe('Error Classification Edge Cases', () => {
+  it('should handle error objects with custom properties', () => {
+    const error = new Error('Custom provider error') as any;
+    error.code = 'PROVIDER_ERROR';
+    error.isRetryable = true;
+    error.statusCode = 400;
+
+    const result = classifyError(error);
+
+    expect(result.isRetryable).toBe(true);
+    expect(result.shouldFallback).toBe(false); // Due to isRetryable flag
+    expect(result.category).toBe('unknown');
+  });
+
+  it('should handle string errors', () => {
+    const result = classifyError('Simple string error');
+
+    expect(result.category).toBe('unknown');
+    expect(result.isRetryable).toBe(false);
+    expect(result.shouldFallback).toBe(true);
+    expect(result.message).toBe('An unexpected error occurred');
+  });
+
+  it('should handle empty error message', () => {
+    const error = new Error('');
+    const result = classifyError(error);
+
+    expect(result.category).toBe('unknown');
+    expect(result.message).toBe('');
+  });
+
+  it('should classify DNS resolution errors as network issues', () => {
+    const error = new Error('ENOTFOUND api.openai.com');
+    const result = classifyError(error);
+
+    expect(result.category).toBe('network');
+    expect(result.isRetryable).toBe(true);
+    expect(result.shouldFallback).toBe(true);
+  });
+});
