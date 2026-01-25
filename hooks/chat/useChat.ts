@@ -141,6 +141,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         model: providedModel,             // Direct model injection (testing)
         onChunk,                          // Callback for streaming chunks
         onThinkingChunk,                  // Callback for streaming thinking chunks
+        enableThinking = true,            // Enable thinking output updates
         onError,                          // Error handling callback
         onComplete,                       // Completion callback
         onFallback,                       // Provider fallback notification
@@ -417,6 +418,18 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // ────────────────────────────────────────────────────────────────
             // STREAMING CONFIGURATION
             // ────────────────────────────────────────────────────────────────
+            const handleThinkingChunk = enableThinking
+                ? (chunk: string, accumulated: string) => {
+                    setIsThinking(true);
+                    setThinkingOutput((prev) => {
+                        const next = [...prev];
+                        next[assistantIndex] = accumulated;
+                        return next;
+                    });
+                    onThinkingChunk?.(chunk, accumulated);
+                }
+                : undefined;
+
             const streamingOptions = {
                 model: {
                     model,
@@ -431,15 +444,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 activeProvider,
                 effectiveProviderId,
                 onChunk,
-                onThinkingChunk: (chunk: string, accumulated: string) => {
-                    setIsThinking(true);
-                    setThinkingOutput((prev) => {
-                        const next = [...prev];
-                        next[assistantIndex] = accumulated;
-                        return next;
-                    });
-                    onThinkingChunk?.(chunk, accumulated);
-                },
+                onThinkingChunk: handleThinkingChunk,
                 onError,
                 onFallback,
                 onProviderChange: (provider: ProviderId, model: string, isFallback: boolean) => {
@@ -495,7 +500,9 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             onComplete, 
             onError, 
             onFallback,
-            effectiveProviderId
+            effectiveProviderId,
+            enableThinking,
+            onThinkingChunk
         ],
     );
 

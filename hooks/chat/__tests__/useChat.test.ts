@@ -182,6 +182,26 @@ describe('useChat', () => {
       expect(result.current.isThinking).toBe(false);
     });
 
+    it('should ignore thinking output when disabled', async () => {
+      const onThinkingChunk = jest.fn();
+      const { result } = renderHook(() => useChat({
+        enableThinking: false,
+        onThinkingChunk,
+      }));
+
+      act(() => {
+        result.current.setText('Hello, world!');
+      });
+
+      await act(async () => {
+        await result.current.sendMessage();
+      });
+
+      expect(result.current.thinkingOutput).toEqual(['', '']);
+      expect(result.current.isThinking).toBe(false);
+      expect(onThinkingChunk).not.toHaveBeenCalled();
+    });
+
     it('should skip placeholder text when disabled', async () => {
       const { result } = renderHook(() => useChat({ placeholder: false }));
 

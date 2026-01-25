@@ -23,6 +23,8 @@ export interface UseChatOptions {
   model?: LanguageModel;
   onChunk?: ChunkHandler;
   onThinkingChunk?: ChunkHandler;
+  /** Enable streaming thinking output updates */
+  enableThinking?: boolean;
   onError?: (error: unknown) => void;
   onComplete?: () => void;
   onFallback?: (from: ProviderId, to: ProviderId, reason: string) => void;
