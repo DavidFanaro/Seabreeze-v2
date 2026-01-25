@@ -13,7 +13,7 @@
 - [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageBubble.tsx
 - [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageInput.tsx
 - [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/MessageList.tsx
-- [ ] add detailed comments about each ui section and label with comments in each ui section in components/chat/RetryBanner.tsx
+- [x] add detailed comments about each ui section and label with comments in each ui section in components/chat/RetryBanner.tsx
 - [ ] add detailed comments about each ui section and label with comments in each ui section in components/chat/ThemedMarkdown.tsx
 - [ ] add detailed comments about each ui section and label with comments in each ui section in components/settings/ModelListManager.tsx
 - [ ] add detailed comments about each ui section and label with comments in each ui section in components/settings/ModelRow.tsx
