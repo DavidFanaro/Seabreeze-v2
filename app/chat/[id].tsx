@@ -135,7 +135,7 @@ export default function Chat() {
                 isActive = false;
             };
             // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [isStreaming, messages.length, title, chatID, db, currentProvider, currentModel, generateTitle, isInitializing])
+        }, [isStreaming, messages.length, thinkingOutput, title, chatID, db, currentProvider, currentModel, generateTitle, isInitializing])
     );
 
     // Update title in database (only when screen is focused)

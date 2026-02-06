@@ -26,7 +26,7 @@ describe('useChatStreaming', () => {
   const mockModel = {
     model: {} as any,
     provider: 'openai' as ProviderId,
-    modelId: 'gpt-4',
+    modelId: 'gpt-5',
     isOriginal: true,
     attemptedProviders: [] as ProviderId[],
   };
@@ -269,12 +269,14 @@ describe('useChatStreaming', () => {
 
     it('should pass thinking level as provider options', async () => {
       const { result } = renderHook(() => useChatStreaming());
+      const mockOnThinkingChunk = jest.fn();
 
       await act(async () => {
         return await result.current.executeStreaming(
           {
             ...defaultOptions,
             thinkingLevel: 'high',
+            onThinkingChunk: mockOnThinkingChunk,
           },
           mockMessages,
           setMessagesMock,
@@ -288,10 +290,125 @@ describe('useChatStreaming', () => {
           providerOptions: {
             openai: {
               reasoningEffort: 'high',
+              reasoningSummary: 'auto',
             },
           },
         })
       );
+    });
+
+    it('should pass OpenRouter reasoning options when thinking is enabled', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const mockOnThinkingChunk = jest.fn();
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            model: {
+              ...mockModel,
+              provider: 'openrouter' as ProviderId,
+              modelId: 'openai/gpt-5',
+            },
+            activeProvider: 'openrouter' as ProviderId,
+            effectiveProviderId: 'openrouter' as ProviderId,
+            thinkingLevel: 'high',
+            onThinkingChunk: mockOnThinkingChunk,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockStreamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerOptions: {
+            openrouter: {
+              includeReasoning: true,
+              reasoning: {
+                effort: 'high',
+              },
+            },
+          },
+        })
+      );
+    });
+
+    it('should pass Ollama think options when thinking is enabled', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const mockOnThinkingChunk = jest.fn();
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            model: {
+              ...mockModel,
+              provider: 'ollama' as ProviderId,
+              modelId: 'gpt-oss:20b',
+            },
+            activeProvider: 'ollama' as ProviderId,
+            effectiveProviderId: 'ollama' as ProviderId,
+            thinkingLevel: 'high',
+            onThinkingChunk: mockOnThinkingChunk,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockStreamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerOptions: {
+            ollama: {
+              think: true,
+            },
+          },
+        })
+      );
+      expect(mockOnThinkingChunk).toHaveBeenCalledWith('Thinking', 'Thinking');
+    });
+
+    it('should handle Ollama reasoning delta format', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const mockOnThinkingChunk = jest.fn();
+
+      const mockFullStream = {
+        [Symbol.asyncIterator]: async function* () {
+          yield { type: 'reasoning-delta', delta: 'Inner reasoning' };
+          yield { type: 'text-delta', text: 'Done' };
+        },
+      };
+
+      mockStreamText.mockReturnValue({
+        fullStream: mockFullStream,
+      } as any);
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            model: {
+              ...mockModel,
+              provider: 'ollama' as ProviderId,
+              modelId: 'gpt-oss:20b',
+            },
+            activeProvider: 'ollama' as ProviderId,
+            effectiveProviderId: 'ollama' as ProviderId,
+            onThinkingChunk: mockOnThinkingChunk,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockOnThinkingChunk).toHaveBeenCalledWith('Inner reasoning', 'Inner reasoning');
     });
 
     it('should skip thinking options for non-thinking models', async () => {

@@ -78,7 +78,6 @@ export const MessageList: React.FC<MessageListProps> = ({
 
         return (
             <MessageBubble
-                key={index}
                 content={item.content as string}
                 isUser={item.role === "user"}
                 isStreaming={isStreamingThisMessage}
@@ -101,7 +100,7 @@ export const MessageList: React.FC<MessageListProps> = ({
      * This ensures proper list item tracking and prevents rendering issues
      */
     const keyExtractor = useCallback((item: ModelMessage, index: number) => {
-        return `${item.role}-${index}-${item.content?.slice(0, 20)}`;
+        return `${item.role}-${index}`;
     }, []);
 
     // ============================================================================

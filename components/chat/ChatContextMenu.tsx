@@ -17,6 +17,7 @@ import {
   OPENAI_MODELS,
   OPENROUTER_MODELS,
   OLLAMA_MODELS,
+  isOllamaThinkingHintModel,
   isThinkingCapableModel,
 } from "@/types/provider.types";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
@@ -220,6 +221,8 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
     selectedProvider,
     selectedModel ?? "",
   );
+  const showOllamaThinkingHint = selectedProvider === "ollama"
+    && isOllamaThinkingHintModel(selectedModel ?? "");
 
   // ============================================================================
   // RENDER
@@ -266,6 +269,12 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
                 </Button>
               ))}
             </Submenu>
+          )}
+
+          {showOllamaThinkingHint && (
+            <Button>
+              Ollama Thinking Model Managed
+            </Button>
           )}
 
           {/* ====================================================================

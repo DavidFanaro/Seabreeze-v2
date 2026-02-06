@@ -142,22 +142,76 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability> = {
   },
 };
 
-const THINKING_MODEL_PREFIXES: Record<ProviderId, string[]> = {
-  apple: [],
-  openai: ["gpt-4", "gpt-5"],
-  openrouter: ["openai/gpt-4", "openai/gpt-5"],
-  ollama: [],
+const OPENAI_REASONING_MODEL_PREFIXES: string[] = [
+  "o1",
+  "o3",
+  "o4-mini",
+  "codex-mini",
+  "computer-use-preview",
+  "gpt-5",
+];
+
+const OPENAI_NON_REASONING_MODEL_PREFIXES: string[] = ["gpt-5-chat"];
+
+const OPENROUTER_REASONING_MODEL_PREFIXES: string[] = [
+  "openai/o1",
+  "openai/o3",
+  "openai/o4-mini",
+  "openai/codex-mini",
+  "openai/computer-use-preview",
+  "openai/gpt-5",
+  "deepseek/deepseek-r1",
+];
+
+const OPENROUTER_NON_REASONING_MODEL_PREFIXES: string[] = ["openai/gpt-5-chat"];
+
+const OLLAMA_REASONING_HINT_PREFIXES: string[] = [
+  "gpt-oss",
+  "deepseek-r1",
+  "qwen3",
+  "qwq",
+];
+
+const startsWithAny = (value: string, prefixes: string[]): boolean => {
+  return prefixes.some((prefix) => value.startsWith(prefix));
+};
+
+export const isOllamaThinkingHintModel = (modelId: string): boolean => {
+  if (!modelId) {
+    return false;
+  }
+
+  const normalizedModelId = modelId.toLowerCase();
+  return startsWithAny(normalizedModelId, OLLAMA_REASONING_HINT_PREFIXES);
 };
 
 export const isThinkingCapableModel = (
   providerId: ProviderId,
   modelId: string,
 ): boolean => {
-  const prefixes = THINKING_MODEL_PREFIXES[providerId];
-  if (!modelId || prefixes.length === 0) {
+  if (!modelId) {
     return false;
   }
 
   const normalizedModelId = modelId.toLowerCase();
-  return prefixes.some((prefix) => normalizedModelId.startsWith(prefix));
+
+  switch (providerId) {
+    case "openai": {
+      if (startsWithAny(normalizedModelId, OPENAI_NON_REASONING_MODEL_PREFIXES)) {
+        return false;
+      }
+      return startsWithAny(normalizedModelId, OPENAI_REASONING_MODEL_PREFIXES);
+    }
+    case "openrouter": {
+      if (normalizedModelId.includes(":thinking")) {
+        return true;
+      }
+      if (startsWithAny(normalizedModelId, OPENROUTER_NON_REASONING_MODEL_PREFIXES)) {
+        return false;
+      }
+      return startsWithAny(normalizedModelId, OPENROUTER_REASONING_MODEL_PREFIXES);
+    }
+    default:
+      return false;
+  }
 };

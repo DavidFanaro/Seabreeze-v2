@@ -422,6 +422,67 @@ describe("MessageBubble Component", () => {
   });
 
   /**
+   * Test: Streaming assistant messages auto-expand thinking output
+   */
+  it("auto-expands thinking output for streaming assistant messages", () => {
+    const { getByTestId } = render(
+      <MessageBubble
+        content="Streaming AI response"
+        isUser={false}
+        isStreaming={true}
+        thinkingOutput="Live reasoning details"
+      />
+    );
+
+    expect(getByTestId("thinking-output-content")).toBeDefined();
+  });
+
+  /**
+   * Test: Auto-expanded thinking output collapses once streaming ends
+   */
+  it("auto-collapses thinking output when streaming ends", () => {
+    const { queryByTestId, rerender } = render(
+      <MessageBubble
+        content="Streaming AI response"
+        isUser={false}
+        isStreaming={true}
+        thinkingOutput="Live reasoning details"
+      />
+    );
+
+    expect(queryByTestId("thinking-output-content")).toBeDefined();
+
+    rerender(
+      <MessageBubble
+        content="Final AI response"
+        isUser={false}
+        isStreaming={false}
+        thinkingOutput="Live reasoning details"
+      />
+    );
+
+    expect(queryByTestId("thinking-output-content")).toBeNull();
+  });
+
+  /**
+   * Test: Auto-expanded thinking output can still be collapsed manually
+   */
+  it("allows collapsing auto-expanded thinking output while streaming", () => {
+    const { getByTestId, queryByTestId } = render(
+      <MessageBubble
+        content="Streaming AI response"
+        isUser={false}
+        isStreaming={true}
+        thinkingOutput="Live reasoning details"
+      />
+    );
+
+    fireEvent.press(getByTestId("thinking-output-toggle"));
+
+    expect(queryByTestId("thinking-output-content")).toBeNull();
+  });
+
+  /**
    * Test: Thinking output does not render for user messages
    */
   it("does not render thinking output for user messages", () => {

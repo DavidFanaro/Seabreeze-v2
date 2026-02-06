@@ -203,7 +203,7 @@ describe("ChatContextMenu", () => {
       const storeWithThinkingModel = {
         ...mockProviderStore,
         selectedProvider: "openai" as const,
-        selectedModel: "gpt-4o",
+        selectedModel: "gpt-5",
       };
       (useProviderStore as unknown as jest.Mock).mockReturnValue(storeWithThinkingModel);
 
@@ -219,7 +219,7 @@ describe("ChatContextMenu", () => {
       const storeWithThinkingModel = {
         ...mockProviderStore,
         selectedProvider: "openai" as const,
-        selectedModel: "gpt-4o",
+        selectedModel: "gpt-5",
       };
       (useProviderStore as unknown as jest.Mock).mockReturnValue(storeWithThinkingModel);
 
@@ -230,6 +230,33 @@ describe("ChatContextMenu", () => {
 
       expect(mockTriggerPress).toHaveBeenCalledWith("light");
       expect(mockSetThinkingLevel).toHaveBeenCalledWith("high");
+    });
+
+    it("should show Ollama thinking hint for reasoning-capable Ollama models", () => {
+      const storeWithOllamaReasoningModel = {
+        ...mockProviderStore,
+        selectedProvider: "ollama" as const,
+        selectedModel: "gpt-oss:20b",
+      };
+      (useProviderStore as unknown as jest.Mock).mockReturnValue(storeWithOllamaReasoningModel);
+
+      render(<ChatContextMenu onReset={mockOnReset} />);
+
+      expect(screen.getByTestId("button-Ollama Thinking Model Managed")).toBeTruthy();
+      expect(screen.queryByTestId("button-Thinking Level")).toBeNull();
+    });
+
+    it("should not show Ollama thinking hint for non-reasoning Ollama models", () => {
+      const storeWithOllamaDefaultModel = {
+        ...mockProviderStore,
+        selectedProvider: "ollama" as const,
+        selectedModel: "llama3.2",
+      };
+      (useProviderStore as unknown as jest.Mock).mockReturnValue(storeWithOllamaDefaultModel);
+
+      render(<ChatContextMenu onReset={mockOnReset} />);
+
+      expect(screen.queryByTestId("button-Ollama Thinking Model Managed")).toBeNull();
     });
   });
 

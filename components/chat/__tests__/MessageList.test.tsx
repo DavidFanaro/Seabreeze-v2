@@ -108,7 +108,8 @@ describe("MessageList Component", () => {
       <MessageList messages={[]} isStreaming={false} />
     );
 
-    expect(getByTestId("message-list-loading")).toBeDefined();
+    expect(getByTestId("message-list-empty")).toBeDefined();
+    expect(queryByTestId("message-list-loading")).toBeNull();
     expect(queryByTestId("message-list-thinking")).toBeNull();
     expect(queryByTestId("message-user")).toBeNull();
   });

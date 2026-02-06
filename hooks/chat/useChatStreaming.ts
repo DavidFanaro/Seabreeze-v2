@@ -271,18 +271,39 @@ export function useChatStreaming() {
          * This function processes the text stream and updates the UI in real-time
          */
         const streamOperation = async () => {
-            const canModelThink = isThinkingCapableModel(
-                currentModel.provider,
-                currentModel.modelId ?? "",
-            );
-            const providerOptions = thinkingLevel && canModelThink
-                ? {
-                    openai: {
-                        reasoningEffort: thinkingLevel,
-                    },
-                }
-                : undefined;
+            const canModelThink = currentModel.provider === "ollama"
+                || isThinkingCapableModel(
+                    currentModel.provider,
+                    currentModel.modelId ?? "",
+                );
             const thinkingChunkHandler = canModelThink ? onThinkingChunk : undefined;
+            const shouldRequestThinking = Boolean(thinkingChunkHandler);
+            const effectiveThinkingLevel: ThinkingLevel = thinkingLevel ?? "medium";
+            let providerOptions: Parameters<typeof streamText>[0]["providerOptions"];
+
+            if (shouldRequestThinking && currentModel.provider === "openai") {
+                providerOptions = {
+                    openai: {
+                        reasoningEffort: effectiveThinkingLevel,
+                        reasoningSummary: "auto",
+                    },
+                };
+            } else if (shouldRequestThinking && currentModel.provider === "openrouter") {
+                providerOptions = {
+                    openrouter: {
+                        includeReasoning: true,
+                        reasoning: {
+                            effort: effectiveThinkingLevel,
+                        },
+                    },
+                };
+            } else if (shouldRequestThinking && currentModel.provider === "ollama") {
+                providerOptions = {
+                    ollama: {
+                        think: true,
+                    },
+                };
+            }
             // Initialize the streaming text generation
             const result = streamText({
                 model: currentModel.model!,
@@ -293,11 +314,21 @@ export function useChatStreaming() {
             if (result.fullStream) {
                 for await (const part of result.fullStream) {
                     if (part.type === "reasoning-delta") {
-                        if (!canModelThink) {
+                        if (!thinkingChunkHandler) {
                             continue;
                         }
-                        reasoningAccumulated += part.text;
-                        thinkingChunkHandler?.(part.text, reasoningAccumulated);
+                        const reasoningDelta = typeof (part as { text?: unknown }).text === "string"
+                            ? (part as { text: string }).text
+                            : typeof (part as { delta?: unknown }).delta === "string"
+                                ? (part as { delta?: string }).delta ?? ""
+                                : "";
+
+                        if (!reasoningDelta) {
+                            continue;
+                        }
+
+                        reasoningAccumulated += reasoningDelta;
+                        thinkingChunkHandler?.(reasoningDelta, reasoningAccumulated);
                         continue;
                     }
 
