@@ -49,7 +49,7 @@ import * as schema from "@/db/schema";
 // =============================================================================
 
 /** Database name used for SQLite file storage */
-export const dbname = "seabreeze";
+export const dbname = "seabreeze-v2";
 
 // =============================================================================
 // DATABASE INITIALIZATION

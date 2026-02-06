@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "944d3ea5-83d9-4401-8fe0-36f7b9900d36",
+  "id": "0463beb8-6790-4c84-a22d-0304df496085",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "chat": {
@@ -25,42 +25,49 @@
           "name": "messages",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "thinkingOutput": {
+          "name": "thinkingOutput",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
           "autoincrement": false
         },
         "providerId": {
           "name": "providerId",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "modelId": {
           "name": "modelId",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "providerMetadata": {
           "name": "providerMetadata",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "updatedAt": {
           "name": "updatedAt",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         }
       },

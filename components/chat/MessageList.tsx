@@ -113,25 +113,28 @@ export const MessageList: React.FC<MessageListProps> = ({
      * Shows a flexible empty view that expands to fill available space,
      * providing a clean appearance before any messages are added to the chat
      */
+    const isGenerating = isStreaming && !isThinking;
     const listEmptyComponent = useCallback(() => (
         <View className="flex-1 items-center justify-center" testID="message-list-empty">
-            <View className="flex-row items-center">
-                <ActivityIndicator color={emptyStateColor} testID="message-list-loading" />
-                {isThinking && (
-                    <Text
-                        style={{
-                            color: emptyStateColor,
-                            marginLeft: theme.spacing.sm,
-                            fontSize: 14,
-                        }}
-                        testID="message-list-thinking"
-                    >
-                        Thinking...
-                    </Text>
-                )}
-            </View>
+            {(isThinking || isGenerating) ? (
+                <View className="flex-row items-center">
+                    <ActivityIndicator color={emptyStateColor} testID="message-list-loading" />
+                    {isThinking && (
+                        <Text
+                            style={{
+                                color: emptyStateColor,
+                                marginLeft: theme.spacing.sm,
+                                fontSize: 14,
+                            }}
+                            testID="message-list-thinking"
+                        >
+                            Thinking...
+                        </Text>
+                    )}
+                </View>
+            ) : null}
         </View>
-    ), [emptyStateColor, isThinking, theme.spacing.sm]);
+    ), [emptyStateColor, isThinking, isGenerating, theme.spacing.sm]);
 
     // ============================================================================
     // LIST CONTAINER SECTION

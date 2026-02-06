@@ -130,17 +130,19 @@ function DatabaseGate() {
   // Error state: Display migration error message if database migrations fail
   if (error) {
     return (
-      <View>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
         {/* Error message label: Shows detailed migration error information to user */}
-        <Text>Migration error: {error.message}</Text>
+        <Text style={{ color: "#ff6b6b", fontSize: 16, textAlign: "center", padding: 20 }}>
+          Migration error: {error.message}
+        </Text>
       </View>
     );
   }
 
   if (!success) {
     return (
-      <View>
-        <Text>Running migrations...</Text>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
+        <Text style={{ color: "#fff", fontSize: 16 }}>Running migrations...</Text>
       </View>
     );
   }

@@ -7,8 +7,9 @@ import { eq } from "drizzle-orm";
 import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Platform, View } from "react-native";
-import { KeyboardAvoidingView, KeyboardStickyView } from "react-native-keyboard-controller";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAvoidingView, KeyboardStickyView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated";
 import { ModelMessage } from "ai";
 import { MessageList, MessageInput, useTheme, ChatContextMenu, RetryBanner } from "@/components";
 import { ProviderId } from "@/types/provider.types";
@@ -25,6 +26,11 @@ export default function Chat() {
     const chatIdParam = rawChatId || "new";
     
     const isIos = Platform.OS === "ios";
+    const insets = useSafeAreaInsets();
+    const { progress } = useReanimatedKeyboardAnimation();
+    const animatedBottomStyle = useAnimatedStyle(() => ({
+        paddingBottom: interpolate(progress.value, [0, 1], [insets.bottom, 0]),
+    }));
     
     // Use unified chat state management
     const { clearOverride, syncFromDatabase } = useChatState(chatIdParam);
@@ -290,24 +296,24 @@ export default function Chat() {
                 {/* ================================================================== */}
                 {isIos ? (
                     <KeyboardStickyView>
-                        <SafeAreaView edges={["bottom"]}>
+                        <Animated.View style={animatedBottomStyle}>
                             <MessageInput
                                 value={text}
                                 onChangeText={setText}
                                 onSend={sendChatMessages}
                                 disabled={isStreaming}
                             />
-                        </SafeAreaView>
+                        </Animated.View>
                     </KeyboardStickyView>
                 ) : (
-                    <SafeAreaView edges={["bottom"]}>
+                    <Animated.View style={animatedBottomStyle}>
                         <MessageInput
                             value={text}
                             onChangeText={setText}
                             onSend={sendChatMessages}
                             disabled={isStreaming}
                         />
-                    </SafeAreaView>
+                    </Animated.View>
                 )}
             </View>
         </>

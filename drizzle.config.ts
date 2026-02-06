@@ -3,5 +3,5 @@ export default {
   schema: "./db/schema.ts",
   out: "./drizzle",
   dialect: "sqlite",
-  driver: "expo", // <--- very important
+  driver: "expo", // Required for Expo SQLite migration format
 } satisfies Config;

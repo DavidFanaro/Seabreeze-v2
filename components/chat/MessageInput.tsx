@@ -82,7 +82,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         // ====================================================================
         <View
             testID="message-input-wrapper"
-            className="flex-row items-end mx-4 my-2"
+            className="flex-row items-end w-full px-4 my-2"
         >
             {/* ================================================================
                 SECTION: Text Input Container
@@ -96,7 +96,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 style={[{ backgroundColor: theme.colors.surface }, style]}
             >
                 <TextInput
-                    className="py-2 max-h-[120px] self-center text-base"
+                    className="py-2 max-h-[120px] text-base"
                     style={{ color: theme.colors.text }}
                     onChangeText={onChangeText}
                     value={value}

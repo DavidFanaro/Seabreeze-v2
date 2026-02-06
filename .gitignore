@@ -37,3 +37,6 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Local SQLite database files
+*.db
