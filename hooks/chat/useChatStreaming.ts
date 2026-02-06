@@ -116,7 +116,7 @@ import { executeWithRetry, DEFAULT_RETRY_CONFIG, type RetryConfig } from "@/hook
 /**
  * Configuration options for the streaming operation
  */
-interface StreamingOptions {
+export interface StreamingOptions {
     /** The resolved model to use for streaming (may be a fallback) */
     model: FallbackResult;
     /** Whether to enable automatic retry on transient errors */
@@ -141,18 +141,22 @@ interface StreamingOptions {
     onFallback?: (from: ProviderId, to: ProviderId, reason: string) => void;
     /** Callback fired when the provider changes (due to fallback or explicit change) */
     onProviderChange?: (provider: ProviderId, model: string, isFallback: boolean) => void;
+    /** Abort signal for cancelling the stream */
+    abortSignal?: AbortSignal;
 }
 
 /**
  * Result of a streaming operation
  */
-interface StreamingResult {
+export interface StreamingResult {
     /** Whether the streaming completed successfully without needing fallback */
     success: boolean;
     /** Whether the operation should be retried with a different provider */
     shouldRetryWithFallback: boolean;
     /** The complete accumulated text from the stream */
     accumulated: string;
+    /** Whether the stream was cancelled */
+    wasCancelled: boolean;
 }
 
 export function useChatStreaming() {
@@ -254,6 +258,7 @@ export function useChatStreaming() {
             onError,
             onFallback,
             onProviderChange,
+            abortSignal,
         } = options;
 
         // Accumulator for the complete response text
@@ -313,6 +318,11 @@ export function useChatStreaming() {
 
             if (result.fullStream) {
                 for await (const part of result.fullStream) {
+                    // Check for abort signal
+                    if (abortSignal?.aborted) {
+                        return;
+                    }
+
                     if (part.type === "reasoning-delta") {
                         if (!thinkingChunkHandler) {
                             continue;
@@ -352,6 +362,11 @@ export function useChatStreaming() {
 
             // Fallback for older SDKs without fullStream
             for await (const chunk of result.textStream) {
+                // Check for abort signal
+                if (abortSignal?.aborted) {
+                    return;
+                }
+
                 accumulated += chunk;
 
                 setMessages((prev) => {
@@ -455,6 +470,7 @@ export function useChatStreaming() {
             success: !shouldRetryWithFallback,
             shouldRetryWithFallback,
             accumulated,
+            wasCancelled: options.abortSignal?.aborted ?? false,
         };
     }, [handleStreamingError]);
 

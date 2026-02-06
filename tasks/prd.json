@@ -1,0 +1,110 @@
+{
+  "name": "Chat Screen Stream Completion Fix",
+  "description": "Fix critical issues in the chat screen where streaming responses fail to complete properly and markdown doesn't update during the streaming process",
+  "branchName": "ralph/chat-stream-completion-fix",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Implement reliable stream completion detection",
+      "description": "As a user, I want chat streams to always complete fully so that I never lose partial AI responses.",
+      "acceptanceCriteria": [
+        "Detect stream end using both `done` signal and fallback timeout (30s)",
+        "Handle stream interruption scenarios: app backgrounding, network drops, component unmount",
+        "Add stream state tracking (`streaming` | `completing` | `completed` | `error`)",
+        "Cancel in-progress streams gracefully when user navigates away",
+        "Log stream lifecycle events for debugging",
+        "npx tsc --noEmit passes",
+        "npm run lint passes",
+        "All existing Jest tests pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "core",
+        "state-management"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-002",
+      "title": "Fix race condition between stream and save operations",
+      "description": "As a user, I want my chat history to persist reliably so that no messages are lost.",
+      "acceptanceCriteria": [
+        "Queue save operation to run only after stream reaches `completed` state",
+        "Implement atomic 'stream complete → save message' transaction",
+        "Handle save failures with 3 retry attempts and exponential backoff",
+        "Show user-friendly error if save fails after retries",
+        "Ensure partial stream content is preserved even if save fails",
+        "npx tsc --noEmit passes",
+        "npm run lint passes",
+        "All existing Jest tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "database",
+        "reliability"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Add stream cancellation and cleanup",
+      "description": "As a user, I want to cancel ongoing streams so that I can start fresh conversations.",
+      "acceptanceCriteria": [
+        "Add cancel button visible during active streaming",
+        "Cancel button stops stream and preserves partial content",
+        "Cleanup all stream resources (abort controllers, timers, subscriptions)",
+        "Update UI state immediately on cancel (show 'Stopped' indicator)",
+        "Prevent memory leaks from uncleaned stream handlers",
+        "npx tsc --noEmit passes",
+        "npm run lint passes",
+        "All existing Jest tests pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "ui",
+        "cleanup"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Improve error recovery for failed streams",
+      "description": "As a user, I want clear feedback when streams fail so that I know what happened.",
+      "acceptanceCriteria": [
+        "Display error message when stream fails mid-response",
+        "Show 'Retry' button for failed messages",
+        "Preserve partial stream content on failure (don't discard)",
+        "Log detailed error info for debugging (provider, timestamp, error type)",
+        "Gracefully degrade to showing raw text if markdown render fails",
+        "npx tsc --noEmit passes",
+        "npm run lint passes",
+        "All existing Jest tests pass"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ],
+      "labels": [
+        "error-handling",
+        "ux"
+      ]
+    }
+  ],
+  "metadata": {
+    "updatedAt": "2026-02-06T23:59:32.135Z"
+  }
+}

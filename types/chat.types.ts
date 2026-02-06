@@ -9,6 +9,8 @@ import type { ProviderId } from "./provider.types";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
 
+export type StreamState = "idle" | "streaming" | "completing" | "completed" | "error" | "cancelled";
+
 export type ThinkingLevel = "low" | "medium" | "high";
 
 export interface UseChatOptions {

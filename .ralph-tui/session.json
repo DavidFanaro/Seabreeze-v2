@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "sessionId": "881800b9-9698-45ee-9c0d-f4e0ac7b91d1",
+  "status": "running",
+  "startedAt": "2026-02-06T23:51:20.378Z",
+  "updatedAt": "2026-02-06T23:59:32.137Z",
+  "currentIteration": 0,
+  "maxIterations": 0,
+  "tasksCompleted": 0,
+  "isPaused": false,
+  "agentPlugin": "opencode",
+  "trackerState": {
+    "plugin": "json",
+    "totalTasks": 0,
+    "tasks": []
+  },
+  "iterations": [],
+  "skippedTaskIds": [],
+  "cwd": "/Users/davidfanaro/Documents/CodingProjects/Seabreeze-v2",
+  "activeTaskIds": [],
+  "subagentPanelVisible": false
+}

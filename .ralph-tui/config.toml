@@ -1,0 +1,11 @@
+configVersion = "2.1"
+maxIterations = 0
+agent = "opencode"
+tracker = "json"
+autoCommit = true
+defaultAgent = "opencode"
+subagentTracingDetail = "minimal"
+
+[agentOptions]
+model = "opencode/kimi-k2.5-free"
+[trackerOptions]

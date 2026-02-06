@@ -1,0 +1,13 @@
+{
+  "id": "881800b9-9698-45ee-9c0d-f4e0ac7b91d1",
+  "status": "running",
+  "startedAt": "2026-02-06T23:51:19.198Z",
+  "updatedAt": "2026-02-06T23:51:19.198Z",
+  "agentPlugin": "opencode",
+  "trackerPlugin": "json",
+  "currentIteration": 0,
+  "maxIterations": 0,
+  "totalTasks": 0,
+  "tasksCompleted": 0,
+  "cwd": "/Users/davidfanaro/Documents/CodingProjects/Seabreeze-v2"
+}

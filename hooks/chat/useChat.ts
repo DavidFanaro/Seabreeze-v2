@@ -48,7 +48,8 @@ import { executeWithRetry, DEFAULT_RETRY_CONFIG, type RetryConfig } from "@/hook
 import { useChatState } from "@/hooks/useChatState";
 import { useTitleGeneration } from "./useTitleGeneration";
 import { useChatStreaming } from "./useChatStreaming";
-import type { UseChatOptions } from "@/types/chat.types";
+import { useStreamLifecycle } from "./useStreamLifecycle";
+import type { UseChatOptions, StreamState } from "@/types/chat.types";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
 
@@ -85,6 +86,8 @@ export interface UseChatReturn {
     isThinking: boolean;
     /** Whether the AI is currently streaming a response */
     isStreaming: boolean;
+    /** Current stream state for lifecycle tracking */
+    streamState: StreamState;
     /** Send a message to the AI (optionally override current text) */
     sendMessage: (overrideText?: string) => Promise<void>;
     /** Cancel the current streaming response */
@@ -270,6 +273,35 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     
     const { executeStreaming, handleStreamingError } = useChatStreaming();
 
+    // =============================================================================
+    // STREAM LIFECYCLE MANAGEMENT
+    // =============================================================================
+    // 
+    // Manages stream state transitions, timeout detection, and cleanup.
+    // Ensures streams always complete fully and handles edge cases like
+    // app backgrounding and navigation away.
+    
+    const {
+        streamState,
+        isStreaming: isStreamLifecycleStreaming,
+        abortController,
+        initializeStream,
+        markChunkReceived,
+        markDoneSignalReceived,
+        markCompleting,
+        markCompleted,
+        markError,
+        cancelStream,
+    } = useStreamLifecycle({
+        timeoutMs: 30000, // 30 second fallback timeout
+        backgroundBehavior: "cancel",
+        enableLogging: __DEV__,
+        onError: (error) => {
+            console.error("[StreamLifecycle] Error:", error.message);
+            onError?.(error);
+        },
+    });
+
         // =============================================================================
     // PROVIDER RESET EFFECT
     // =============================================================================
@@ -320,13 +352,14 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
 
     /**
      * Cancel the current streaming operation
-     * 
+     *
      * Sets a flag that the streaming loop checks to determine if it should
      * stop processing chunks. This provides a clean way to interrupt AI responses.
      */
     const cancel = useCallback(() => {
         canceledRef.current = true;
-    }, []);
+        cancelStream(); // Use stream lifecycle cancel for comprehensive cancellation
+    }, [cancelStream]);
 
         // =============================================================================
     // CORE MESSAGE SENDING LOGIC
@@ -370,6 +403,10 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             canceledRef.current = false;            // Clear cancellation flag
             setCanRetry(false);                     // Disable retry until needed
             lastUserMessageRef.current = content;   // Store for retry capability
+            
+            // Initialize stream lifecycle management
+            const streamController = initializeStream();
+            const abortSignal = streamController.signal;
 
             // ────────────────────────────────────────────────────────────────
             // MESSAGE HISTORY MANAGEMENT
@@ -445,9 +482,19 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 activeProvider,
                 effectiveProviderId,
                 thinkingLevel,
+                abortSignal,
                 onChunk,
                 onThinkingChunk: handleThinkingChunk,
-                onError,
+                onError: (error: unknown) => {
+                    if (error instanceof Error) {
+                        markError(error);
+                        onError?.(error);
+                    } else {
+                        const wrappedError = new Error(String(error));
+                        markError(wrappedError);
+                        onError?.(wrappedError);
+                    }
+                },
                 onFallback,
                 onProviderChange: (provider: ProviderId, model: string, isFallback: boolean) => {
                     setActiveProvider(provider);
@@ -583,28 +630,29 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         setThinkingOutput,              // Update reasoning output
         isThinking,                     // Thinking status
         isStreaming,                    // Streaming status
-        
+        streamState,                    // Stream lifecycle state (streaming | completing | completed | error)
+
         // ────────────────────────────────────────────────────────────────
         // ACTIONS
         // ────────────────────────────────────────────────────────────────
         sendMessage,                    // Send message
         cancel,                         // Cancel streaming
         reset,                          // Reset all state
-        
+
         // ────────────────────────────────────────────────────────────────
         // TITLE MANAGEMENT
         // ────────────────────────────────────────────────────────────────
         title,                          // Current title
         setTitle,                       // Update title
         generateTitle,                  // Generate new title
-        
+
         // ────────────────────────────────────────────────────────────────
         // PROVIDER STATE
         // ────────────────────────────────────────────────────────────────
         currentProvider: activeProvider, // Active AI provider
         currentModel: activeModel,      // Active model
         isUsingFallback,                // Fallback status
-        
+
         // ────────────────────────────────────────────────────────────────
         // RETRY FUNCTIONALITY
         // ────────────────────────────────────────────────────────────────

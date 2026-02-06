@@ -1,20 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/big-pickle",
-  "permission": "allow",
-
-  "provider": {
-    "openai": {
-      "models": {
-        "gpt-5.2-codex": {
-          "options": {
-            "reasoningEffort": "xhigh",
-            "textVerbosity": "low",
-            "reasoningSummary": "auto",
-            "include": ["reasoning.encrypted_content"]
-          }
-        }
-      }
-    }
-  }
+  "model": "opencode/kimi-k2.5-free",
+  "permission": "allow"
 }
