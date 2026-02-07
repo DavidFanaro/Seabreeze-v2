@@ -1,5 +1,6 @@
 import { LanguageModel } from "ai";
 import { ProviderId } from "@/types/provider.types";
+import { createIdempotencyKey, createIdempotencyRegistry } from "@/lib/concurrency";
 
 /**
  * @file provider-cache.ts
@@ -431,6 +432,7 @@ class ProviderCache {
 
 // Singleton instance
 let cacheInstance: ProviderCache | null = null;
+const modelCreationRegistry = createIdempotencyRegistry<LanguageModel | null>();
 
 /**
  * Get the global provider cache instance
@@ -450,6 +452,8 @@ export function resetProviderCache(): void {
     cacheInstance.dispose();
     cacheInstance = null;
   }
+
+  modelCreationRegistry.clear();
 }
 
 /**
@@ -480,6 +484,36 @@ export function getCachedModel(
   }
   
   return model;
+}
+
+/**
+ * Get a cached model while deduplicating concurrent creation for the same key.
+ */
+export async function getCachedModelWithContentionProtection(
+  providerId: ProviderId,
+  modelId: string,
+  createModel: () => Promise<LanguageModel | null>
+): Promise<LanguageModel | null> {
+  const cache = getProviderCache();
+  const cached = cache.get(providerId, modelId);
+  if (cached) {
+    return cached;
+  }
+
+  const operationKey = createIdempotencyKey("provider-cache-model", [providerId, modelId]);
+  return modelCreationRegistry.run(operationKey, async () => {
+    const existing = cache.get(providerId, modelId);
+    if (existing) {
+      return existing;
+    }
+
+    const model = await createModel();
+    if (model) {
+      cache.set(providerId, modelId, model);
+    }
+
+    return model;
+  });
 }
 
 /**

@@ -619,5 +619,43 @@ describe('useChat', () => {
         content: 'flap-safe',
       });
     });
+
+    it('retries fallback in a single authoritative pipeline without duplicating user messages', async () => {
+      mockExecuteStreaming
+        .mockImplementationOnce(async () => ({
+          success: false,
+          shouldRetryWithFallback: true,
+          accumulated: '',
+          nextProvider: 'apple',
+          nextModel: 'gpt-4',
+        }))
+        .mockImplementationOnce(async () => ({
+          success: true,
+          shouldRetryWithFallback: false,
+          accumulated: 'fallback success',
+        }));
+
+      const { result } = renderHook(() => useChat({
+        providerId: 'openai' as any,
+        modelId: 'gpt-5',
+      }));
+
+      await act(async () => {
+        await result.current.sendMessage('fallback me');
+      });
+
+      const firstCallOptions = mockExecuteStreaming.mock.calls[0]?.[0] as { activeProvider?: string } | undefined;
+      const secondCallOptions = mockExecuteStreaming.mock.calls[1]?.[0] as { activeProvider?: string } | undefined;
+
+      expect(mockExecuteStreaming).toHaveBeenCalledTimes(2);
+      expect(firstCallOptions?.activeProvider).toBe('openai');
+      expect(secondCallOptions?.activeProvider).toBe('apple');
+      expect(result.current.messages).toHaveLength(2);
+      expect(result.current.messages[0]).toEqual({
+        role: 'user',
+        content: 'fallback me',
+      });
+      expect(result.current.isStreaming).toBe(false);
+    });
   });
 });

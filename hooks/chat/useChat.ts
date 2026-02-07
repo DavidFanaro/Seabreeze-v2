@@ -270,6 +270,20 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         return cachedModel || null;
     }, [providedModel, activeProvider, activeModel]);
 
+    const resolveModelForSelection = useCallback((providerId: ProviderId, modelId: string): LanguageModel | null => {
+        if (providedModel) {
+            return providedModel as LanguageModel;
+        }
+
+        const resolvedModel = getCachedModel(
+            providerId,
+            modelId,
+            () => getProviderModel(providerId, modelId).model
+        );
+
+        return resolvedModel || null;
+    }, [providedModel]);
+
     // =============================================================================
     // TITLE GENERATION INTEGRATION
     // =============================================================================
@@ -472,10 +486,14 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             ]);
             setThinkingOutput((prev) => [...prev, ""]);
 
+            let attemptProvider = activeProvider;
+            let attemptModel = activeModel;
+            let attemptResolvedModel = resolveModelForSelection(attemptProvider, attemptModel);
+
             // ────────────────────────────────────────────────────────────────
             // MODEL VALIDATION
             // ────────────────────────────────────────────────────────────────
-            if (!model) {
+            if (!attemptResolvedModel) {
                 // Show helpful error message when no provider is configured
                 setMessages((prev) => {
                     const next = [...prev];
@@ -512,87 +530,91 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 }
                 : undefined;
 
-            const streamingOptions = {
-                model: {
-                    model,
-                    provider: activeProvider,
-                    modelId: activeModel,
-                    isOriginal: !isUsingFallback,
-                    attemptedProviders: failedProvidersRef.current,
-                } as FallbackResult,
-                enableRetry,
-                retryConfig: mergedRetryConfig,
-                enableFallback,
-                activeProvider,
-                effectiveProviderId,
-                thinkingLevel,
-                abortSignal,
-                onChunk,
-                onThinkingChunk: handleThinkingChunk,
-                canMutateState: canMutateForCurrentSend,
-                onError: (error: unknown) => {
-                    if (!canMutateForCurrentSend()) {
-                        return;
-                    }
-
-                    if (error instanceof Error) {
-                        markError(error);
-                        setErrorMessage(error.message);
-                        setCanRetry(true);
-                        lastRetryableOperationRef.current = {
-                            operationKey: sendOperationKey,
-                            content,
-                        };
-                        onError?.(error);
-                    } else {
-                        const wrappedError = new Error(String(error));
-                        markError(wrappedError);
-                        setErrorMessage(wrappedError.message);
-                        setCanRetry(true);
-                        lastRetryableOperationRef.current = {
-                            operationKey: sendOperationKey,
-                            content,
-                        };
-                        onError?.(wrappedError);
-                    }
-                },
-                onFallback,
-                onProviderChange: (provider: ProviderId, model: string, isFallback: boolean) => {
-                    if (!canMutateForCurrentSend()) {
-                        return;
-                    }
-
-                    setActiveProvider(provider);
-                    setActiveModel(model);
-                    setIsUsingFallback(isFallback);
-                },
-            };
-
             // ────────────────────────────────────────────────────────────────
             // STREAMING EXECUTION
             // ────────────────────────────────────────────────────────────────
-            const result = await executeStreaming(
-                streamingOptions,
-                updatedMessages,
-                setMessages,
-                assistantIndex,
-                failedProvidersRef
-            );
+            while (true) {
+                const streamingOptions = {
+                    model: {
+                        model: attemptResolvedModel,
+                        provider: attemptProvider,
+                        modelId: attemptModel,
+                        isOriginal: attemptProvider === effectiveProviderId && !isUsingFallback,
+                        attemptedProviders: failedProvidersRef.current,
+                    } as FallbackResult,
+                    enableRetry,
+                    retryConfig: mergedRetryConfig,
+                    enableFallback,
+                    activeProvider: attemptProvider,
+                    effectiveProviderId: attemptProvider,
+                    thinkingLevel,
+                    abortSignal,
+                    onChunk,
+                    onThinkingChunk: handleThinkingChunk,
+                    canMutateState: canMutateForCurrentSend,
+                    onError: (error: unknown) => {
+                        if (!canMutateForCurrentSend()) {
+                            return;
+                        }
 
-            if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
-                return;
-            }
+                        if (error instanceof Error) {
+                            markError(error);
+                            setErrorMessage(error.message);
+                            setCanRetry(true);
+                            lastRetryableOperationRef.current = {
+                                operationKey: sendOperationKey,
+                                content,
+                            };
+                            onError?.(error);
+                        } else {
+                            const wrappedError = new Error(String(error));
+                            markError(wrappedError);
+                            setErrorMessage(wrappedError.message);
+                            setCanRetry(true);
+                            lastRetryableOperationRef.current = {
+                                operationKey: sendOperationKey,
+                                content,
+                            };
+                            onError?.(wrappedError);
+                        }
+                    },
+                    onFallback,
+                    onProviderChange: (provider: ProviderId, model: string, isFallback: boolean) => {
+                        if (!canMutateForCurrentSend()) {
+                            return;
+                        }
 
-            // ────────────────────────────────────────────────────────────────
-            // FALLBACK RETRY LOGIC
-            // ────────────────────────────────────────────────────────────────
-            if (result.shouldRetryWithFallback && !canceledRef.current) {
-                setIsStreaming(false);
-                setIsThinking(false);
-                // Small delay to ensure clean state transition
-                await new Promise(resolve => setTimeout(resolve, 100));
-                await sendMessage(content);
-                return;
+                        setActiveProvider(provider);
+                        setActiveModel(model);
+                        setIsUsingFallback(isFallback);
+                    },
+                };
+
+                const result = await executeStreaming(
+                    streamingOptions,
+                    updatedMessages,
+                    setMessages,
+                    assistantIndex,
+                    failedProvidersRef
+                );
+
+                if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
+                    return;
+                }
+
+                if (result.shouldRetryWithFallback && result.nextProvider && result.nextModel && !canceledRef.current) {
+                    const fallbackModel = resolveModelForSelection(result.nextProvider, result.nextModel);
+                    if (!fallbackModel) {
+                        break;
+                    }
+
+                    attemptProvider = result.nextProvider;
+                    attemptModel = result.nextModel;
+                    attemptResolvedModel = fallbackModel;
+                    continue;
+                }
+
+                break;
             }
 
             // ────────────────────────────────────────────────────────────────
@@ -607,7 +629,6 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         [
             text, 
             placeholderText, 
-            model, 
             activeProvider, 
             activeModel, 
             isUsingFallback,
@@ -625,7 +646,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             markError,
             enableThinking,
             thinkingLevel,
-            onThinkingChunk
+            onThinkingChunk,
+            resolveModelForSelection,
         ],
     );
 

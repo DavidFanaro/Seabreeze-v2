@@ -159,6 +159,10 @@ export interface StreamingResult {
     accumulated: string;
     /** Whether the stream was cancelled */
     wasCancelled: boolean;
+    /** Provider selected for the next fallback attempt, if any */
+    nextProvider?: ProviderId;
+    /** Model selected for the next fallback attempt, if any */
+    nextModel?: string;
 }
 
 export function useChatStreaming() {
@@ -293,6 +297,8 @@ export function useChatStreaming() {
         let reasoningAccumulated = "";
         // Flag indicating whether we should retry with a different provider
         let shouldRetryWithFallback = false;
+        let nextProvider: ProviderId | undefined;
+        let nextModel: string | undefined;
 
         // Merge default retry config with any custom overrides
         const mergedRetryConfig: RetryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
@@ -408,6 +414,17 @@ export function useChatStreaming() {
 
                 // If retry failed but we have an error to handle
                 if (!retryResult.success && retryResult.error) {
+                    if (!canCommit()) {
+                        return {
+                            success: true,
+                            shouldRetryWithFallback: false,
+                            accumulated,
+                            wasCancelled: options.abortSignal?.aborted ?? false,
+                            nextProvider,
+                            nextModel,
+                        };
+                    }
+
                     // Log detailed error info for debugging
                     console.error("[useChatStreaming] Streaming error after retries:", {
                         provider: effectiveProviderId,
@@ -432,10 +449,14 @@ export function useChatStreaming() {
 
                     if (errorResult.shouldRetry) {
                         // If we have a fallback provider available
-                        if (errorResult.nextProvider) {
+                        if (errorResult.nextProvider && errorResult.nextModel) {
                             // Mark current provider as failed
-                            failedProvidersRef.current.push(activeProvider);
+                            if (!failedProvidersRef.current.includes(activeProvider)) {
+                                failedProvidersRef.current.push(activeProvider);
+                            }
                             shouldRetryWithFallback = true;
+                            nextProvider = errorResult.nextProvider;
+                            nextModel = errorResult.nextModel;
                             
                             console.log("[useChatStreaming] Falling back to provider:", {
                                 from: activeProvider,
@@ -488,10 +509,23 @@ export function useChatStreaming() {
                 failedProvidersRef.current
             );
 
+            if (!canCommit()) {
+                return {
+                    success: true,
+                    shouldRetryWithFallback: false,
+                    accumulated,
+                    wasCancelled: options.abortSignal?.aborted ?? false,
+                };
+            }
+
             if (errorResult.shouldRetry && errorResult.nextProvider) {
                 // We have a fallback provider available
-                failedProvidersRef.current.push(activeProvider);
+                if (!failedProvidersRef.current.includes(activeProvider)) {
+                    failedProvidersRef.current.push(activeProvider);
+                }
                 shouldRetryWithFallback = true;
+                nextProvider = errorResult.nextProvider;
+                nextModel = errorResult.nextModel;
                 
                 console.log("[useChatStreaming] Falling back to provider after error:", {
                     from: activeProvider,
@@ -521,6 +555,8 @@ export function useChatStreaming() {
             shouldRetryWithFallback,
             accumulated,
             wasCancelled: options.abortSignal?.aborted ?? false,
+            nextProvider,
+            nextModel,
         };
     }, [handleStreamingError]);
 

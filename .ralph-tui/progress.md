@@ -11,6 +11,7 @@ after each iteration and it's included in prompts for context.
 - For async workflows, compose a local trio per scope: `createSequenceGuard` to gate commits, `createAbortManager` to cancel superseded work, and `createIdempotencyRegistry` with deterministic keys to dedupe in-flight side effects.
 - For overlapping chat sends, assign a new sequence token per send and require all stream-side callbacks/state commits (chunks, errors, provider switches, completion) to pass a shared `canMutateState` gate built from token freshness + abort/cancel flags.
 - For retry UX, persist a retryable logical operation key on failure and run retry cleanup/send through an in-flight idempotency registry keyed by that operation so rapid taps collapse into one execution.
+- For fallback chains, keep retries inside the same send token and pass explicit `nextProvider`/`nextModel` metadata back to the orchestrator so fallback attempts reuse the same assistant slot instead of recursively starting a new send.
 
 ---
 
@@ -90,4 +91,27 @@ after each iteration and it's included in prompts for context.
   - Gotchas encountered
     - Triggering retries back-to-back in tests requires a microtask flush before asserting streaming invocations because idempotency-registry tasks are promise-queued.
     - Repo-wide `tsc` and `npm test` currently fail due unrelated baseline issues, so targeted story verification was used to confirm retry behavior.
+---
+
+## 2026-02-06 - US-005
+- What was implemented
+  - Reworked `useChat` fallback execution to stay within one authoritative send pipeline: fallback retries now loop within the same send token and assistant placeholder instead of recursively calling `sendMessage`, preventing duplicate/interleaved response branches.
+  - Extended `useChatStreaming` to return `nextProvider`/`nextModel` metadata and added stale-branch gating before fallback/error handling commits so superseded paths cannot schedule fallback retries or mutate provider/error state.
+  - Added contention-safe provider-cache model creation via `getCachedModelWithContentionProtection`, deduplicating concurrent async model creation for the same provider/model key through an in-flight idempotency registry.
+  - Added concurrency-focused tests for timeout-triggered fallback routing, stale fallback-branch suppression, single-pipeline fallback retries, and provider-cache contention deduplication.
+- Files changed
+  - `hooks/chat/useChat.ts`
+  - `hooks/chat/useChatStreaming.ts`
+  - `hooks/chat/__tests__/useChat.test.ts`
+  - `hooks/chat/__tests__/useChatStreaming.test.ts`
+  - `providers/provider-cache.ts`
+  - `providers/__tests__/provider-cache.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Returning concrete fallback targets (`nextProvider`, `nextModel`) from stream workers removes hidden coupling to asynchronous React state updates and makes orchestration deterministic.
+    - Cache contention controls should use key-scoped in-flight dedupe and a second cache read inside the deduped closure (double-check pattern) before creating expensive instances.
+  - Gotchas encountered
+    - Recursive fallback retries in the orchestrator can accidentally enqueue duplicate user/assistant entries even when per-chunk mutation guards exist; retries must stay inside the original send transaction.
+    - Repository-wide `npx tsc --noEmit` and `npm test` still fail because of unrelated pre-existing issues in other suites/files, so story-level verification required targeted tests for modified modules.
 ---

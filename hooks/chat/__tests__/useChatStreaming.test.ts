@@ -484,9 +484,102 @@ describe('useChatStreaming', () => {
 
       expect(streamingResult.success).toBe(false);
       expect(streamingResult.shouldRetryWithFallback).toBe(true);
+      expect(streamingResult.nextProvider).toBe('apple');
+      expect(streamingResult.nextModel).toBe('gpt-4');
       expect(failedProvidersRef.current).toContain('openai');
       expect(mockOnProviderChange).toHaveBeenCalledWith('apple', 'gpt-4', true);
       expect(mockOnFallback).toHaveBeenCalledWith('openai', 'apple', 'Server error occurred');
+    });
+
+    it('surfaces timeout-triggered fallback target for authoritative retry branch', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      mockClassifyError.mockReturnValue({
+        category: 'timeout',
+        isRetryable: true,
+        shouldFallback: true,
+        message: 'Request timed out',
+      });
+
+      mockExecuteWithRetry.mockResolvedValue({
+        success: false,
+        attempts: 2,
+        shouldFallback: true,
+        error: {
+          category: 'timeout',
+          isRetryable: true,
+          shouldFallback: true,
+          message: 'Request timed out',
+        },
+      });
+
+      mockGetNextFallbackProvider.mockReturnValue({
+        provider: 'openrouter' as ProviderId,
+        model: 'openai/gpt-5',
+      });
+
+      const streamingResult = await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            enableRetry: true,
+            enableFallback: true,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(streamingResult.success).toBe(false);
+      expect(streamingResult.shouldRetryWithFallback).toBe(true);
+      expect(streamingResult.nextProvider).toBe('openrouter');
+      expect(streamingResult.nextModel).toBe('openai/gpt-5');
+      expect(failedProvidersRef.current).toContain('openai');
+    });
+
+    it('ignores stale retry-failure fallback branch when mutation gate is closed', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const onFallback = jest.fn();
+      const onProviderChange = jest.fn();
+
+      mockExecuteWithRetry.mockResolvedValue({
+        success: false,
+        attempts: 2,
+        shouldFallback: true,
+        error: {
+          category: 'timeout',
+          isRetryable: true,
+          shouldFallback: true,
+          message: 'timed out',
+        },
+      });
+
+      const streamingResult = await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            enableRetry: true,
+            enableFallback: true,
+            canMutateState: () => false,
+            onFallback,
+            onProviderChange,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(streamingResult.success).toBe(true);
+      expect(streamingResult.shouldRetryWithFallback).toBe(false);
+      expect(streamingResult.nextProvider).toBeUndefined();
+      expect(streamingResult.nextModel).toBeUndefined();
+      expect(onFallback).not.toHaveBeenCalled();
+      expect(onProviderChange).not.toHaveBeenCalled();
+      expect(failedProvidersRef.current).toEqual([]);
     });
 
     it('should handle streaming with retry when no fallback available', async () => {

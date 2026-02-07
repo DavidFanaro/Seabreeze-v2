@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { getCachedModel, invalidateProviderCache, getProviderCache, resetProviderCache } from '../provider-cache';
+import {
+  getCachedModel,
+  getCachedModelWithContentionProtection,
+  invalidateProviderCache,
+  getProviderCache,
+  resetProviderCache,
+} from '../provider-cache';
 import { LanguageModel } from 'ai';
 import type { ProviderId } from '@/types/provider.types';
 
@@ -76,6 +82,33 @@ describe('ProviderCache', () => {
       getCachedModel('apple', 'gpt-4', createModelNull);
       getCachedModel('apple', 'gpt-4', createModel);
       
+      expect(createModel).toHaveBeenCalledTimes(1);
+    });
+
+    it('deduplicates concurrent async model creation for same provider/model key', async () => {
+      const mockModel = {} as LanguageModel;
+      let resolveCreation!: (value: LanguageModel | null) => void;
+
+      const createModel = jest.fn(async () => {
+        return await new Promise<LanguageModel | null>((resolve) => {
+          resolveCreation = resolve;
+        });
+      });
+
+      const first = getCachedModelWithContentionProtection('openai', 'gpt-4', createModel);
+      const second = getCachedModelWithContentionProtection('openai', 'gpt-4', createModel);
+
+      await Promise.resolve();
+      expect(createModel).toHaveBeenCalledTimes(1);
+
+      resolveCreation(mockModel);
+
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+      expect(firstResult).toBe(mockModel);
+      expect(secondResult).toBe(mockModel);
+
+      const third = await getCachedModelWithContentionProtection('openai', 'gpt-4', createModel);
+      expect(third).toBe(mockModel);
       expect(createModel).toHaveBeenCalledTimes(1);
     });
   });
