@@ -8,6 +8,7 @@ after each iteration and it's included in prompts for context.
 *Add reusable patterns discovered during development here.*
 
 - Concurrency audits should use a stable schema per entry: `Race Class`, `Vulnerable Flow`, `Modules/Files`, `Severity`, `Reproducibility`, and `Owner Subsystem`, plus class-level fixed evidence gates to make remediation traceable.
+- For async workflows, compose a local trio per scope: `createSequenceGuard` to gate commits, `createAbortManager` to cancel superseded work, and `createIdempotencyRegistry` with deterministic keys to dedupe in-flight side effects.
 
 ---
 
@@ -26,4 +27,26 @@ after each iteration and it's included in prompts for context.
   - Gotchas encountered
     - Stream lifecycle utilities define robust transitions, but integration gaps can still produce out-of-order completion semantics if chunk/done/completed markers are not consistently emitted.
     - New-chat persistence relies on runtime guards rather than DB constraints, so duplicate insert races remain plausible under timing pressure.
+---
+
+## 2026-02-06 - US-002
+- What was implemented
+  - Added shared concurrency primitives in `lib/concurrency.ts` for sequence guards, abort lifecycle management, abort error detection, deterministic idempotency keys, and in-flight idempotency registries.
+  - Introduced typed contracts in `types/concurrency.types.ts` and exported them via `types/index.ts` for use by hooks/providers/stores.
+  - Added contributor-facing usage rules and an integration recipe in `docs/concurrency-primitives.md`.
+  - Added unit tests covering stale token rejection, out-of-order completion gating, superseded abort behavior, and idempotent in-flight deduplication.
+- Files changed
+  - `lib/concurrency.ts`
+  - `lib/__tests__/concurrency.test.ts`
+  - `types/concurrency.types.ts`
+  - `types/index.ts`
+  - `docs/concurrency-primitives.md`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Sequence guards are most reliable when every async request gets a fresh token at launch and every commit path checks token freshness right before mutation.
+    - Abort managers and idempotency registries should be scoped per workflow (not global) to avoid cross-feature cancellation and dedupe collisions.
+  - Gotchas encountered
+    - Deduplication should only cover in-flight work; keeping completed promises in a registry can suppress legitimate retries.
+    - Abort handling is most maintainable when abort outcomes are normalized (`AbortError`) and filtered from fallback/error UX flows.
 ---
