@@ -14,6 +14,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { classifyError, ErrorClassification, ErrorCategory } from "@/providers/fallback-chain";
+import { createSequenceGuard } from "@/lib/concurrency";
+import type { RequestToken } from "@/types/concurrency.types";
 
 /**
  * ============================================================================
@@ -67,6 +69,66 @@ export interface RetryState {
   isRetrying: boolean;
   /** Seconds remaining until the next retry attempt (null if not counting down) */
   nextRetryIn: number | null;
+}
+
+/**
+ * Module-level retry state invariants:
+ * 1) `nextRetryIn` is non-null only while `isRetrying` is true.
+ * 2) Selector outputs (`canRetry`, `retryAfterMs`) are derived from a single snapshot.
+ * 3) Async callbacks must only commit state for the active execution token.
+ */
+const INITIAL_RETRY_STATE: RetryState = {
+  attemptNumber: 0,
+  lastError: null,
+  isRetrying: false,
+  nextRetryIn: null,
+};
+
+function buildRetryStateSnapshot(snapshot: RetryState): RetryState {
+  if (!snapshot.isRetrying) {
+    return {
+      ...snapshot,
+      nextRetryIn: null,
+    };
+  }
+
+  return snapshot;
+}
+
+function normalizeClassification(
+  classification: ErrorClassification | null | undefined,
+): ErrorClassification {
+  return (
+    classification ?? {
+      category: "unknown",
+      isRetryable: false,
+      shouldFallback: true,
+      message: "Unknown error",
+    }
+  );
+}
+
+export function selectCanRetry(retryState: RetryState, config: RetryConfig): boolean {
+  return (
+    !retryState.isRetrying &&
+    retryState.attemptNumber < config.maxRetries &&
+    retryState.lastError?.isRetryable === true
+  );
+}
+
+export function selectRetryAfterMs(
+  retryState: RetryState,
+  config: RetryConfig,
+): number | null {
+  if (
+    retryState.isRetrying ||
+    !retryState.lastError ||
+    retryState.lastError.category !== "rate_limit"
+  ) {
+    return null;
+  }
+
+  return calculateBackoffDelay(retryState.attemptNumber, config);
 }
 
 /**
@@ -171,7 +233,7 @@ export async function executeWithRetry<T>(
         shouldFallback: false,
       };
     } catch (error) {
-      lastError = classifyError(error);
+      lastError = normalizeClassification(classifyError(error));
       
       // Check if this error category is retryable
       const isRetryableCategory = config.retryableCategories.includes(lastError.category);
@@ -179,11 +241,12 @@ export async function executeWithRetry<T>(
       
       // If not retryable or we've exhausted retries, stop
       if (!isRetryable || attempt >= config.maxRetries) {
+        const shouldFallback = attempt >= config.maxRetries ? true : lastError.shouldFallback;
         return {
           success: false,
           error: lastError,
           attempts: attempt + 1,
-          shouldFallback: lastError.shouldFallback,
+          shouldFallback,
         };
       }
       
@@ -197,7 +260,7 @@ export async function executeWithRetry<T>(
   // Should not reach here, but handle gracefully
   return {
     success: false,
-    error: lastError || { category: "unknown", isRetryable: false, shouldFallback: true, message: "Unknown error" },
+    error: normalizeClassification(lastError),
     attempts: config.maxRetries + 1,
     shouldFallback: true,
   };
@@ -246,15 +309,27 @@ export async function executeWithRetry<T>(
 export function useErrorRecovery(config: Partial<RetryConfig> = {}) {
   const mergedConfig: RetryConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
   
-  const [retryState, setRetryState] = useState<RetryState>({
-    attemptNumber: 0,
-    lastError: null,
-    isRetrying: false,
-    nextRetryIn: null,
-  });
+  const [retryState, setRetryState] = useState<RetryState>(INITIAL_RETRY_STATE);
   
   const abortRef = useRef<boolean>(false);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sequenceGuardRef = useRef(createSequenceGuard("useErrorRecovery"));
+
+  const beginExecution = useCallback((): RequestToken => {
+    return sequenceGuardRef.current.next();
+  }, []);
+
+  const isExecutionActive = useCallback((token: RequestToken): boolean => {
+    return !abortRef.current && sequenceGuardRef.current.isCurrent(token);
+  }, []);
+
+  const commitRetryState = useCallback((token: RequestToken, snapshot: RetryState) => {
+    if (!isExecutionActive(token)) {
+      return;
+    }
+
+    setRetryState(buildRetryStateSnapshot(snapshot));
+  }, [isExecutionActive]);
 
   /**
    * Clear any running countdown
@@ -271,39 +346,45 @@ export function useErrorRecovery(config: Partial<RetryConfig> = {}) {
    */
   const resetRetryState = useCallback(() => {
     abortRef.current = false;
+    beginExecution();
     clearCountdown();
-    setRetryState({
-      attemptNumber: 0,
-      lastError: null,
-      isRetrying: false,
-      nextRetryIn: null,
-    });
-  }, [clearCountdown]);
+    setRetryState(INITIAL_RETRY_STATE);
+  }, [beginExecution, clearCountdown]);
 
   /**
    * Abort any ongoing retry attempts
    */
   const abortRetry = useCallback(() => {
     abortRef.current = true;
+    beginExecution();
     clearCountdown();
-    setRetryState((prev) => ({
-      ...prev,
-      isRetrying: false,
-      nextRetryIn: null,
-    }));
-  }, [clearCountdown]);
+    setRetryState((prev) =>
+      buildRetryStateSnapshot({
+        ...prev,
+        lastError: null,
+        attemptNumber: 0,
+        isRetrying: false,
+        nextRetryIn: null,
+      }),
+    );
+  }, [beginExecution, clearCountdown]);
 
   /**
    * Execute an operation with retry logic, updating state throughout
    */
   const executeWithRecovery = useCallback(
     async <T>(operation: () => Promise<T>): Promise<RetryResult<T>> => {
-      resetRetryState();
+      abortRef.current = false;
+      clearCountdown();
+      const executionToken = beginExecution();
+      setRetryState(INITIAL_RETRY_STATE);
       
       const onRetry = (attemptNumber: number, delay: number, error: ErrorClassification) => {
-        if (abortRef.current) return;
-        
-        setRetryState({
+        if (!isExecutionActive(executionToken)) {
+          return;
+        }
+          
+        commitRetryState(executionToken, {
           attemptNumber,
           lastError: error,
           isRetrying: true,
@@ -315,62 +396,74 @@ export function useErrorRecovery(config: Partial<RetryConfig> = {}) {
         clearCountdown();
         countdownRef.current = setInterval(() => {
           remaining -= 1;
-          if (remaining <= 0 || abortRef.current) {
+          if (!isExecutionActive(executionToken) || remaining <= 0) {
             clearCountdown();
-            setRetryState((prev) => ({ ...prev, nextRetryIn: null }));
+            commitRetryState(executionToken, {
+              attemptNumber,
+              lastError: error,
+              isRetrying: true,
+              nextRetryIn: null,
+            });
           } else {
-            setRetryState((prev) => ({ ...prev, nextRetryIn: remaining }));
+            commitRetryState(executionToken, {
+              attemptNumber,
+              lastError: error,
+              isRetrying: true,
+              nextRetryIn: remaining,
+            });
           }
         }, 1000);
       };
       
       const result = await executeWithRetry(operation, mergedConfig, onRetry);
+
+      if (!sequenceGuardRef.current.isCurrent(executionToken)) {
+        return result;
+      }
       
       clearCountdown();
       
       if (!result.success && result.error) {
-        setRetryState((prev) => ({
-          ...prev,
-          lastError: result.error!,
+        commitRetryState(executionToken, {
+          attemptNumber: result.attempts,
+          lastError: result.error,
           isRetrying: false,
           nextRetryIn: null,
-        }));
+        });
       } else {
-        resetRetryState();
+        commitRetryState(executionToken, INITIAL_RETRY_STATE);
       }
       
       return result;
     },
-    [mergedConfig, resetRetryState, clearCountdown]
+    [beginExecution, clearCountdown, commitRetryState, isExecutionActive, mergedConfig]
   );
 
   /**
    * Manually trigger a retry with a specific error
    */
   const recordError = useCallback((error: unknown) => {
-    const classification = classifyError(error);
-    setRetryState((prev) => ({
-      ...prev,
+    const classification = normalizeClassification(classifyError(error));
+    setRetryState((prev) =>
+      buildRetryStateSnapshot({
+        ...prev,
       lastError: classification,
       attemptNumber: prev.attemptNumber + 1,
-    }));
+      }),
+    );
     return classification;
   }, []);
 
   /**
    * Check if we can still retry
    */
-  const canRetry = retryState.attemptNumber < mergedConfig.maxRetries && 
-    retryState.lastError?.isRetryable === true;
+  const canRetry = selectCanRetry(retryState, mergedConfig);
 
   /**
    * Get time until next retry is allowed (for rate limiting)
    */
   const getRetryAfter = useCallback((): number | null => {
-    if (!retryState.lastError || retryState.lastError.category !== "rate_limit") {
-      return null;
-    }
-    return calculateBackoffDelay(retryState.attemptNumber, mergedConfig);
+    return selectRetryAfterMs(retryState, mergedConfig);
   }, [retryState, mergedConfig]);
 
   return {

@@ -10,7 +10,10 @@ import {
   calculateBackoffDelay,
   DEFAULT_RETRY_CONFIG,
   executeWithRetry,
+  selectCanRetry,
+  selectRetryAfterMs,
   type RetryConfig,
+  type RetryState,
   useErrorRecovery,
 } from "../useErrorRecovery";
 
@@ -87,6 +90,8 @@ describe("useErrorRecovery", () => {
     });
 
     it("should retry retryable errors and eventually succeed", async () => {
+      jest.useRealTimers();
+
       const mockOperation = jest
         .fn()
         .mockRejectedValueOnce(new Error("First failure"))
@@ -101,7 +106,17 @@ describe("useErrorRecovery", () => {
       });
 
       const onRetry = jest.fn();
-      const result = await executeWithRetry(mockOperation, DEFAULT_RETRY_CONFIG, onRetry);
+      const promise = executeWithRetry(
+        mockOperation,
+        {
+          ...DEFAULT_RETRY_CONFIG,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+          backoffMultiplier: 1,
+        },
+        onRetry,
+      );
+      const result = await promise;
 
       expect(result.success).toBe(true);
       expect(result.data).toBe("success");
@@ -129,6 +144,8 @@ describe("useErrorRecovery", () => {
     });
 
     it("should respect max retries limit", async () => {
+      jest.useRealTimers();
+
       const mockOperation = jest.fn().mockRejectedValue(new Error("Always fails"));
       (classifyError as jest.Mock).mockReturnValue({
         category: "network",
@@ -137,10 +154,14 @@ describe("useErrorRecovery", () => {
         message: "Network error",
       });
 
-      const result = await executeWithRetry(mockOperation, {
+      const promise = executeWithRetry(mockOperation, {
         ...DEFAULT_RETRY_CONFIG,
         maxRetries: 2,
+        baseDelayMs: 1,
+        maxDelayMs: 1,
+        backoffMultiplier: 1,
       });
+      const result = await promise;
 
       expect(result.success).toBe(false);
       expect(result.attempts).toBe(3); // Initial + 2 retries
@@ -185,7 +206,7 @@ describe("useErrorRecovery", () => {
         promise = result.current.executeWithRecovery(mockOperation);
       });
 
-      const retryResult = await promise;
+      const retryResult = await promise!;
 
       expect(retryResult.success).toBe(true);
       expect(retryResult.data).toBe("success");
@@ -204,6 +225,7 @@ describe("useErrorRecovery", () => {
         shouldFallback: false,
         message: "Network error",
       };
+      (classifyError as jest.Mock).mockReturnValueOnce(retryableError);
 
       act(() => {
         result.current.recordError(retryableError);
@@ -218,6 +240,7 @@ describe("useErrorRecovery", () => {
         shouldFallback: true,
         message: "Auth error",
       };
+      (classifyError as jest.Mock).mockReturnValueOnce(nonRetryableError);
 
       act(() => {
         result.current.recordError(nonRetryableError);
@@ -261,6 +284,69 @@ describe("useErrorRecovery", () => {
       expect(mockOperation).toHaveBeenCalledTimes(3);
     });
 
+    it("keeps retry selectors stable when a newer execution supersedes an older one", async () => {
+      const retryableClassification = {
+        category: "network",
+        isRetryable: true,
+        shouldFallback: false,
+        message: "Network error",
+      };
+      (classifyError as jest.Mock).mockReturnValue(retryableClassification);
+
+      const firstOperation = jest
+        .fn<() => Promise<string>>()
+        .mockRejectedValueOnce(new Error("first failure"))
+        .mockResolvedValue("first-success");
+      const secondOperation = jest.fn<() => Promise<string>>().mockResolvedValue("second-success");
+
+      const { result } = renderHook(() =>
+        useErrorRecovery({
+          maxRetries: 1,
+          baseDelayMs: 1000,
+          maxDelayMs: 1000,
+          backoffMultiplier: 1,
+          retryableCategories: ["network"],
+        }),
+      );
+
+      let firstPromise: Promise<any>;
+      act(() => {
+        firstPromise = result.current.executeWithRecovery(firstOperation);
+      });
+
+      await waitFor(() => {
+        expect(result.current.retryState.isRetrying).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.executeWithRecovery(secondOperation);
+      });
+
+      expect(result.current.retryState).toEqual({
+        attemptNumber: 0,
+        lastError: null,
+        isRetrying: false,
+        nextRetryIn: null,
+      });
+      expect(result.current.canRetry).toBe(false);
+      expect(result.current.getRetryAfter()).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      await firstPromise!;
+
+      expect(result.current.retryState).toEqual({
+        attemptNumber: 0,
+        lastError: null,
+        isRetrying: false,
+        nextRetryIn: null,
+      });
+      expect(result.current.canRetry).toBe(false);
+      expect(result.current.getRetryAfter()).toBeNull();
+    });
+
     it("should provide getRetryAfter utility", () => {
       const { result } = renderHook(() => useErrorRecovery());
 
@@ -274,13 +360,122 @@ describe("useErrorRecovery", () => {
         shouldFallback: false,
         message: "Rate limit exceeded",
       };
+      (classifyError as jest.Mock).mockReturnValueOnce(rateLimitError);
 
       act(() => {
         result.current.recordError(rateLimitError);
       });
 
       const retryAfter = result.current.getRetryAfter();
-      expect(retryAfter).toBeGreaterThanOrEqual(5000); // 5 second minimum for rate limits
+      expect(retryAfter).toBeGreaterThanOrEqual(2000);
+      expect(retryAfter).toBeLessThan(2500);
+    });
+
+    it("clears retry selectors atomically on abort", async () => {
+      (classifyError as jest.Mock).mockReturnValue({
+        category: "network",
+        isRetryable: true,
+        shouldFallback: false,
+        message: "Network error",
+      });
+
+      const retryingOperation = jest
+        .fn<() => Promise<string>>()
+        .mockRejectedValueOnce(new Error("retry me"))
+        .mockResolvedValue("done");
+
+      const { result } = renderHook(() =>
+        useErrorRecovery({
+          maxRetries: 1,
+          baseDelayMs: 1000,
+          maxDelayMs: 1000,
+          backoffMultiplier: 1,
+          retryableCategories: ["network"],
+        }),
+      );
+
+      let inFlight: Promise<any>;
+      act(() => {
+        inFlight = result.current.executeWithRecovery(retryingOperation);
+      });
+
+      await waitFor(() => {
+        expect(result.current.retryState.isRetrying).toBe(true);
+      });
+
+      act(() => {
+        result.current.abortRetry();
+      });
+
+      expect(result.current.retryState).toEqual({
+        attemptNumber: 0,
+        lastError: null,
+        isRetrying: false,
+        nextRetryIn: null,
+      });
+      expect(result.current.canRetry).toBe(false);
+      expect(result.current.getRetryAfter()).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      await inFlight!;
+
+      expect(result.current.retryState).toEqual({
+        attemptNumber: 0,
+        lastError: null,
+        isRetrying: false,
+        nextRetryIn: null,
+      });
+    });
+  });
+
+  describe("selector invariants", () => {
+    const config: RetryConfig = {
+      ...DEFAULT_RETRY_CONFIG,
+      maxRetries: 3,
+      baseDelayMs: 1000,
+      maxDelayMs: 1000,
+      backoffMultiplier: 1,
+    };
+
+    it("selectCanRetry rejects retrying snapshots", () => {
+      const snapshot: RetryState = {
+        attemptNumber: 1,
+        isRetrying: true,
+        nextRetryIn: 1,
+        lastError: {
+          category: "network",
+          isRetryable: true,
+          shouldFallback: false,
+          message: "Network error",
+        },
+      };
+
+      expect(selectCanRetry(snapshot, config)).toBe(false);
+    });
+
+    it("selectRetryAfterMs only returns for stable rate-limit snapshots", () => {
+      const rateLimitedSnapshot: RetryState = {
+        attemptNumber: 1,
+        isRetrying: false,
+        nextRetryIn: null,
+        lastError: {
+          category: "rate_limit",
+          isRetryable: true,
+          shouldFallback: false,
+          message: "Rate limit",
+        },
+      };
+      const inFlightSnapshot: RetryState = {
+        ...rateLimitedSnapshot,
+        isRetrying: true,
+        nextRetryIn: 1,
+      };
+
+      expect(selectRetryAfterMs(rateLimitedSnapshot, config)).not.toBeNull();
+      expect(selectRetryAfterMs(inFlightSnapshot, config)).toBeNull();
     });
   });
 
@@ -316,10 +511,11 @@ describe("useErrorRecovery", () => {
 
       const startTime = Date.now();
       const promise = executeWithRetry(mockOperation, longDelayConfig);
+      await Promise.resolve();
 
       // Fast forward past the delay
       act(() => {
-        jest.advanceTimersByTime(1000);
+        jest.runAllTimers();
       });
 
       await promise;

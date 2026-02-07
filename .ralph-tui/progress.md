@@ -14,6 +14,7 @@ after each iteration and it's included in prompts for context.
 - For fallback chains, keep retries inside the same send token and pass explicit `nextProvider`/`nextModel` metadata back to the orchestrator so fallback attempts reuse the same assistant slot instead of recursively starting a new send.
 - For persisted Zustand stores, include a monotonic `writeVersion` metadata field and a custom `persist.merge` that keeps runtime state when `persisted.writeVersion < runtime.writeVersion`; use `partialize` to persist only `writeVersion` from metadata.
 - For critical DB write paths, build a deterministic persistence snapshot key and route writes through a single serialized queue plus a key-scoped in-flight idempotency registry; keep authoritative record identity in a mutable ref so queued post-insert writes promote to update instead of issuing duplicate inserts.
+- For async retry domains, pair execution-sequence tokens with snapshot-based selector helpers so stale closures cannot partially mutate shared retry metadata (`attempt`, `lastError`, `isRetrying`, `nextRetryIn`) and derived UI flags stay invariant-safe.
 
 ---
 
@@ -159,4 +160,21 @@ after each iteration and it's included in prompts for context.
     - Serializing writes with a queue and retaining resolved row identity in a ref closes the common "double insert before first ID returns" race in new-record flows.
   - Gotchas encountered
     - Full-repo `npx tsc --noEmit` and `npm test -- --watchAll=false` remain red from unrelated baseline issues (existing `useErrorRecovery`/`ollama-provider` typing failures and multiple UI test expectation mismatches), so US-007 validation relied on targeted persistence tests in addition to the required global command attempts.
+---
+
+## 2026-02-06 - US-008
+- What was implemented
+  - Refactored `useErrorRecovery` async retry flow into token-gated atomic commit phases so stale retry callbacks/countdown ticks cannot write partial derived state after newer executions or abort/reset actions.
+  - Removed closure read-modify-write risks by committing full retry snapshots through one normalization path and by deriving selector outputs (`canRetry`, `getRetryAfter`) from exported selector helpers.
+  - Added selector/invariant coverage and concurrent supersession tests in `useErrorRecovery` to assert stable derived flags under overlapping executions and abort-triggered cancellation.
+- Files changed
+  - `hooks/useErrorRecovery.ts`
+  - `hooks/__tests__/useErrorRecovery.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Execution-token guards are a lightweight way to enforce atomicity in hook-local async workflows without introducing global coordination state.
+    - Selector helper exports make retry invariants testable in isolation while keeping hook consumers on one derived-state contract.
+  - Gotchas encountered
+    - Repository-level `npx tsc --noEmit` and `npm test -- --watchAll=false` remain failing due pre-existing baseline issues (`app/index.tsx` type mismatch, legacy Jest typing friction in older suites, and existing UI expectation mismatches), but the updated `hooks/__tests__/useErrorRecovery.test.ts` suite passes in isolation.
 ---
