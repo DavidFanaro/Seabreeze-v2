@@ -14,6 +14,7 @@ import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated
 import { ModelMessage } from "ai";
 import { MessageList, MessageInput, useTheme, ChatContextMenu, RetryBanner } from "@/components";
 import { SaveErrorBanner } from "@/components/chat/SaveErrorBanner";
+import { StreamControlBanner } from "@/components/chat/StreamControlBanner";
 import { ProviderId } from "@/types/provider.types";
 
 export default function Chat() {
@@ -63,6 +64,7 @@ export default function Chat() {
         currentModel,
         retryLastMessage,
         canRetry,
+        cancel,
     } = useChat({ 
         chatId: chatIdParam,
         enableThinking: thinkingEnabled,
@@ -272,6 +274,16 @@ export default function Chat() {
                      <RetryBanner 
                          canRetry={canRetry}
                          onRetry={retryLastMessage}
+                     />
+
+                     {/* ================================================================== */}
+                     {/* STREAM CONTROL BANNER SECTION */}
+                     {/* Shows cancel button during streaming and 'Stopped' when cancelled */}
+                     {/* ================================================================== */}
+                     <StreamControlBanner 
+                         isStreaming={isStreaming}
+                         streamState={streamState}
+                         onCancel={cancel}
                      />
 
                      {/* ================================================================== */}

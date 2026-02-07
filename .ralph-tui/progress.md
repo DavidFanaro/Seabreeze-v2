@@ -29,7 +29,46 @@ after each iteration and it's included in prompts for context.
 
 ---
 
-## [2026-02-06] - US-001
+## [2026-02-06] - US-003
+
+### What was implemented
+- **Created** `components/chat/StreamControlBanner.tsx`: Stream control UI component
+  - Displays "Cancel" button during active streaming (visible when isStreaming=true)
+  - Shows "Stopped" indicator when streamState is 'cancelled'
+  - Uses theme colors for visual consistency (accent for streaming, error for cancel button)
+  - Non-blocking design allows user to cancel without app freezing
+  - ~100 lines of reusable UI component with accessibility test IDs
+  - Follows existing banner patterns (RetryBanner, SaveErrorBanner)
+
+- **Updated** `app/chat/[id].tsx`: Integrated stream cancellation UI
+  - Imported and added StreamControlBanner component
+  - Exposed `cancel` function from useChat hook (was already implemented in US-001)
+  - Positioned banner between RetryBanner and SaveErrorBanner for logical flow
+  - Passes required props: isStreaming, streamState, onCancel=cancel
+
+- **Updated** `components/index.ts`: Exported StreamControlBanner for reuse
+
+### Files changed
+- `components/chat/StreamControlBanner.tsx` (NEW - 100 lines)
+- `app/chat/[id].tsx` (MODIFIED - +15 lines)
+- `components/index.ts` (MODIFIED - +1 line)
+
+### Quality checks
+- TypeScript: `npx tsc --noEmit` - Existing errors in test files (pre-existing, not related to changes)
+- ESLint: `npm run lint` - PASSES ✓
+- Jest tests: Chat-related tests pass (useChat, RetryBanner)
+- Note: 3 pre-existing test failures in ThemeProvider, useDatabase, and Ollama settings (unrelated)
+
+### **Learnings:**
+- **Pattern: Banner-Based Stream Controls**: Similar to RetryBanner/SaveErrorBanner, stream controls should be banner components that appear contextually rather than blocking the input field
+- **Pattern: Dual-State UI**: Same component handles two states (active streaming with cancel button, cancelled with stopped indicator) based on streamState prop
+- **Pattern: Icon Consistency**: Use `SymbolView` from expo-symbols for system-native icons (stop.fill, xmark, dot.radiowaves.left.and.right)
+- **Gotcha: Hook Already Implemented**: The cancel() method was already implemented in US-001, just needed to expose it and add UI
+- **Pattern: Alpha Background Colors**: Use hex color + "15" or "20" for subtle backgrounds (e.g., `theme.colors.accent + "15"` for 9% opacity)
+- **Pattern: Test ID Structure**: Use descriptive test IDs like `stream-cancel-button`, `stream-stopped-indicator` for reliable E2E testing
+
+---
+
 
 ### What was implemented
 - **Created** `hooks/chat/useStreamLifecycle.ts`: Centralized stream lifecycle management

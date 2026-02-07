@@ -15,6 +15,7 @@ export { MessageBubble } from "./chat/MessageBubble";
 export { MessageInput } from "./chat/MessageInput";
 export { MessageList } from "./chat/MessageList";
 export { RetryBanner } from "./chat/RetryBanner";
+export { StreamControlBanner } from "./chat/StreamControlBanner";
 
 // Settings Components
 export { SettingInput } from "./settings/SettingInput";

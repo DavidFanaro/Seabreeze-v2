@@ -3,10 +3,10 @@
   "sessionId": "881800b9-9698-45ee-9c0d-f4e0ac7b91d1",
   "status": "running",
   "startedAt": "2026-02-06T23:51:20.378Z",
-  "updatedAt": "2026-02-07T00:06:47.187Z",
-  "currentIteration": 1,
+  "updatedAt": "2026-02-07T00:10:03.126Z",
+  "currentIteration": 2,
   "maxIterations": 0,
-  "tasksCompleted": 1,
+  "tasksCompleted": 2,
   "isPaused": false,
   "agentPlugin": "opencode",
   "trackerState": {
@@ -24,6 +24,16 @@
       "durationMs": 475155,
       "startedAt": "2026-02-06T23:51:36.974Z",
       "endedAt": "2026-02-06T23:59:32.129Z"
+    },
+    {
+      "iteration": 2,
+      "status": "completed",
+      "taskId": "US-002",
+      "taskTitle": "Fix race condition between stream and save operations",
+      "taskCompleted": true,
+      "durationMs": 433868,
+      "startedAt": "2026-02-06T23:59:33.316Z",
+      "endedAt": "2026-02-07T00:06:47.184Z"
     }
   ],
   "skippedTaskIds": [],
