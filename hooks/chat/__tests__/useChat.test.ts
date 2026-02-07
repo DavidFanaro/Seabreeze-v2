@@ -4,6 +4,20 @@ import useChat from '../useChat';
 
 const mockExecuteStreaming = jest.fn();
 
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+}
+
+const createDeferred = <T,>(): Deferred<T> => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+
+  return { promise, resolve };
+};
+
 // Mock all dependencies with simpler mocks
 jest.mock('@/hooks/useChatState', () => ({
   useChatState: jest.fn(() => ({
@@ -342,6 +356,102 @@ describe('useChat', () => {
 
       expect(result.current.messages).toEqual([]);
       expect(result.current.isStreaming).toBe(false);
+    });
+
+    it('keeps completion ordering stable under rapid sends', async () => {
+      const onComplete = jest.fn();
+      const first = createDeferred<{
+        success: boolean;
+        shouldRetryWithFallback: boolean;
+        accumulated: string;
+      }>();
+      const second = createDeferred<{
+        success: boolean;
+        shouldRetryWithFallback: boolean;
+        accumulated: string;
+      }>();
+
+      mockExecuteStreaming
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => second.promise);
+
+      const { result } = renderHook(() => useChat({ onComplete }));
+
+      let firstSend = Promise.resolve();
+      let secondSend = Promise.resolve();
+
+      act(() => {
+        firstSend = result.current.sendMessage('first');
+      });
+
+      act(() => {
+        secondSend = result.current.sendMessage('second');
+      });
+
+      await act(async () => {
+        first.resolve({
+          success: true,
+          shouldRetryWithFallback: false,
+          accumulated: 'first-response',
+        });
+        await firstSend;
+      });
+
+      expect(result.current.isStreaming).toBe(true);
+      expect(onComplete).toHaveBeenCalledTimes(0);
+
+      await act(async () => {
+        second.resolve({
+          success: true,
+          shouldRetryWithFallback: false,
+          accumulated: 'second-response',
+        });
+        await secondSend;
+      });
+
+      expect(result.current.isStreaming).toBe(false);
+      expect(onComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('prevents post-cancel error mutation from stale stream callbacks', async () => {
+      const onError = jest.fn();
+      const pending = createDeferred<{
+        success: boolean;
+        shouldRetryWithFallback: boolean;
+        accumulated: string;
+      }>();
+      let capturedOptions: { onError?: (error: unknown) => void } | null = null;
+
+      mockExecuteStreaming.mockImplementationOnce(async (options: any) => {
+        capturedOptions = options;
+        return pending.promise;
+      });
+
+      const { result } = renderHook(() => useChat({ onError }));
+
+      let sendPromise = Promise.resolve();
+
+      act(() => {
+        sendPromise = result.current.sendMessage('cancel-me');
+      });
+
+      act(() => {
+        result.current.cancel();
+      });
+
+      await act(async () => {
+        capturedOptions?.onError?.(new Error('late error'));
+        pending.resolve({
+          success: true,
+          shouldRetryWithFallback: false,
+          accumulated: '',
+        });
+        await sendPromise;
+      });
+
+      expect(result.current.errorMessage).toBeNull();
+      expect(result.current.canRetry).toBe(false);
+      expect(onError).toHaveBeenCalledTimes(0);
     });
   });
 });

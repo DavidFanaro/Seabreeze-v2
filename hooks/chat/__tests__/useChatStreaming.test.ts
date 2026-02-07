@@ -664,6 +664,105 @@ describe('useChatStreaming', () => {
       expect(streamingResult.success).toBe(true);
       expect(streamingResult.shouldRetryWithFallback).toBe(false);
     });
+
+    it('blocks stale chunk updates when canMutateState becomes false', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const mockOnChunk = jest.fn();
+      let canMutate = true;
+
+      const mockFullStream = {
+        [Symbol.asyncIterator]: async function* () {
+          yield { type: 'text-delta', text: 'Hello' };
+          yield { type: 'text-delta', text: ' stale' };
+        },
+      };
+
+      mockStreamText.mockReturnValue({
+        fullStream: mockFullStream,
+      } as any);
+
+      mockOnChunk.mockImplementation(() => {
+        canMutate = false;
+      });
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            onChunk: mockOnChunk,
+            canMutateState: () => canMutate,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockOnChunk).toHaveBeenCalledTimes(1);
+      expect(setMessagesMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips late error content updates when mutation gate is closed', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      mockStreamText.mockImplementation(() => {
+        throw new Error('late stream error');
+      });
+
+      await act(async () => {
+        await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            canMutateState: () => false,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(setMessagesMock).toHaveBeenCalledTimes(0);
+    });
+
+    it('reports cancellation and avoids updates after abort', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const abortController = new AbortController();
+
+      const mockFullStream = {
+        [Symbol.asyncIterator]: async function* () {
+          yield { type: 'text-delta', text: 'first' };
+          yield { type: 'text-delta', text: 'second' };
+        },
+      };
+
+      mockStreamText.mockReturnValue({
+        fullStream: mockFullStream,
+      } as any);
+
+      const mockOnChunk = jest.fn(() => {
+        abortController.abort();
+      });
+
+      const streamingResult = await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            abortSignal: abortController.signal,
+            onChunk: mockOnChunk,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockOnChunk).toHaveBeenCalledTimes(1);
+      expect(setMessagesMock).toHaveBeenCalledTimes(1);
+      expect(streamingResult.wasCancelled).toBe(true);
+    });
   });
 
   describe('integration scenarios', () => {

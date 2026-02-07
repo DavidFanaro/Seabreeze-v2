@@ -143,6 +143,8 @@ export interface StreamingOptions {
     onProviderChange?: (provider: ProviderId, model: string, isFallback: boolean) => void;
     /** Abort signal for cancelling the stream */
     abortSignal?: AbortSignal;
+    /** Gate used to block stale/cancelled state mutation */
+    canMutateState?: () => boolean;
 }
 
 /**
@@ -259,7 +261,31 @@ export function useChatStreaming() {
             onFallback,
             onProviderChange,
             abortSignal,
+            canMutateState,
         } = options;
+
+        const canCommit = (): boolean => {
+            if (abortSignal?.aborted) {
+                return false;
+            }
+
+            return canMutateState ? canMutateState() : true;
+        };
+
+        const updateAssistantMessage = (content: string): void => {
+            if (!canCommit()) {
+                return;
+            }
+
+            setMessages((prev) => {
+                const next = [...prev];
+                next[assistantIndex] = {
+                    role: "assistant",
+                    content,
+                };
+                return next;
+            });
+        };
 
         // Accumulator for the complete response text
         let accumulated = "";
@@ -338,23 +364,19 @@ export function useChatStreaming() {
                         }
 
                         reasoningAccumulated += reasoningDelta;
-                        thinkingChunkHandler?.(reasoningDelta, reasoningAccumulated);
+                        if (canCommit()) {
+                            thinkingChunkHandler?.(reasoningDelta, reasoningAccumulated);
+                        }
                         continue;
                     }
 
                     if (part.type === "text-delta") {
                         accumulated += part.text;
+                        updateAssistantMessage(accumulated);
 
-                        setMessages((prev) => {
-                            const next = [...prev];
-                            next[assistantIndex] = {
-                                role: "assistant",
-                                content: accumulated,
-                            };
-                            return next;
-                        });
-
-                        onChunk?.(part.text, accumulated);
+                        if (canCommit()) {
+                            onChunk?.(part.text, accumulated);
+                        }
                     }
                 }
                 return;
@@ -368,17 +390,11 @@ export function useChatStreaming() {
                 }
 
                 accumulated += chunk;
+                updateAssistantMessage(accumulated);
 
-                setMessages((prev) => {
-                    const next = [...prev];
-                    next[assistantIndex] = {
-                        role: "assistant",
-                        content: accumulated,
-                    };
-                    return next;
-                });
-
-                onChunk?.(chunk, accumulated);
+                if (canCommit()) {
+                    onChunk?.(chunk, accumulated);
+                }
             }
         };
 
@@ -440,14 +456,7 @@ export function useChatStreaming() {
                                 ? `${accumulated}\n\n---\n\n**Error:** ${fullErrorMessage}`
                                 : fullErrorMessage;
 
-                            setMessages((prev) => {
-                                const next = [...prev];
-                                next[assistantIndex] = {
-                                    role: "assistant",
-                                    content: partialContent,
-                                };
-                                return next;
-                            });
+                            updateAssistantMessage(partialContent);
                         }
                     }
                 }
@@ -503,14 +512,7 @@ export function useChatStreaming() {
                     ? `${accumulated}\n\n---\n\n**Error:** ${fullErrorMessage}`
                     : fullErrorMessage;
 
-                setMessages((prev) => {
-                    const next = [...prev];
-                    next[assistantIndex] = {
-                        role: "assistant",
-                        content: partialContent,
-                    };
-                    return next;
-                });
+                updateAssistantMessage(partialContent);
             }
         }
 

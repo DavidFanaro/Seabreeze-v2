@@ -9,6 +9,7 @@ after each iteration and it's included in prompts for context.
 
 - Concurrency audits should use a stable schema per entry: `Race Class`, `Vulnerable Flow`, `Modules/Files`, `Severity`, `Reproducibility`, and `Owner Subsystem`, plus class-level fixed evidence gates to make remediation traceable.
 - For async workflows, compose a local trio per scope: `createSequenceGuard` to gate commits, `createAbortManager` to cancel superseded work, and `createIdempotencyRegistry` with deterministic keys to dedupe in-flight side effects.
+- For overlapping chat sends, assign a new sequence token per send and require all stream-side callbacks/state commits (chunks, errors, provider switches, completion) to pass a shared `canMutateState` gate built from token freshness + abort/cancel flags.
 
 ---
 
@@ -49,4 +50,25 @@ after each iteration and it's included in prompts for context.
   - Gotchas encountered
     - Deduplication should only cover in-flight work; keeping completed promises in a registry can suppress legitimate retries.
     - Abort handling is most maintainable when abort outcomes are normalized (`AbortError`) and filtered from fallback/error UX flows.
+---
+
+## 2026-02-06 - US-003
+- What was implemented
+  - Hardened `useChat` send lifecycle ordering by introducing per-send sequence tokens and guarding all async completion paths so stale sends cannot flip stream state or trigger completion callbacks.
+  - Added mutation gating plumbing (`canMutateState`) to `useChatStreaming` so text/reasoning chunks, callbacks, and error-content writes are ignored after cancellation or when a send becomes stale.
+  - Updated cancel behavior to invalidate active sequence tokens and immediately clear streaming/thinking UI state, preventing post-cancel completion races.
+  - Added deterministic concurrency tests covering rapid send overlap ordering, post-cancel stale callback suppression, stale chunk gating, and abort-driven stop/start behavior.
+- Files changed
+  - `hooks/chat/useChat.ts`
+  - `hooks/chat/useChatStreaming.ts`
+  - `hooks/chat/__tests__/useChat.test.ts`
+  - `hooks/chat/__tests__/useChatStreaming.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - A single `canMutateState` gate shared between orchestrator (`useChat`) and stream worker (`useChatStreaming`) is an effective seam for enforcing ordering without tightly coupling hook internals.
+    - Cancel semantics are safer when cancellation both aborts transport and invalidates sequencing tokens, so late async work self-rejects even if already in flight.
+  - Gotchas encountered
+    - Guarding stale completion paths can accidentally leave `isStreaming` stuck `true` unless cancel explicitly clears UI stream flags.
+    - Mocked streaming tests need deferred promises and captured callback options to deterministically reproduce overlap/cancel races.
 ---

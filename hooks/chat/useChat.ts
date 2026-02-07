@@ -50,6 +50,7 @@ import { useTitleGeneration } from "./useTitleGeneration";
 import { useChatStreaming } from "./useChatStreaming";
 import { useStreamLifecycle } from "./useStreamLifecycle";
 import type { UseChatOptions, StreamState } from "@/types/chat.types";
+import { createSequenceGuard } from "@/lib/concurrency";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
 
@@ -214,6 +215,12 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     const [canRetry, setCanRetry] = useState<boolean>(false); // Whether retry is available
     const [errorMessage, setErrorMessage] = useState<string | null>(null); // Error message for display
     const canceledRef = useRef<boolean>(false);             // Track if streaming was canceled
+    const messagesRef = useRef<ModelMessage[]>(initialMessages);
+    const sendSequenceGuardRef = useRef(createSequenceGuard(`chat-send-${chatId ?? "default"}`));
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     // =============================================================================
     // CONFIGURATION MERGING
@@ -362,6 +369,9 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
      */
     const cancel = useCallback(() => {
         canceledRef.current = true;
+        sendSequenceGuardRef.current.next();
+        setIsStreaming(false);
+        setIsThinking(false);
         cancelStream(); // Use stream lifecycle cancel for comprehensive cancellation
     }, [cancelStream]);
 
@@ -399,6 +409,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // Exit early if no valid content to send
             if (!content) return;
 
+            const sendToken = sendSequenceGuardRef.current.next();
+
             // ────────────────────────────────────────────────────────────────
             // STATE INITIALIZATION
             // ────────────────────────────────────────────────────────────────
@@ -411,12 +423,17 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // Initialize stream lifecycle management
             const streamController = initializeStream();
             const abortSignal = streamController.signal;
+            const canMutateForCurrentSend = (): boolean => (
+                sendSequenceGuardRef.current.isCurrent(sendToken)
+                && !canceledRef.current
+                && !abortSignal.aborted
+            );
 
             // ────────────────────────────────────────────────────────────────
             // MESSAGE HISTORY MANAGEMENT
             // ────────────────────────────────────────────────────────────────
             const userMessage: ModelMessage = { role: "user", content };
-            const updatedMessages = [...messages, userMessage];
+            const updatedMessages = [...messagesRef.current, userMessage];
             setMessages(updatedMessages);
             setThinkingOutput((prev) => [...prev, ""]);
 
@@ -462,6 +479,10 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // ────────────────────────────────────────────────────────────────
             const handleThinkingChunk = enableThinking
                 ? (chunk: string, accumulated: string) => {
+                    if (!canMutateForCurrentSend()) {
+                        return;
+                    }
+
                     setIsThinking(true);
                     setThinkingOutput((prev) => {
                         const next = [...prev];
@@ -489,7 +510,12 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 abortSignal,
                 onChunk,
                 onThinkingChunk: handleThinkingChunk,
+                canMutateState: canMutateForCurrentSend,
                 onError: (error: unknown) => {
+                    if (!canMutateForCurrentSend()) {
+                        return;
+                    }
+
                     if (error instanceof Error) {
                         markError(error);
                         setErrorMessage(error.message);
@@ -505,6 +531,10 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 },
                 onFallback,
                 onProviderChange: (provider: ProviderId, model: string, isFallback: boolean) => {
+                    if (!canMutateForCurrentSend()) {
+                        return;
+                    }
+
                     setActiveProvider(provider);
                     setActiveModel(model);
                     setIsUsingFallback(isFallback);
@@ -522,6 +552,10 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 failedProvidersRef
             );
 
+            if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
+                return;
+            }
+
             // ────────────────────────────────────────────────────────────────
             // FALLBACK RETRY LOGIC
             // ────────────────────────────────────────────────────────────────
@@ -537,12 +571,13 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // ────────────────────────────────────────────────────────────────
             // COMPLETION
             // ────────────────────────────────────────────────────────────────
-            setIsStreaming(false);
-            setIsThinking(false);
-            onComplete?.();
+            if (canMutateForCurrentSend()) {
+                setIsStreaming(false);
+                setIsThinking(false);
+                onComplete?.();
+            }
         },
         [
-            messages, 
             text, 
             placeholderText, 
             model, 
