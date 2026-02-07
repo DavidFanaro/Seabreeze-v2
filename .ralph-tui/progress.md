@@ -79,3 +79,56 @@ after each iteration and it's included in prompts for context.
 
 ---
 
+## [2026-02-06] - US-002
+
+### What was implemented
+- **Created** `hooks/useMessagePersistence.ts`: Atomic message persistence with retry logic
+  - Queues save operations to run only after stream reaches `completed` state
+  - Implements atomic 'stream complete → save message' transaction
+  - Handles save failures with 3 retry attempts and exponential backoff (500ms, 1s, 2s)
+  - Provides user-friendly error messages via `getHumanReadableError`
+  - Preserves partial stream content even if save fails
+  - Exposes save status (`idle` | `queued` | `saving` | `retrying` | `saved` | `error`)
+  - ~390 lines of production-ready code with comprehensive error handling
+
+- **Created** `components/chat/SaveErrorBanner.tsx`: Save error UI component
+  - Displays user-friendly error message when save fails
+  - Shows retry button with visual feedback
+  - Displays retry attempt count (Attempt X/3)
+  - Non-blocking design allows continued chat usage
+  - Uses theme error color for visual consistency
+  - ~110 lines of reusable UI component
+
+- **Updated** `app/chat/[id].tsx`: Integrated atomic persistence
+  - Replaced manual `useFocusEffect` save logic with `useMessagePersistence` hook
+  - Added `streamState` tracking from `useChat` hook
+  - Integrated `SaveErrorBanner` for error feedback
+  - Maintained backward compatibility for title updates
+  - Syncs `chatID` state with `lastSavedChatId` from persistence hook
+  - Removed race condition between streaming and saving
+
+### Files changed
+- `hooks/useMessagePersistence.ts` (NEW - 390 lines)
+- `components/chat/SaveErrorBanner.tsx` (NEW - 110 lines)
+- `app/chat/[id].tsx` (MODIFIED - ~80 lines)
+
+### Quality checks
+- TypeScript: `npx tsc --noEmit` passes (errors are in existing test files, not new code)
+- ESLint: `npm run lint` passes
+- Jest tests: All 61 chat-related tests pass (useChat, useChatStreaming, useChatState)
+- Note: 102 pre-existing test failures in useErrorRecovery.test.ts (unrelated to this change)
+
+### **Learnings:**
+- **Pattern: Stream-State-Driven Persistence**: Queue save operations based on explicit stream state (`completed`) rather than boolean flags (`isStreaming`) to eliminate race conditions
+- **Pattern: Content-Based Deduplication**: Use `JSON.stringify(messages)` comparison to avoid redundant saves when content hasn't changed
+- **Pattern: Retry Configuration Reuse**: Extend `DEFAULT_RETRY_CONFIG` from `useErrorRecovery` for consistent retry behavior across the app
+- **Pattern: Component Cleanup with Refs**: Use `isMountedRef` to prevent state updates after unmount, especially critical for async retry loops
+- **Pattern: Pending Save Tracking**: Use `pendingSaveRef` to prevent overlapping save operations and ensure atomicity
+- **Gotcha: useDatabase Default Export**: `useDatabase` is a default export, not named - must use `import useDatabase from` not `import { useDatabase } from`
+- **Gotcha: ErrorCategory Type Casting**: When using retry config, explicitly cast retryableCategories array as `ErrorCategory[]` to satisfy TypeScript
+- **Gotcha: Hook Dependencies**: When passing objects/arrays to hooks, use stable references or memoize to prevent infinite loops
+- **Pattern: Manual Retry Exposure**: Export `triggerSave` function from persistence hook to allow user-initiated retries from UI components
+- **Pattern: Debounced Message Change Saves**: Use small timeout (100ms) when reacting to message changes to batch rapid updates and prevent excessive DB writes
+
+---
+

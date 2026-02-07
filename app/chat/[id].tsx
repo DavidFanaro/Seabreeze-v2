@@ -3,6 +3,7 @@ import useChat from "@/hooks/chat/useChat";
 import useDatabase from "@/hooks/useDatabase";
 import { useChatState } from "@/hooks/useChatState";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useMessagePersistence } from "@/hooks/useMessagePersistence";
 import { eq } from "drizzle-orm";
 import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -12,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated";
 import { ModelMessage } from "ai";
 import { MessageList, MessageInput, useTheme, ChatContextMenu, RetryBanner } from "@/components";
+import { SaveErrorBanner } from "@/components/chat/SaveErrorBanner";
 import { ProviderId } from "@/types/provider.types";
 
 export default function Chat() {
@@ -51,6 +53,7 @@ export default function Chat() {
         reset,
         isThinking,
         isStreaming,
+        streamState,
         setMessages,
         setThinkingOutput,
         generateTitle,
@@ -70,6 +73,37 @@ export default function Chat() {
         },
     });
 
+    // Use atomic message persistence with retry logic
+    const {
+        saveStatus,
+        hasSaveError,
+        userFriendlyError,
+        triggerSave,
+        saveAttempts,
+        lastSavedChatId,
+    } = useMessagePersistence({
+        streamState,
+        chatIdParam,
+        messages,
+        thinkingOutput,
+        providerId: currentProvider,
+        modelId: currentModel,
+        title,
+        onSaveComplete: (savedChatId) => {
+            if (chatID === 0) {
+                setChatID(savedChatId);
+            }
+            // Generate title if needed
+            if (!title || title === "Chat") {
+                generateTitle();
+            }
+        },
+        onSaveError: (error, attempts) => {
+            console.error(`[Chat] Save failed after ${attempts} attempts:`, error);
+        },
+        enabled: !isInitializing && messages.length > 0,
+    });
+
     const handleReset = useCallback(() => {
         reset();
         // Clear any chat-specific overrides
@@ -80,71 +114,15 @@ export default function Chat() {
         await sendMessage();
     }, [sendMessage]);
 
-    // Save or update chat when streaming stops (only when screen is focused)
-    useFocusEffect(
-        useCallback(() => {
-            if (isInitializing || (chatIdParam !== "new" && chatID === 0)) return;
-            let isActive = true;
-            const saveOrUpdate = async () => {
-                if (!isActive) return;
-                const now = new Date();
-                if (chatID === 0) {
-                    // New chat - insert only if there are messages
-                    if (messages.length > 0) {
-                        const data = (
-                            await db
-                                .insert(chat)
-                                .values({
-                                    messages: messages,
-                                    thinkingOutput: thinkingOutput,
-                                    title: null,
-                                    // Use current active provider/model (may be fallback)
-                                    providerId: currentProvider,
-                                    modelId: currentModel,
-                                    providerMetadata: {},
-                                    createdAt: now,
-                                    updatedAt: now,
-                                })
-                                .returning({ id: chat.id })
-                        )[0];
-                        if (!isActive) return;
-                        setChatID(data.id);
-                    }
-                } else {
-                    // Existing chat - update messages and provider/model
-                    await db
-                        .update(chat)
-                        .set({
-                            messages: messages,
-                            thinkingOutput: thinkingOutput,
-                            providerId: currentProvider,
-                            modelId: currentModel,
-                            updatedAt: now
-                        })
-                        .where(eq(chat.id, chatID));
-                }
-            };
-
-            if (!isStreaming && messages.length > 0) {
-                saveOrUpdate();
-                if (!title || title === "Chat") {
-                    generateTitle();
-                }
-            }
-            return () => {
-                isActive = false;
-            };
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [isStreaming, messages.length, thinkingOutput, title, chatID, db, currentProvider, currentModel, generateTitle, isInitializing])
-    );
-
-    // Update title in database (only when screen is focused)
+    // Update title in database when title changes (only when screen is focused)
     useFocusEffect(
         useCallback(() => {
             if (isInitializing || (chatIdParam !== "new" && chatID === 0)) return;
             let isActive = true;
             const updateTitle = async () => {
                 if (!isActive) return;
+                // Only update if we have a valid chat ID and a non-default title
+                // Note: Main message save is handled by useMessagePersistence hook
                 if (chatID !== 0 && title && title !== "Chat") {
                     await db
                         .update(chat)
@@ -158,6 +136,13 @@ export default function Chat() {
             };
         }, [title, chatID, db, isInitializing, chatIdParam])
     );
+
+    // Sync chatID with lastSavedChatId when persistence succeeds for new chats
+    useEffect(() => {
+        if (lastSavedChatId && chatID === 0) {
+            setChatID(lastSavedChatId);
+        }
+    }, [lastSavedChatId, chatID]);
 
     // Reset state immediately on chat change
     useEffect(() => {
@@ -287,6 +272,17 @@ export default function Chat() {
                      <RetryBanner 
                          canRetry={canRetry}
                          onRetry={retryLastMessage}
+                     />
+
+                     {/* ================================================================== */}
+                     {/* SAVE ERROR BANNER SECTION */}
+                     {/* Shows error when message persistence fails with retry option */}
+                     {/* ================================================================== */}
+                     <SaveErrorBanner
+                         visible={hasSaveError}
+                         errorMessage={userFriendlyError}
+                         onRetry={triggerSave}
+                         attempts={saveStatus === "retrying" ? saveAttempts : undefined}
                      />
                 </KeyboardAvoidingView>
                 
