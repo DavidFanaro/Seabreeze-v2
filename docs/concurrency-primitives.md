@@ -68,3 +68,30 @@ async function runStream(conversationId: string): Promise<void> {
   });
 }
 ```
+
+## Seeded Stress Interleavings (CI-Safe)
+
+- Keep stress suites deterministic by using a seeded PRNG and printing the seed in
+  the test name (for example: `seed=7`).
+- Run a bounded matrix in CI (`process.env.CI ? smallCount : largerCount`) so
+  runtime is predictable and failures are reproducible.
+- Model interleaving with prerequisite-aware operation scheduling instead of real
+  timers/random sleeps.
+
+## Converting Flakes into Regressions
+
+1. Capture the failing seed and operation order from the stress run.
+2. Create a new deterministic regression test with the exact sequence and a
+   `regression:` prefix in the test title.
+3. Assert invariants directly (latest-token-only commit, stale error isolation,
+   idempotent in-flight dedupe) without probabilistic checks.
+
+## Extending Stress Cases Safely
+
+- Use explicit operation prerequisites so every randomized schedule is valid.
+- Keep one authoritative assertion block per run with invariant-style checks,
+  not snapshot-like incidental details.
+- Avoid nondeterministic clocks/network; use deferred promises and explicit
+  settle steps.
+- Add new scenarios as small focused flows (one race class at a time), then add
+  a paired deterministic regression if the stress matrix uncovers a bug.

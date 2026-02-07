@@ -7,6 +7,40 @@ import {
   isAbortError,
 } from "../concurrency";
 
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return {
+    promise,
+    resolve,
+    reject,
+  };
+}
+
+function createSeededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+
+  return (): number => {
+    state += 0x6d2b79f5;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function waitForAbort(signal: AbortSignal): Promise<never> {
   return new Promise((_, reject) => {
     if (signal.aborted) {
@@ -134,6 +168,171 @@ describe("concurrency primitives", () => {
     it("detects abort errors", () => {
       expect(isAbortError(createAbortError())).toBe(true);
       expect(isAbortError(new Error("boom"))).toBe(false);
+    });
+  });
+
+  describe("seeded stress interleavings", () => {
+    const STRESS_SEED_COUNT = process.env.CI ? 12 : 24;
+    const STRESS_SEEDS = Array.from({ length: STRESS_SEED_COUNT }, (_, index) => index + 1);
+
+    it.each(STRESS_SEEDS)(
+      "preserves latest-only mutation and stale-error isolation (seed=%s)",
+      async (seed) => {
+        const random = createSeededRandom(seed);
+        const guard = createSequenceGuard("stress-chat");
+        const manager = createAbortManager();
+
+        const commits: string[] = [];
+        const surfacedErrors: string[] = [];
+        const requests: Promise<void>[] = [];
+
+        const deferredByName = {
+          first: createDeferred<string>(),
+          second: createDeferred<string>(),
+          third: createDeferred<string>(),
+        };
+
+        const startRequest = (name: "first" | "second" | "third"): void => {
+          const token = guard.next();
+          const request = manager
+            .withAbort(async (signal) => {
+              const result = await deferredByName[name].promise;
+
+              if (signal.aborted) {
+                throw createAbortError(`${name}-aborted`);
+              }
+
+              if (guard.isCurrent(token)) {
+                commits.push(result);
+              }
+            })
+            .catch((error: unknown) => {
+              if (!isAbortError(error) && guard.isCurrent(token)) {
+                surfacedErrors.push(name);
+              }
+            });
+
+          requests.push(request);
+        };
+
+        const operations: Array<{
+          name: string;
+          requires: string[];
+          run: () => void;
+        }> = [
+          {
+            name: "start-first",
+            requires: [],
+            run: () => startRequest("first"),
+          },
+          {
+            name: "start-second",
+            requires: ["start-first"],
+            run: () => startRequest("second"),
+          },
+          {
+            name: "start-third",
+            requires: ["start-second"],
+            run: () => startRequest("third"),
+          },
+          {
+            name: "settle-first",
+            requires: ["start-second"],
+            run: () => {
+              if (random() < 0.5) {
+                deferredByName.first.resolve("first");
+                return;
+              }
+
+              deferredByName.first.reject(new Error("first-network-error"));
+            },
+          },
+          {
+            name: "settle-second",
+            requires: ["start-third"],
+            run: () => {
+              if (random() < 0.5) {
+                deferredByName.second.resolve("second");
+                return;
+              }
+
+              deferredByName.second.reject(new Error("second-network-error"));
+            },
+          },
+          {
+            name: "settle-third",
+            requires: ["start-third"],
+            run: () => {
+              deferredByName.third.resolve("third");
+            },
+          },
+        ];
+
+        const completed = new Set<string>();
+
+        while (completed.size < operations.length) {
+          const ready = operations.filter(
+            (operation) =>
+              !completed.has(operation.name) &&
+              operation.requires.every((requiredStep) => completed.has(requiredStep)),
+          );
+
+          const nextIndex = Math.floor(random() * ready.length);
+          const nextOperation = ready[nextIndex];
+
+          nextOperation.run();
+          completed.add(nextOperation.name);
+        }
+
+        await Promise.all(requests);
+
+        expect(commits).toEqual(["third"]);
+        expect(surfacedErrors).toEqual([]);
+      },
+    );
+
+    it("regression: stale failure is ignored after supersession", async () => {
+      const guard = createSequenceGuard("stress-chat");
+      const manager = createAbortManager();
+
+      const deferredFirst = createDeferred<void>();
+      const deferredSecond = createDeferred<void>();
+
+      const commits: string[] = [];
+      const surfacedErrors: string[] = [];
+
+      const startRequest = (name: "first" | "second", deferred: Deferred<void>): Promise<void> => {
+        const token = guard.next();
+
+        return manager
+          .withAbort(async (signal) => {
+            await deferred.promise;
+
+            if (signal.aborted) {
+              throw createAbortError(`${name}-aborted`);
+            }
+
+            if (guard.isCurrent(token)) {
+              commits.push(name);
+            }
+          })
+          .catch((error: unknown) => {
+            if (!isAbortError(error) && guard.isCurrent(token)) {
+              surfacedErrors.push(name);
+            }
+          });
+      };
+
+      const first = startRequest("first", deferredFirst);
+      const second = startRequest("second", deferredSecond);
+
+      deferredFirst.reject(new Error("late-stale-failure"));
+      deferredSecond.resolve(undefined);
+
+      await Promise.all([first, second]);
+
+      expect(commits).toEqual(["second"]);
+      expect(surfacedErrors).toEqual([]);
     });
   });
 });

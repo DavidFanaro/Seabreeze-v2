@@ -16,6 +16,7 @@ after each iteration and it's included in prompts for context.
 - For critical DB write paths, build a deterministic persistence snapshot key and route writes through a single serialized queue plus a key-scoped in-flight idempotency registry; keep authoritative record identity in a mutable ref so queued post-insert writes promote to update instead of issuing duplicate inserts.
 - For async retry domains, pair execution-sequence tokens with snapshot-based selector helpers so stale closures cannot partially mutate shared retry metadata (`attempt`, `lastError`, `isRetrying`, `nextRetryIn`) and derived UI flags stay invariant-safe.
 - For regression closure across subsystems, map each taxonomy race class to at least one deterministic suite (deferred/barrier/fake-timer controlled) and keep a representative matrix spanning hooks/chat, providers, stores, DB persistence, and shared concurrency utilities.
+- For stress-style race surfacing, use seeded prerequisite-aware operation scheduling (instead of wall-clock timing) and convert any failing seed/order into a fixed `regression:` test with invariant assertions.
 
 ---
 
@@ -194,4 +195,21 @@ after each iteration and it's included in prompts for context.
     - A small representative matrix run (selected suites) is a fast signal for concurrency regressions even when full-repo test baselines include unrelated failures.
   - Gotchas encountered
     - Repository-wide `npx tsc --noEmit` and `npm test -- --watchAll=false` still fail from pre-existing unrelated issues (not introduced by US-009), so acceptance verification for race classes must rely on deterministic representative suites until baseline debt is cleared.
+---
+
+## 2026-02-07 - US-010
+- What was implemented
+  - Added seeded stress-style async interleaving coverage in `lib/__tests__/concurrency.test.ts` with repeated prerequisite-aware randomized operation schedules to exercise stale completion/error races under deterministic seeds.
+  - Added a deterministic regression test (`regression: stale failure is ignored after supersession`) capturing a reproducible stale-error-after-supersession pattern from the stress class.
+  - Added contributor guidance in `docs/concurrency-primitives.md` for CI-safe stress gating, seed capture, and safe extension practices for new interleaving scenarios.
+- Files changed
+  - `lib/__tests__/concurrency.test.ts`
+  - `docs/concurrency-primitives.md`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Seeded operation scheduling with explicit step prerequisites gives high interleaving coverage while remaining fully reproducible and CI-stable.
+    - Converting stress-found failing orders into focused `regression:` tests keeps future diagnosis fast and protects against accidental invariant drift.
+  - Gotchas encountered
+    - `npm run lint` passes, but repository-wide `npx tsc --noEmit` and `npm test -- --watchAll=false` still fail due pre-existing unrelated baseline issues outside US-010 scope.
 ---
