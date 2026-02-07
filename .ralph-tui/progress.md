@@ -15,6 +15,7 @@ after each iteration and it's included in prompts for context.
 - For persisted Zustand stores, include a monotonic `writeVersion` metadata field and a custom `persist.merge` that keeps runtime state when `persisted.writeVersion < runtime.writeVersion`; use `partialize` to persist only `writeVersion` from metadata.
 - For critical DB write paths, build a deterministic persistence snapshot key and route writes through a single serialized queue plus a key-scoped in-flight idempotency registry; keep authoritative record identity in a mutable ref so queued post-insert writes promote to update instead of issuing duplicate inserts.
 - For async retry domains, pair execution-sequence tokens with snapshot-based selector helpers so stale closures cannot partially mutate shared retry metadata (`attempt`, `lastError`, `isRetrying`, `nextRetryIn`) and derived UI flags stay invariant-safe.
+- For regression closure across subsystems, map each taxonomy race class to at least one deterministic suite (deferred/barrier/fake-timer controlled) and keep a representative matrix spanning hooks/chat, providers, stores, DB persistence, and shared concurrency utilities.
 
 ---
 
@@ -177,4 +178,20 @@ after each iteration and it's included in prompts for context.
     - Selector helper exports make retry invariants testable in isolation while keeping hook consumers on one derived-state contract.
   - Gotchas encountered
     - Repository-level `npx tsc --noEmit` and `npm test -- --watchAll=false` remain failing due pre-existing baseline issues (`app/index.tsx` type mismatch, legacy Jest typing friction in older suites, and existing UI expectation mismatches), but the updated `hooks/__tests__/useErrorRecovery.test.ts` suite passes in isolation.
+---
+
+## 2026-02-07 - US-009
+- What was implemented
+  - Verified and consolidated cross-subsystem concurrency regression coverage against the taxonomy classes using deterministic race controls already present in the repository.
+  - Confirmed representative deterministic suites for all race classes across: chat/hooks (`useChat`, `useChatStreaming`), providers (`provider-cache` contention), stores (hydration guards), DB async persistence (`useMessagePersistence`), and utility async flows (`lib/concurrency`, `useErrorRecovery`).
+  - Executed targeted representative regression matrix suites to validate fail-class guards remain green under controlled ordering (`deferred` promises, in-flight barriers, fake timers, mutation gates).
+  - Executed requested global quality commands (`npm run lint`, `npx tsc --noEmit`, `npm test -- --watchAll=false`) and captured current repo baseline outcomes.
+- Files changed
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Cross-subsystem race closure is easiest to keep stable when each taxonomy class has an explicit representative suite owner (hook/provider/store/db/utility) and deterministic timing primitives are mandatory in those tests.
+    - A small representative matrix run (selected suites) is a fast signal for concurrency regressions even when full-repo test baselines include unrelated failures.
+  - Gotchas encountered
+    - Repository-wide `npx tsc --noEmit` and `npm test -- --watchAll=false` still fail from pre-existing unrelated issues (not introduced by US-009), so acceptance verification for race classes must rely on deterministic representative suites until baseline debt is cleared.
 ---
