@@ -93,6 +93,9 @@ import type { ProviderId } from "@/types/provider.types";
 ### Files & Docs
 - Add JSDoc file headers for complex modules.
 - Keep file responsibilities narrow; extract helpers when logic grows.
+- Before modifying async orchestration, fallback, hydration, or persistence logic,
+  review `docs/concurrency-invariants-critical-modules.md` and
+  `docs/concurrency-primitives.md`.
 
 ```ts
 /**

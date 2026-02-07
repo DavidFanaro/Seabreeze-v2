@@ -17,6 +17,7 @@ after each iteration and it's included in prompts for context.
 - For async retry domains, pair execution-sequence tokens with snapshot-based selector helpers so stale closures cannot partially mutate shared retry metadata (`attempt`, `lastError`, `isRetrying`, `nextRetryIn`) and derived UI flags stay invariant-safe.
 - For regression closure across subsystems, map each taxonomy race class to at least one deterministic suite (deferred/barrier/fake-timer controlled) and keep a representative matrix spanning hooks/chat, providers, stores, DB persistence, and shared concurrency utilities.
 - For stress-style race surfacing, use seeded prerequisite-aware operation scheduling (instead of wall-clock timing) and convert any failing seed/order into a fixed `regression:` test with invariant assertions.
+- For critical-module docs, record each invariant as a triad: invariant statement, guarding code paths, and deterministic regression tests; this keeps async refactors reviewable and evidence-backed.
 
 ---
 
@@ -212,4 +213,21 @@ after each iteration and it's included in prompts for context.
     - Converting stress-found failing orders into focused `regression:` tests keeps future diagnosis fast and protects against accidental invariant drift.
   - Gotchas encountered
     - `npm run lint` passes, but repository-wide `npx tsc --noEmit` and `npm test -- --watchAll=false` still fail due pre-existing unrelated baseline issues outside US-010 scope.
+---
+
+## 2026-02-07 - US-011
+- What was implemented
+  - Added `docs/concurrency-invariants-critical-modules.md` defining concurrency invariants for chat orchestration, provider fallback, store hydration boundaries, and DB persistence boundaries.
+  - Linked each invariant to guarding code paths and deterministic regression tests across `hooks/chat`, `providers`, `stores`, and persistence hook suites.
+  - Added explicit required patterns and anti-patterns for all new async code touching critical modules.
+  - Made the new invariants doc discoverable from contributor workflow guidance in `AGENTS.md`.
+- Files changed
+  - `docs/concurrency-invariants-critical-modules.md`
+  - `AGENTS.md`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Invariant docs stay actionable when each item is anchored to both the code-level guard seam and at least one deterministic regression test title.
+  - Gotchas encountered
+    - Discoverability should be wired into contributor workflow docs, not only placed inside `docs/`, or invariants get bypassed during routine refactors.
 ---
