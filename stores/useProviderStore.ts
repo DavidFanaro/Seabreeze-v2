@@ -28,6 +28,13 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import * as SecureStore from "expo-secure-store";
 import type { ProviderId } from "@/types/provider.types";
+import {
+  applyRuntimeWriteVersion,
+  INITIAL_HYDRATION_META,
+  markHydrationReady,
+  resolveHydrationMerge,
+  type HydrationMetaState,
+} from "@/stores/hydration-registry";
 
 // ============================================================================
 // STATE INTERFACES
@@ -49,6 +56,8 @@ interface ProviderState {
   customModels: Record<ProviderId, string[]>;
   /** Models that have been hidden from the UI for each provider */
   hiddenModels: Record<ProviderId, string[]>;
+  /** Internal hydration and runtime write metadata */
+  __meta: HydrationMetaState;
 }
 
 /**
@@ -200,6 +209,8 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       customModels: DEFAULT_CUSTOM_MODELS,
       /** Initialize with no hidden models */
       hiddenModels: DEFAULT_HIDDEN_MODELS,
+      /** Runtime mutation and hydration metadata */
+      __meta: INITIAL_HYDRATION_META,
 
       // ========================================================================
       // PROVIDER SELECTION ACTIONS
@@ -212,10 +223,12 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        * available model from the new provider to ensure a valid selection.
        */
       setSelectedProvider: (provider) =>
-        set((state) => ({
-          selectedProvider: provider,
-          selectedModel: DEFAULT_MODELS[provider][0] || "",
-        })),
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            selectedProvider: provider,
+            selectedModel: DEFAULT_MODELS[provider][0] || "",
+          }),
+        ),
 
       /**
        * Updates the currently selected model
@@ -223,7 +236,12 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        * @description Directly updates the selected model without validation.
        * UI components should ensure the model is valid for the current provider.
        */
-      setSelectedModel: (model) => set({ selectedModel: model }),
+      setSelectedModel: (model) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            selectedModel: model,
+          }),
+        ),
 
       /**
        * Updates the available models list for a specific provider
@@ -233,12 +251,14 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        * Does not affect custom models or hidden models.
        */
       setAvailableModels: (provider, models) =>
-        set((state) => ({
-          availableModels: {
-            ...state.availableModels,
-            [provider]: models,
-          },
-        })),
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            availableModels: {
+              ...state.availableModels,
+              [provider]: models,
+            },
+          }),
+        ),
 
       // ========================================================================
       // CUSTOM MODEL MANAGEMENT ACTIONS
@@ -257,7 +277,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           // Prevent duplicate custom models
           if (existing.includes(model)) return state;
           const hidden = state.hiddenModels[provider] || [];
-          return {
+          return applyRuntimeWriteVersion(state, {
             customModels: {
               ...state.customModels,
               [provider]: [...existing, model],
@@ -267,7 +287,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
               // Unhide the model if it was previously hidden
               [provider]: hidden.filter((m) => m !== model),
             },
-          };
+          });
         }),
 
       /**
@@ -286,7 +306,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           if (index === -1) return state;
           const updated = [...existing];
           updated[index] = newModel;
-          return {
+          return applyRuntimeWriteVersion(state, {
             customModels: {
               ...state.customModels,
               [provider]: updated,
@@ -294,7 +314,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
             // Update selected model if it was the edited model
             selectedModel:
               state.selectedModel === oldModel ? newModel : state.selectedModel,
-          };
+          });
         }),
 
       /**
@@ -315,7 +335,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
             ),
             ...customModelsFiltered,
           ];
-          return {
+          return applyRuntimeWriteVersion(state, {
             customModels: {
               ...state.customModels,
               [provider]: customModelsFiltered,
@@ -325,7 +345,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
               state.selectedModel === model
                 ? allVisible[0] || ""
                 : state.selectedModel,
-          };
+          });
         }),
 
       // ========================================================================
@@ -366,7 +386,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
             ...newCustomModels,
           ];
 
-          return {
+          return applyRuntimeWriteVersion(state, {
             customModels: {
               ...state.customModels,
               [provider]: newCustomModels,
@@ -380,7 +400,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
               state.selectedModel === model
                 ? allVisible[0] || ""
                 : state.selectedModel,
-          };
+          });
         }),
 
       // ========================================================================
@@ -393,13 +413,15 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        * returning the store to its original state.
        */
       resetToDefaults: () =>
-        set({
-          selectedProvider: "apple",
-          selectedModel: "system-default",
-          availableModels: DEFAULT_MODELS,
-          customModels: DEFAULT_CUSTOM_MODELS,
-          hiddenModels: DEFAULT_HIDDEN_MODELS,
-        }),
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            selectedProvider: "apple",
+            selectedModel: "system-default",
+            availableModels: DEFAULT_MODELS,
+            customModels: DEFAULT_CUSTOM_MODELS,
+            hiddenModels: DEFAULT_HIDDEN_MODELS,
+          }),
+        ),
 
       /**
        * Sets hidden models configuration for all providers
@@ -408,9 +430,11 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        * Used for bulk updates or restoring saved configurations.
        */
       setHiddenModels: (models) =>
-        set((state) => ({
-          hiddenModels: models,
-        })),
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            hiddenModels: models,
+          }),
+        ),
     }),
     // ========================================================================
     // PERSISTENCE CONFIGURATION
@@ -426,6 +450,25 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         setItem: (name, value) => secureStorage.setItem(name, value),
         removeItem: (name) => secureStorage.removeItem(name),
       })),
+      partialize: (state) => ({
+        selectedProvider: state.selectedProvider,
+        selectedModel: state.selectedModel,
+        availableModels: state.availableModels,
+        customModels: state.customModels,
+        hiddenModels: state.hiddenModels,
+        __meta: {
+          writeVersion: state.__meta.writeVersion,
+        },
+      }),
+      merge: (persistedState, currentState) =>
+        resolveHydrationMerge(persistedState, currentState),
+      onRehydrateStorage: () => (state) => {
+        if (!state) {
+          return;
+        }
+
+        state.__meta = markHydrationReady(state.__meta, "provider");
+      },
     },
   ),
 );

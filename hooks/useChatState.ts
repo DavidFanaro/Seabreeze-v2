@@ -20,8 +20,17 @@ import { useCallback, useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import * as SecureStore from "expo-secure-store";
-import { ProviderId } from "@/types/provider.types";
+import type { ProviderId } from "@/types/provider.types";
 import { useProviderStore } from "@/stores";
+import {
+  applyRuntimeWriteVersion,
+  areStoreDependenciesHydrated,
+  INITIAL_HYDRATION_META,
+  isStoreHydrated,
+  markHydrationReady,
+  resolveHydrationMerge,
+  type HydrationMetaState,
+} from "@/stores/hydration-registry";
 
 // ===== TYPE DEFINITIONS =====
 
@@ -51,6 +60,8 @@ interface ChatOverrideState {
    * Key: chat ID (string), Value: ChatOverride configuration
    */
   overrides: Record<string, ChatOverride>;
+  /** Internal hydration and runtime write metadata */
+  __meta: HydrationMetaState;
 }
 
 /**
@@ -165,6 +176,7 @@ export const useChatOverrideStore = create<ChatOverrideState & ChatOverrideActio
     (set, get) => ({
       // Initial state - empty overrides object
       overrides: {},
+      __meta: INITIAL_HYDRATION_META,
       
       /**
        * Set or update a provider/model override for a specific chat
@@ -177,12 +189,14 @@ export const useChatOverrideStore = create<ChatOverrideState & ChatOverrideActio
        * @param model - Specific model within the provider
        */
       setChatOverride: (chatId: string, provider: ProviderId, model: string) => {
-        set((state) => ({
-          overrides: {
-            ...state.overrides, // Preserve existing overrides
-            [chatId]: { provider, model }, // Add/update specific override
-          },
-        }));
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            overrides: {
+              ...state.overrides, // Preserve existing overrides
+              [chatId]: { provider, model }, // Add/update specific override
+            },
+          }),
+        );
       },
       
       /**
@@ -196,7 +210,9 @@ export const useChatOverrideStore = create<ChatOverrideState & ChatOverrideActio
       clearChatOverride: (chatId: string) => {
         set((state) => {
           const { [chatId]: _, ...rest } = state.overrides; // Remove specific key
-          return { overrides: rest };
+          return applyRuntimeWriteVersion(state, {
+            overrides: rest,
+          });
         });
       },
       
@@ -220,7 +236,11 @@ export const useChatOverrideStore = create<ChatOverrideState & ChatOverrideActio
        * migrating to a new override system.
        */
       clearAllOverrides: () => {
-        set({ overrides: {} }); // Reset to empty object
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            overrides: {},
+          }),
+        ); // Reset to empty object
       },
     }),
     {
@@ -232,9 +252,28 @@ export const useChatOverrideStore = create<ChatOverrideState & ChatOverrideActio
         setItem: (name, value) => secureStorage.setItem(name, value),
         removeItem: (name) => secureStorage.removeItem(name),
       })),
+      partialize: (state) => ({
+        overrides: state.overrides,
+        __meta: {
+          writeVersion: state.__meta.writeVersion,
+        },
+      }),
+      merge: (persistedState, currentState) =>
+        resolveHydrationMerge(persistedState, currentState),
+      onRehydrateStorage: () => (state) => {
+        if (!state) {
+          return;
+        }
+
+        state.__meta = markHydrationReady(state.__meta, "chatOverride");
+      },
     }
   )
 );
+
+function canUseChatOverrides(): boolean {
+  return isStoreHydrated("chatOverride") && areStoreDependenciesHydrated("chatOverride");
+}
 
 // ===== RESULT TYPES =====
 
@@ -311,6 +350,15 @@ export function useChatState(chatId: string | null) {
         provider: selectedProvider,
         model: selectedModel,
         isOverridden: false, // Never overridden for new chats
+      };
+    }
+
+    // Guard against cross-store hydration ordering races
+    if (!canUseChatOverrides()) {
+      return {
+        provider: selectedProvider,
+        model: selectedModel,
+        isOverridden: false,
       };
     }
 
@@ -402,6 +450,11 @@ export function useChatState(chatId: string | null) {
     if (!chatId || chatId === "new") {
       return false;
     }
+
+    if (!canUseChatOverrides()) {
+      return false;
+    }
+
     // Check if the overrides object contains an entry for this chat ID
     return !!overrides[chatId];
   }, [chatId, overrides]); // Dependencies: chat ID for validation, overrides object for lookup
@@ -424,6 +477,10 @@ export function useChatState(chatId: string | null) {
     (dbProvider: ProviderId | null, dbModel: string | null) => {
       // Skip database sync for new chats
       if (!chatId || chatId === "new") {
+        return;
+      }
+
+      if (!canUseChatOverrides()) {
         return;
       }
       
@@ -493,6 +550,14 @@ export function getEffectiveProviderModelSync(chatId: string | null): EffectiveP
 
   // Apply the same resolution logic as the hook
   if (!chatId || chatId === "new") {
+    return {
+      provider: selectedProvider,
+      model: selectedModel,
+      isOverridden: false,
+    };
+  }
+
+  if (!canUseChatOverrides()) {
     return {
       provider: selectedProvider,
       model: selectedModel,

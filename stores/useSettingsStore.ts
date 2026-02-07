@@ -9,6 +9,13 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import * as SecureStore from "expo-secure-store";
 
 import type { ThinkingLevel } from "@/types/chat.types";
+import {
+  applyRuntimeWriteVersion,
+  INITIAL_HYDRATION_META,
+  markHydrationReady,
+  resolveHydrationMerge,
+  type HydrationMetaState,
+} from "@/stores/hydration-registry";
 
 /**
  * Custom secure storage adapter for Zustand persistence
@@ -140,6 +147,7 @@ interface SettingsState {
    * and debugging convenience.
    */
   showCodeLineNumbers: boolean;
+  __meta: HydrationMetaState;
 }
 
 /**
@@ -227,7 +235,7 @@ interface SettingsActions {
  * These values are applied when the app first launches or when settings are reset.
  * Each default is chosen for optimal user experience and accessibility.
  */
-const DEFAULT_SETTINGS: SettingsState = {
+const DEFAULT_SETTINGS: Omit<SettingsState, "__meta"> = {
   /**
    * Dark theme is default for better eye comfort in low-light conditions
    * and reduced battery consumption on OLED displays.
@@ -292,16 +300,57 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     (set) => ({
       // Initialize with default settings
       ...DEFAULT_SETTINGS,
+      __meta: INITIAL_HYDRATION_META,
       
       // Action implementations - each updates specific state properties
-      setTheme: (theme) => set({ theme }),
-      setHapticEnabled: (enabled) => set({ hapticEnabled: enabled }),
-      setAutoGenerateTitles: (enabled) => set({ autoGenerateTitles: enabled }),
-      setThinkingEnabled: (enabled) => set({ thinkingEnabled: enabled }),
-      setThinkingLevel: (level) => set({ thinkingLevel: level }),
-      setMessageFontSize: (size) => set({ messageFontSize: size }),
-      setShowCodeLineNumbers: (enabled) => set({ showCodeLineNumbers: enabled }),
-      resetSettings: () => set(DEFAULT_SETTINGS),
+      setTheme: (theme) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            theme,
+          }),
+        ),
+      setHapticEnabled: (enabled) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            hapticEnabled: enabled,
+          }),
+        ),
+      setAutoGenerateTitles: (enabled) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            autoGenerateTitles: enabled,
+          }),
+        ),
+      setThinkingEnabled: (enabled) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            thinkingEnabled: enabled,
+          }),
+        ),
+      setThinkingLevel: (level) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            thinkingLevel: level,
+          }),
+        ),
+      setMessageFontSize: (size) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            messageFontSize: size,
+          }),
+        ),
+      setShowCodeLineNumbers: (enabled) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            showCodeLineNumbers: enabled,
+          }),
+        ),
+      resetSettings: () =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            ...DEFAULT_SETTINGS,
+          }),
+        ),
     }),
     {
       /**
@@ -317,6 +366,27 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
         setItem: (name, value) => secureStorage.setItem(name, value),
         removeItem: (name) => secureStorage.removeItem(name),
       })),
+      partialize: (state) => ({
+        theme: state.theme,
+        hapticEnabled: state.hapticEnabled,
+        autoGenerateTitles: state.autoGenerateTitles,
+        thinkingEnabled: state.thinkingEnabled,
+        thinkingLevel: state.thinkingLevel,
+        messageFontSize: state.messageFontSize,
+        showCodeLineNumbers: state.showCodeLineNumbers,
+        __meta: {
+          writeVersion: state.__meta.writeVersion,
+        },
+      }),
+      merge: (persistedState, currentState) =>
+        resolveHydrationMerge(persistedState, currentState),
+      onRehydrateStorage: () => (state) => {
+        if (!state) {
+          return;
+        }
+
+        state.__meta = markHydrationReady(state.__meta, "settings");
+      },
     },
   ),
 );

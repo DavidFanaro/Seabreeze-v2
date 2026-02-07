@@ -8,11 +8,19 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import * as SecureStore from "expo-secure-store";
 import type { ProviderId } from "@/types/provider.types";
+import {
+  applyRuntimeWriteVersion,
+  INITIAL_HYDRATION_META,
+  markHydrationReady,
+  resolveHydrationMerge,
+  type HydrationMetaState,
+} from "@/stores/hydration-registry";
 
 interface AuthState {
   openaiApiKey: string | null;
   openrouterApiKey: string | null;
   ollamaUrl: string | null;
+  __meta: HydrationMetaState;
 }
 
 interface AuthActions {
@@ -50,15 +58,33 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       openaiApiKey: null,
       openrouterApiKey: null,
       ollamaUrl: null,
-      setOpenAIApiKey: (key) => set({ openaiApiKey: key }),
-      setOpenRouterApiKey: (key) => set({ openrouterApiKey: key }),
-      setOllamaUrl: (url) => set({ ollamaUrl: url }),
+      __meta: INITIAL_HYDRATION_META,
+      setOpenAIApiKey: (key) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            openaiApiKey: key,
+          }),
+        ),
+      setOpenRouterApiKey: (key) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            openrouterApiKey: key,
+          }),
+        ),
+      setOllamaUrl: (url) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            ollamaUrl: url,
+          }),
+        ),
       clearAllCredentials: () =>
-        set({
-          openaiApiKey: null,
-          openrouterApiKey: null,
-          ollamaUrl: null,
-        }),
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            openaiApiKey: null,
+            openrouterApiKey: null,
+            ollamaUrl: null,
+          }),
+        ),
     }),
     {
       name: "ai-auth-storage",
@@ -68,6 +94,23 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         setItem: (name, value) => secureStorage.setItem(name, value),
         removeItem: (name) => secureStorage.removeItem(name),
       })),
+      partialize: (state) => ({
+        openaiApiKey: state.openaiApiKey,
+        openrouterApiKey: state.openrouterApiKey,
+        ollamaUrl: state.ollamaUrl,
+        __meta: {
+          writeVersion: state.__meta.writeVersion,
+        },
+      }),
+      merge: (persistedState, currentState) =>
+        resolveHydrationMerge(persistedState, currentState),
+      onRehydrateStorage: () => (state) => {
+        if (!state) {
+          return;
+        }
+
+        state.__meta = markHydrationReady(state.__meta, "auth");
+      },
     },
   ),
 );

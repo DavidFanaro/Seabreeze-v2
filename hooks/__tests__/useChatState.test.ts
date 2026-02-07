@@ -5,6 +5,7 @@ import { useProviderStore } from '@/stores/useProviderStore';
 import * as SecureStore from 'expo-secure-store';
 import type { ChatOverride } from '../useChatState';
 import type { ProviderId } from '@/types/provider.types';
+import { markStoreHydrated, resetHydrationRegistryForTests } from '@/stores/hydration-registry';
 
 // Mock the provider store
 jest.mock('@/stores/useProviderStore', () => ({
@@ -19,14 +20,17 @@ jest.mock('expo-secure-store', () => ({
 }));
 
 // Mock Zustand persistence
-jest.mock('zustand/middleware', () => ({
-  ...jest.requireActual('zustand/middleware'),
-  createJSONStorage: jest.fn(() => ({
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
-  })),
-}));
+jest.mock('zustand/middleware', () => {
+  const actualMiddleware = jest.requireActual('zustand/middleware') as Record<string, unknown>;
+  return {
+    ...actualMiddleware,
+    createJSONStorage: jest.fn(() => ({
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn(),
+    })),
+  };
+});
 
 const mockUseProviderStore = useProviderStore as jest.MockedFunction<typeof useProviderStore>;
 const mockSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
@@ -63,6 +67,9 @@ describe('useChatState', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetHydrationRegistryForTests();
+    markStoreHydrated('provider');
+    markStoreHydrated('chatOverride');
     
     // Set up store mocks
     setupStoreMocks();
@@ -149,7 +156,7 @@ describe('useChatState', () => {
         selectedModel: 'gpt-4',
       });
 
-      rerender();
+      rerender(undefined);
 
       expect(result.current.provider).toBe('openai');
       expect(result.current.model).toBe('gpt-4');
@@ -297,6 +304,9 @@ describe('useChatState', () => {
 describe('getEffectiveProviderModelSync', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetHydrationRegistryForTests();
+    markStoreHydrated('provider');
+    markStoreHydrated('chatOverride');
     
     // Reset the override store state
     const currentState = useChatOverrideStore.getState();
@@ -369,6 +379,26 @@ describe('getEffectiveProviderModelSync', () => {
     expect(() => {
       getEffectiveProviderModelSync('123');
     }).not.toThrow();
+  });
+
+  it('should ignore overrides until provider dependency is hydrated', () => {
+    resetHydrationRegistryForTests();
+    markStoreHydrated('chatOverride');
+
+    const testOverrides: Record<string, ChatOverride> = {
+      '123': { provider: 'openai' as ProviderId, model: 'gpt-4' },
+    };
+
+    const currentState = useChatOverrideStore.getState();
+    Object.assign(currentState, {
+      overrides: testOverrides,
+    });
+
+    const result = getEffectiveProviderModelSync('123');
+
+    expect(result.provider).toBe('apple');
+    expect(result.model).toBe('system-default');
+    expect(result.isOverridden).toBe(false);
   });
 });
 

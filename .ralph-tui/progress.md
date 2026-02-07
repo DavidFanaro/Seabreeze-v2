@@ -12,7 +12,32 @@ after each iteration and it's included in prompts for context.
 - For overlapping chat sends, assign a new sequence token per send and require all stream-side callbacks/state commits (chunks, errors, provider switches, completion) to pass a shared `canMutateState` gate built from token freshness + abort/cancel flags.
 - For retry UX, persist a retryable logical operation key on failure and run retry cleanup/send through an in-flight idempotency registry keyed by that operation so rapid taps collapse into one execution.
 - For fallback chains, keep retries inside the same send token and pass explicit `nextProvider`/`nextModel` metadata back to the orchestrator so fallback attempts reuse the same assistant slot instead of recursively starting a new send.
+- For persisted Zustand stores, include a monotonic `writeVersion` metadata field and a custom `persist.merge` that keeps runtime state when `persisted.writeVersion < runtime.writeVersion`; use `partialize` to persist only `writeVersion` from metadata.
 
+---
+
+## 2026-02-06 - US-006
+- What was implemented
+  - Added deterministic hydration-vs-runtime precedence guards for persisted stores (`useAuthStore`, `useProviderStore`, `useSettingsStore`, `useChatOverrideStore`) using shared monotonic `writeVersion` metadata.
+  - Added explicit `persist.partialize`, guarded `persist.merge`, and hydration completion metadata updates so late hydration cannot overwrite newer in-memory mutations.
+  - Added a cross-store hydration dependency guard so chat overrides apply only after both `chatOverride` and its `provider` dependency are hydrated.
+  - Added race-condition coverage for cold start hydration, resume/runtime-first writes, and simultaneous provider/settings runtime updates.
+- Files changed
+  - `stores/hydration-registry.ts`
+  - `stores/useAuthStore.ts`
+  - `stores/useProviderStore.ts`
+  - `stores/useSettingsStore.ts`
+  - `hooks/useChatState.ts`
+  - `hooks/__tests__/useChatState.test.ts`
+  - `stores/__tests__/hydrationGuards.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - A tiny store-hydration registry (`isStoreHydrated` + dependency map) is an effective seam for enforcing multi-store initialization order without tightly coupling stores.
+    - Persist middleware behavior is safest when merge precedence is explicit and tested; default merge semantics can silently regress runtime-updated state during delayed hydration.
+  - Gotchas encountered
+    - `onRehydrateStorage` does not expose `set`, so hydration-complete metadata must be updated through the provided state reference or external store APIs.
+    - Repository-wide `npx tsc --noEmit` and `npm test -- --watchAll=false` still fail due unrelated baseline issues; US-006-specific suites pass.
 ---
 
 ## 2026-02-06 - US-001
