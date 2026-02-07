@@ -10,6 +10,7 @@ after each iteration and it's included in prompts for context.
 - Concurrency audits should use a stable schema per entry: `Race Class`, `Vulnerable Flow`, `Modules/Files`, `Severity`, `Reproducibility`, and `Owner Subsystem`, plus class-level fixed evidence gates to make remediation traceable.
 - For async workflows, compose a local trio per scope: `createSequenceGuard` to gate commits, `createAbortManager` to cancel superseded work, and `createIdempotencyRegistry` with deterministic keys to dedupe in-flight side effects.
 - For overlapping chat sends, assign a new sequence token per send and require all stream-side callbacks/state commits (chunks, errors, provider switches, completion) to pass a shared `canMutateState` gate built from token freshness + abort/cancel flags.
+- For retry UX, persist a retryable logical operation key on failure and run retry cleanup/send through an in-flight idempotency registry keyed by that operation so rapid taps collapse into one execution.
 
 ---
 
@@ -71,4 +72,22 @@ after each iteration and it's included in prompts for context.
   - Gotchas encountered
     - Guarding stale completion paths can accidentally leave `isStreaming` stuck `true` unless cancel explicitly clears UI stream flags.
     - Mocked streaming tests need deferred promises and captured callback options to deterministically reproduce overlap/cancel races.
+---
+
+## 2026-02-06 - US-004
+- What was implemented
+  - Added idempotent retry semantics in `useChat` by tracking a retryable logical send key on failure and deduplicating retry execution with an in-flight idempotency registry.
+  - Hardened retry cleanup so failed assistant/user tail entries are removed in one deterministic pass before re-send, preventing duplicate message rows and thinking-state drift.
+  - Added concurrency-focused tests for rapid double-tap retry, retry presses while an earlier retry is still in-flight, and repeated network-flap retry recovery.
+- Files changed
+  - `hooks/chat/useChat.ts`
+  - `hooks/chat/__tests__/useChat.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Retry dedupe is most reliable when logical-operation identity is captured at failure time and reused as the idempotency key for all follow-up retry attempts.
+    - Tail-pruning both message and thinking arrays in one retry transaction avoids split-state corruption under rapid UI interactions.
+  - Gotchas encountered
+    - Triggering retries back-to-back in tests requires a microtask flush before asserting streaming invocations because idempotency-registry tasks are promise-queued.
+    - Repo-wide `tsc` and `npm test` currently fail due unrelated baseline issues, so targeted story verification was used to confirm retry behavior.
 ---

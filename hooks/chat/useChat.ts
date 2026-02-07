@@ -50,9 +50,18 @@ import { useTitleGeneration } from "./useTitleGeneration";
 import { useChatStreaming } from "./useChatStreaming";
 import { useStreamLifecycle } from "./useStreamLifecycle";
 import type { UseChatOptions, StreamState } from "@/types/chat.types";
-import { createSequenceGuard } from "@/lib/concurrency";
+import {
+    createIdempotencyKey,
+    createIdempotencyRegistry,
+    createSequenceGuard,
+} from "@/lib/concurrency";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
+
+interface RetryableOperation {
+    operationKey: string;
+    content: string;
+}
 
 const DEFAULT_PLACEHOLDER_TEXT = "...";
 
@@ -217,6 +226,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     const canceledRef = useRef<boolean>(false);             // Track if streaming was canceled
     const messagesRef = useRef<ModelMessage[]>(initialMessages);
     const sendSequenceGuardRef = useRef(createSequenceGuard(`chat-send-${chatId ?? "default"}`));
+    const retryOperationRegistryRef = useRef(createIdempotencyRegistry<void>());
+    const lastRetryableOperationRef = useRef<RetryableOperation | null>(null);
 
     useEffect(() => {
         messagesRef.current = messages;
@@ -359,6 +370,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         lastUserMessageRef.current = null;       // Clear retry message
         setCanRetry(false);                      // Disable retry capability
         setErrorMessage(null);                   // Clear error message
+        lastRetryableOperationRef.current = null;
+        retryOperationRegistryRef.current.clear();
     }, [effectiveProviderId, effectiveModelId, setTitle]);
 
     /**
@@ -410,6 +423,11 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             if (!content) return;
 
             const sendToken = sendSequenceGuardRef.current.next();
+            const sendOperationKey = createIdempotencyKey("chat-send", [
+                chatId ?? "default",
+                sendToken.sequence,
+                content,
+            ]);
 
             // ────────────────────────────────────────────────────────────────
             // STATE INITIALIZATION
@@ -418,6 +436,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             setIsThinking(false);                    // Reset thinking state
             canceledRef.current = false;            // Clear cancellation flag
             setCanRetry(false);                     // Disable retry until needed
+            lastRetryableOperationRef.current = null;
             lastUserMessageRef.current = content;   // Store for retry capability
             
             // Initialize stream lifecycle management
@@ -520,12 +539,20 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                         markError(error);
                         setErrorMessage(error.message);
                         setCanRetry(true);
+                        lastRetryableOperationRef.current = {
+                            operationKey: sendOperationKey,
+                            content,
+                        };
                         onError?.(error);
                     } else {
                         const wrappedError = new Error(String(error));
                         markError(wrappedError);
                         setErrorMessage(wrappedError.message);
                         setCanRetry(true);
+                        lastRetryableOperationRef.current = {
+                            operationKey: sendOperationKey,
+                            content,
+                        };
                         onError?.(wrappedError);
                     }
                 },
@@ -588,11 +615,14 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             mergedRetryConfig,
             executeStreaming,
             onChunk, 
-            onThinkingChunk,
             onComplete, 
             onError, 
             onFallback,
+            chatId,
+            enableFallback,
             effectiveProviderId,
+            initializeStream,
+            markError,
             enableThinking,
             thinkingLevel,
             onThinkingChunk
@@ -617,41 +647,48 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
      * and resends the original message with fresh streaming state.
      */
     const retryLastMessage = useCallback(async () => {
+        const retryableOperation = lastRetryableOperationRef.current;
+
         // Guard against invalid retry attempts
-        if (!lastUserMessageRef.current || !canRetry) return;
-        
-        // Remove the failed assistant message from history
-        setMessages((prev) => {
-            if (prev.length >= 2 && prev[prev.length - 1].role === "assistant") {
-                return prev.slice(0, -1);
-            }
-            return prev;
-        });
-        setThinkingOutput((prev) => {
-            if (prev.length >= 1) {
-                return prev.slice(0, -1);
-            }
-            return prev;
-        });
+        if (!lastUserMessageRef.current || !canRetry || !retryableOperation) return;
 
-        // Remove the original user message (we'll resend it fresh)
-        setMessages((prev) => {
-            if (prev.length >= 1 && prev[prev.length - 1].role === "user") {
-                return prev.slice(0, -1);
-            }
-            return prev;
-        });
-        setThinkingOutput((prev) => {
-            if (prev.length >= 1) {
-                return prev.slice(0, -1);
-            }
-            return prev;
-        });
+        const retryOperationKey = createIdempotencyKey("chat-retry", [
+            retryableOperation.operationKey,
+            retryableOperation.content,
+        ]);
 
-        // Reset retry state and clear error message
-        setCanRetry(false);
-        setErrorMessage(null);
-        await sendMessage(lastUserMessageRef.current);
+        await retryOperationRegistryRef.current.run(retryOperationKey, async () => {
+            const currentMessages = messagesRef.current;
+            let nextMessages = [...currentMessages];
+            let removedCount = 0;
+
+            if (nextMessages.length > 0 && nextMessages[nextMessages.length - 1].role === "assistant") {
+                nextMessages = nextMessages.slice(0, -1);
+                removedCount += 1;
+            }
+
+            const lastMessage = nextMessages[nextMessages.length - 1];
+            if (
+                lastMessage
+                && lastMessage.role === "user"
+                && typeof lastMessage.content === "string"
+                && lastMessage.content === retryableOperation.content
+            ) {
+                nextMessages = nextMessages.slice(0, -1);
+                removedCount += 1;
+            }
+
+            messagesRef.current = nextMessages;
+            setMessages(nextMessages);
+            setThinkingOutput((prev) => prev.slice(0, Math.max(0, prev.length - removedCount)));
+
+            // Reset retry state and clear error message
+            setCanRetry(false);
+            setErrorMessage(null);
+            lastRetryableOperationRef.current = null;
+
+            await sendMessage(retryableOperation.content);
+        });
     }, [canRetry, sendMessage]);
 
     // =============================================================================

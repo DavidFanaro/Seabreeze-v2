@@ -453,5 +453,171 @@ describe('useChat', () => {
       expect(result.current.canRetry).toBe(false);
       expect(onError).toHaveBeenCalledTimes(0);
     });
+
+    it('deduplicates quick retry taps for the same failed operation', async () => {
+      mockExecuteStreaming.mockImplementationOnce(async (options: any) => {
+        options?.onError?.(new Error('network flap'));
+        return {
+          success: false,
+          shouldRetryWithFallback: false,
+          accumulated: '',
+        };
+      });
+
+      const retryDeferred = createDeferred<{
+        success: boolean;
+        shouldRetryWithFallback: boolean;
+        accumulated: string;
+      }>();
+
+      mockExecuteStreaming.mockImplementationOnce(async () => retryDeferred.promise);
+
+      const { result } = renderHook(() => useChat({}));
+
+      await act(async () => {
+        await result.current.sendMessage('retry me');
+      });
+
+      expect(result.current.canRetry).toBe(true);
+      expect(result.current.messages).toHaveLength(2);
+
+      let firstRetry = Promise.resolve();
+      let secondRetry = Promise.resolve();
+
+      act(() => {
+        firstRetry = result.current.retryLastMessage();
+        secondRetry = result.current.retryLastMessage();
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockExecuteStreaming).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        retryDeferred.resolve({
+          success: true,
+          shouldRetryWithFallback: false,
+          accumulated: 'retry ok',
+        });
+
+        await Promise.all([firstRetry, secondRetry]);
+      });
+
+      expect(result.current.messages).toHaveLength(2);
+      expect(result.current.messages[0]).toEqual({
+        role: 'user',
+        content: 'retry me',
+      });
+    });
+
+    it('keeps retry state stable when retry is tapped while a retry is inflight', async () => {
+      mockExecuteStreaming.mockImplementationOnce(async (options: any) => {
+        options?.onError?.(new Error('temporary outage'));
+        return {
+          success: false,
+          shouldRetryWithFallback: false,
+          accumulated: '',
+        };
+      });
+
+      const inflightRetry = createDeferred<{
+        success: boolean;
+        shouldRetryWithFallback: boolean;
+        accumulated: string;
+      }>();
+
+      mockExecuteStreaming.mockImplementationOnce(async () => inflightRetry.promise);
+
+      const { result } = renderHook(() => useChat({}));
+
+      await act(async () => {
+        await result.current.sendMessage('inflight retry');
+      });
+
+      let firstRetry = Promise.resolve();
+      let secondRetry = Promise.resolve();
+
+      act(() => {
+        firstRetry = result.current.retryLastMessage();
+      });
+
+      act(() => {
+        secondRetry = result.current.retryLastMessage();
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockExecuteStreaming).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        inflightRetry.resolve({
+          success: true,
+          shouldRetryWithFallback: false,
+          accumulated: 'recovered',
+        });
+
+        await Promise.all([firstRetry, secondRetry]);
+      });
+
+      expect(result.current.messages).toHaveLength(2);
+      expect(result.current.canRetry).toBe(false);
+    });
+
+    it('recovers from repeated network flap retries without duplicating chat entries', async () => {
+      mockExecuteStreaming.mockImplementationOnce(async (options: any) => {
+        options?.onError?.(new Error('network flap - initial'));
+        return {
+          success: false,
+          shouldRetryWithFallback: false,
+          accumulated: '',
+        };
+      });
+
+      mockExecuteStreaming.mockImplementationOnce(async (options: any) => {
+        options?.onError?.(new Error('network flap - retry'));
+        return {
+          success: false,
+          shouldRetryWithFallback: false,
+          accumulated: '',
+        };
+      });
+
+      mockExecuteStreaming.mockImplementationOnce(async () => ({
+        success: true,
+        shouldRetryWithFallback: false,
+        accumulated: 'eventual success',
+      }));
+
+      const { result } = renderHook(() => useChat({}));
+
+      await act(async () => {
+        await result.current.sendMessage('flap-safe');
+      });
+
+      expect(result.current.canRetry).toBe(true);
+      expect(result.current.messages).toHaveLength(2);
+
+      await act(async () => {
+        await result.current.retryLastMessage();
+      });
+
+      expect(result.current.canRetry).toBe(true);
+      expect(result.current.messages).toHaveLength(2);
+
+      await act(async () => {
+        await result.current.retryLastMessage();
+      });
+
+      expect(result.current.canRetry).toBe(false);
+      expect(result.current.messages).toHaveLength(2);
+      expect(result.current.messages[0]).toEqual({
+        role: 'user',
+        content: 'flap-safe',
+      });
+    });
   });
 });
