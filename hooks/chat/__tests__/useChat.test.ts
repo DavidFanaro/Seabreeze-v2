@@ -64,8 +64,11 @@ describe('useChat', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockExecuteStreaming.mockImplementation(async (options: any) => {
+      options?.onChunkReceived?.();
       const onThinkingChunk = options?.onThinkingChunk as ((chunk: string, accumulated: string) => void) | undefined;
       onThinkingChunk?.('Thinking', 'Thinking');
+      options?.onDoneSignalReceived?.();
+      options?.onStreamCompleted?.();
       return {
         success: true,
         shouldRetryWithFallback: false,
@@ -158,6 +161,32 @@ describe('useChat', () => {
       expect(result.current.text).toBe('');
       expect(result.current.isThinking).toBe(false);
       expect(result.current.isStreaming).toBe(false); // Streaming completes after act
+    });
+
+    it('marks stream lifecycle as completed when streaming succeeds', async () => {
+      const { result } = renderHook(() => useChat({}));
+
+      act(() => {
+        result.current.setText('complete this stream');
+      });
+
+      await act(async () => {
+        await result.current.sendMessage();
+      });
+
+      const [options] = mockExecuteStreaming.mock.calls[0] as [
+        {
+          onChunkReceived?: () => void;
+          onDoneSignalReceived?: () => void;
+          onStreamCompleted?: () => void;
+        },
+      ];
+
+      expect(options.onChunkReceived).toEqual(expect.any(Function));
+      expect(options.onDoneSignalReceived).toEqual(expect.any(Function));
+      expect(options.onStreamCompleted).toEqual(expect.any(Function));
+      expect(result.current.streamState).toBe('completed');
+      expect(result.current.isStreaming).toBe(false);
     });
 
     it('should set isThinking while reasoning streams', async () => {
@@ -452,6 +481,36 @@ describe('useChat', () => {
       expect(result.current.errorMessage).toBeNull();
       expect(result.current.canRetry).toBe(false);
       expect(onError).toHaveBeenCalledTimes(0);
+    });
+
+    it('fails stalled streams with watchdog timeout and enables retry', async () => {
+      jest.useFakeTimers();
+
+      try {
+        mockExecuteStreaming.mockImplementationOnce(
+          async () => new Promise(() => undefined)
+        );
+
+        const onError = jest.fn();
+        const { result } = renderHook(() => useChat({ onError }));
+
+        let sendPromise = Promise.resolve();
+        act(() => {
+          sendPromise = result.current.sendMessage('watchdog timeout');
+        });
+
+        await act(async () => {
+          jest.advanceTimersByTime(46000);
+          await sendPromise;
+        });
+
+        expect(result.current.isStreaming).toBe(false);
+        expect(result.current.canRetry).toBe(true);
+        expect(result.current.errorMessage).toContain('timed out');
+        expect(onError).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('deduplicates quick retry taps for the same failed operation', async () => {

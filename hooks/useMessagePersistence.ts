@@ -119,6 +119,19 @@ const SAVE_RETRY_CONFIG = {
   retryableCategories: ["network", "server_error", "timeout", "unknown"] as ErrorCategory[],
 };
 
+function hasMeaningfulAssistantContent(messages: ModelMessage[]): boolean {
+  const lastAssistantMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && typeof message.content === "string");
+
+  if (!lastAssistantMessage || typeof lastAssistantMessage.content !== "string") {
+    return false;
+  }
+
+  const trimmedContent = lastAssistantMessage.content.trim();
+  return trimmedContent.length > 0 && trimmedContent !== "...";
+}
+
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
@@ -415,8 +428,18 @@ export function useMessagePersistence(
   useEffect(() => {
     if (!enabled) return;
 
-    // Queue save when stream reaches completed state
-    if (streamState === "completed" && !hasCompletedStreamRef.current) {
+    const isTerminalState =
+      streamState === "completed"
+      || streamState === "error"
+      || streamState === "cancelled";
+
+    const shouldPersistTerminalState =
+      streamState === "completed"
+      || hasMeaningfulAssistantContent(messages);
+
+    // Queue save when stream reaches terminal state.
+    // For error/cancelled, persist only when we have meaningful assistant content.
+    if (isTerminalState && shouldPersistTerminalState && !hasCompletedStreamRef.current) {
       hasCompletedStreamRef.current = true;
       setSaveStatus("queued");
 
@@ -428,7 +451,7 @@ export function useMessagePersistence(
     if (streamState === "streaming") {
       hasCompletedStreamRef.current = false;
     }
-  }, [streamState, enabled, createSnapshot, runSerializedSave]);
+  }, [messages, streamState, enabled, createSnapshot, runSerializedSave]);
 
   // ===========================================================================
   // MESSAGES CHANGE MONITORING
@@ -439,7 +462,13 @@ export function useMessagePersistence(
    */
   useEffect(() => {
     if (!enabled) return;
-    if (streamState !== "completed" && streamState !== "idle") return;
+    const canSaveForCurrentState =
+      streamState === "idle"
+      || streamState === "completed"
+      || (streamState === "error" && hasMeaningfulAssistantContent(messages))
+      || (streamState === "cancelled" && hasMeaningfulAssistantContent(messages));
+
+    if (!canSaveForCurrentState) return;
     if (messages.length === 0) return;
 
     const nextSnapshot = createSnapshot();

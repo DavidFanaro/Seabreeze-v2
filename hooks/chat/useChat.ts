@@ -47,7 +47,7 @@ import { type FallbackResult } from "@/providers/fallback-chain";
 import { executeWithRetry, DEFAULT_RETRY_CONFIG, type RetryConfig } from "@/hooks/useErrorRecovery";
 import { useChatState } from "@/hooks/useChatState";
 import { useTitleGeneration } from "./useTitleGeneration";
-import { useChatStreaming } from "./useChatStreaming";
+import { useChatStreaming, type StreamingResult } from "./useChatStreaming";
 import { useStreamLifecycle } from "./useStreamLifecycle";
 import type { UseChatOptions, StreamState } from "@/types/chat.types";
 import {
@@ -64,6 +64,7 @@ interface RetryableOperation {
 }
 
 const DEFAULT_PLACEHOLDER_TEXT = "...";
+const STREAM_EXECUTION_WATCHDOG_MS = 45000;
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -306,7 +307,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     // Connect to the streaming subsystem that handles real-time AI responses.
     // This provides the core functionality for streaming text from AI providers.
     
-    const { executeStreaming, handleStreamingError } = useChatStreaming();
+    const { executeStreaming } = useChatStreaming();
 
     // =============================================================================
     // STREAM LIFECYCLE MANAGEMENT
@@ -443,6 +444,15 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 content,
             ]);
 
+            const finalizeCurrentSendState = (): void => {
+                if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
+                    return;
+                }
+
+                setIsStreaming(false);
+                setIsThinking(false);
+            };
+
             // ────────────────────────────────────────────────────────────────
             // STATE INITIALIZATION
             // ────────────────────────────────────────────────────────────────
@@ -505,8 +515,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 });
                 
                 onError?.(new Error("No AI provider configured"));
-                setIsStreaming(false);
-                setIsThinking(false);
+                finalizeCurrentSendState();
                 onComplete?.();
                 return;
             }
@@ -551,6 +560,28 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                     abortSignal,
                     onChunk,
                     onThinkingChunk: handleThinkingChunk,
+                    onChunkReceived: () => {
+                        if (!canMutateForCurrentSend()) {
+                            return;
+                        }
+
+                        markChunkReceived();
+                    },
+                    onDoneSignalReceived: () => {
+                        if (!canMutateForCurrentSend()) {
+                            return;
+                        }
+
+                        markDoneSignalReceived();
+                    },
+                    onStreamCompleted: () => {
+                        if (!canMutateForCurrentSend()) {
+                            return;
+                        }
+
+                        markCompleting();
+                        markCompleted();
+                    },
                     canMutateState: canMutateForCurrentSend,
                     onError: (error: unknown) => {
                         if (!canMutateForCurrentSend()) {
@@ -590,13 +621,60 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                     },
                 };
 
-                const result = await executeStreaming(
-                    streamingOptions,
-                    updatedMessages,
-                    setMessages,
-                    assistantIndex,
-                    failedProvidersRef
-                );
+                let result: StreamingResult;
+
+                let watchdogTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+                try {
+                    result = await Promise.race<StreamingResult>([
+                        executeStreaming(
+                            streamingOptions,
+                            updatedMessages,
+                            setMessages,
+                            assistantIndex,
+                            failedProvidersRef
+                        ),
+                        new Promise<StreamingResult>((_, reject) => {
+                            watchdogTimeoutId = setTimeout(() => {
+                                reject(new Error("Streaming timed out waiting for provider completion"));
+                            }, STREAM_EXECUTION_WATCHDOG_MS);
+                        }),
+                    ]);
+
+                } catch (error: unknown) {
+                    if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
+                        return;
+                    }
+
+                    const watchdogError = error instanceof Error
+                        ? error
+                        : new Error(String(error));
+
+                    const canFinalizeWatchdogError =
+                        sendSequenceGuardRef.current.isCurrent(sendToken)
+                        && !canceledRef.current;
+
+                    if (canFinalizeWatchdogError) {
+                        markError(watchdogError);
+                        setErrorMessage(watchdogError.message);
+                        setCanRetry(true);
+                        lastRetryableOperationRef.current = {
+                            operationKey: sendOperationKey,
+                            content,
+                        };
+                        onError?.(watchdogError);
+                    }
+
+                    if (!abortSignal.aborted) {
+                        streamController.abort();
+                    }
+
+                    break;
+                } finally {
+                    if (watchdogTimeoutId) {
+                        clearTimeout(watchdogTimeoutId);
+                    }
+                }
 
                 if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
                     return;
@@ -620,11 +698,15 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // ────────────────────────────────────────────────────────────────
             // COMPLETION
             // ────────────────────────────────────────────────────────────────
-            if (canMutateForCurrentSend()) {
-                setIsStreaming(false);
-                setIsThinking(false);
+            if (
+                sendSequenceGuardRef.current.isCurrent(sendToken)
+                && !canceledRef.current
+                && !abortSignal.aborted
+            ) {
                 onComplete?.();
             }
+
+            finalizeCurrentSendState();
         },
         [
             text, 
@@ -643,6 +725,10 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             enableFallback,
             effectiveProviderId,
             initializeStream,
+            markChunkReceived,
+            markDoneSignalReceived,
+            markCompleting,
+            markCompleted,
             markError,
             enableThinking,
             thinkingLevel,

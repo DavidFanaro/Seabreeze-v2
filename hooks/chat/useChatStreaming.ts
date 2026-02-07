@@ -131,8 +131,14 @@ export interface StreamingOptions {
     effectiveProviderId: ProviderId;
     /** Callback fired when a new text chunk is received */
     onChunk?: (chunk: string, accumulated: string) => void;
+    /** Callback fired when any stream chunk arrives (text or reasoning) */
+    onChunkReceived?: () => void;
     /** Callback fired when a new thinking/reasoning chunk is received */
     onThinkingChunk?: (chunk: string, accumulated: string) => void;
+    /** Callback fired when stream emits a terminal done signal */
+    onDoneSignalReceived?: () => void;
+    /** Callback fired when stream has fully completed */
+    onStreamCompleted?: () => void;
     /** Control reasoning effort for supported providers */
     thinkingLevel?: ThinkingLevel;
     /** Callback fired when an error occurs during streaming */
@@ -259,7 +265,10 @@ export function useChatStreaming() {
             activeProvider,
             effectiveProviderId,
             onChunk,
+            onChunkReceived,
             onThinkingChunk,
+            onDoneSignalReceived,
+            onStreamCompleted,
             thinkingLevel,
             onError,
             onFallback,
@@ -356,6 +365,8 @@ export function useChatStreaming() {
                     }
 
                     if (part.type === "reasoning-delta") {
+                        onChunkReceived?.();
+
                         if (!thinkingChunkHandler) {
                             continue;
                         }
@@ -377,6 +388,7 @@ export function useChatStreaming() {
                     }
 
                     if (part.type === "text-delta") {
+                        onChunkReceived?.();
                         accumulated += part.text;
                         updateAssistantMessage(accumulated);
 
@@ -385,6 +397,9 @@ export function useChatStreaming() {
                         }
                     }
                 }
+
+                onDoneSignalReceived?.();
+                onStreamCompleted?.();
                 return;
             }
 
@@ -395,6 +410,8 @@ export function useChatStreaming() {
                     return;
                 }
 
+                onChunkReceived?.();
+
                 accumulated += chunk;
                 updateAssistantMessage(accumulated);
 
@@ -402,6 +419,9 @@ export function useChatStreaming() {
                     onChunk?.(chunk, accumulated);
                 }
             }
+
+            onDoneSignalReceived?.();
+            onStreamCompleted?.();
         };
 
         try {

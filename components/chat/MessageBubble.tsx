@@ -54,6 +54,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
     const [hasAutoExpandedThinking, setHasAutoExpandedThinking] = useState(false);
     const normalizedThinkingOutput = thinkingOutput?.trim() ?? "";
     const hasThinkingOutput = !isUser && normalizedThinkingOutput.length > 0;
+    const shouldDeferThinkingMarkdown = isStreaming && content.includes("```");
 
     const toggleThinkingOutput = useCallback(() => {
       setIsThinkingExpanded((prev) => !prev);
@@ -119,13 +120,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
                 }}
                 testID="thinking-output-content"
               >
-                <CustomMarkdown
-                  content={normalizedThinkingOutput}
-                  isStreaming={isStreaming}
-                  showLineNumbers={showCodeLineNumbers}
-                  showCopyAll={false}
-                  isUser={false}
-                />
+                {shouldDeferThinkingMarkdown ? (
+                  <Text
+                    style={{
+                      color: theme.colors.textSecondary ?? theme.colors.text,
+                      fontSize: 12,
+                      fontFamily: "Menlo",
+                    }}
+                    testID="thinking-output-content-plain"
+                  >
+                    {normalizedThinkingOutput}
+                  </Text>
+                ) : (
+                  <CustomMarkdown
+                    content={normalizedThinkingOutput}
+                    isStreaming={isStreaming}
+                    showLineNumbers={showCodeLineNumbers}
+                    showCopyAll={false}
+                    isUser={false}
+                  />
+                )}
               </View>
             )}
           </View>

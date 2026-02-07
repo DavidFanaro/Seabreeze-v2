@@ -42,6 +42,8 @@ interface MarkdownErrorBoundaryProps {
     fallback: React.ReactNode;
 }
 
+const STREAM_RENDER_THROTTLE_MS = 150;
+
 /**
  * Error Boundary for Markdown rendering
  * Catches errors during markdown parsing/rendering and shows raw text fallback
@@ -129,29 +131,124 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
 
     // Streaming buffer
     const bufferRef = useRef(createStreamingBuffer({ bufferSize: 50 }));
+    const ingestedLengthRef = useRef(0);
+    const prevStreamingRef = useRef(isStreaming);
+    const prevContentRef = useRef(content);
+    const pendingRenderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingRenderContentRef = useRef<string | null>(null);
+    const lastRenderUpdateAtRef = useRef(0);
     const [renderedContent, setRenderedContent] = useState(content);
-
-    // Handle streaming content
-    useEffect(() => {
-        if (isStreaming) {
-            const result = bufferRef.current.push(content.slice(renderedContent.length));
-            if (result.shouldUpdate) {
-                setRenderedContent(result.renderContent);
+    const setRenderedContentIfChanged = useCallback((nextContent: string) => {
+        setRenderedContent((prevContent) => {
+            if (prevContent === nextContent) {
+                return prevContent;
             }
-        } else {
-            // Not streaming, render everything
-            const finalContent = bufferRef.current.complete();
-            setRenderedContent(finalContent || content);
-            bufferRef.current.reset();
-        }
-    }, [content, isStreaming, renderedContent.length]);
+            return nextContent;
+        });
+    }, []);
 
-    // Reset buffer when content changes significantly
+    // Deterministic streaming state machine
     useEffect(() => {
-        if (!isStreaming && content !== renderedContent) {
-            setRenderedContent(content);
+        const wasStreaming = prevStreamingRef.current;
+        const isStreamStart = isStreaming && !wasStreaming;
+        const isStreamEnd = !isStreaming && wasStreaming;
+        const buffer = bufferRef.current;
+
+        if (isStreaming) {
+            if (isStreamStart) {
+                buffer.reset();
+                ingestedLengthRef.current = 0;
+                setRenderedContentIfChanged("");
+            }
+
+            const currentIngestedLength = ingestedLengthRef.current;
+            const previousContent = prevContentRef.current;
+            const hasRegression = content.length < currentIngestedLength;
+            const hasPrefixMismatch =
+                currentIngestedLength > 0 &&
+                !content.startsWith(previousContent.slice(0, currentIngestedLength));
+
+            if (hasRegression || hasPrefixMismatch) {
+                buffer.reset();
+                ingestedLengthRef.current = 0;
+            }
+
+            if (content.length > ingestedLengthRef.current) {
+                const delta = content.slice(ingestedLengthRef.current);
+                const result = buffer.push(delta);
+                ingestedLengthRef.current = content.length;
+
+                if (result.shouldUpdate) {
+                    const now = Date.now();
+                    const elapsedSinceLastUpdate = now - lastRenderUpdateAtRef.current;
+
+                    if (elapsedSinceLastUpdate >= STREAM_RENDER_THROTTLE_MS) {
+                        if (pendingRenderTimeoutRef.current) {
+                            clearTimeout(pendingRenderTimeoutRef.current);
+                            pendingRenderTimeoutRef.current = null;
+                        }
+                        pendingRenderContentRef.current = null;
+                        lastRenderUpdateAtRef.current = now;
+                        setRenderedContentIfChanged(result.renderContent);
+                    } else {
+                        pendingRenderContentRef.current = result.renderContent;
+                        if (!pendingRenderTimeoutRef.current) {
+                            const waitMs = STREAM_RENDER_THROTTLE_MS - elapsedSinceLastUpdate;
+                            pendingRenderTimeoutRef.current = setTimeout(() => {
+                                pendingRenderTimeoutRef.current = null;
+                                const pendingContent = pendingRenderContentRef.current;
+                                pendingRenderContentRef.current = null;
+                                if (pendingContent !== null) {
+                                    lastRenderUpdateAtRef.current = Date.now();
+                                    setRenderedContentIfChanged(pendingContent);
+                                }
+                            }, waitMs);
+                        }
+                    }
+                }
+            }
+
+            prevStreamingRef.current = isStreaming;
+            prevContentRef.current = content;
+            return;
         }
-    }, [content, isStreaming, renderedContent]);
+
+        if (isStreamEnd) {
+            if (pendingRenderTimeoutRef.current) {
+                clearTimeout(pendingRenderTimeoutRef.current);
+                pendingRenderTimeoutRef.current = null;
+            }
+            pendingRenderContentRef.current = null;
+            const finalContent = buffer.complete() || content;
+            lastRenderUpdateAtRef.current = Date.now();
+            setRenderedContentIfChanged(finalContent);
+            buffer.reset();
+            ingestedLengthRef.current = 0;
+        } else {
+            if (pendingRenderTimeoutRef.current) {
+                clearTimeout(pendingRenderTimeoutRef.current);
+                pendingRenderTimeoutRef.current = null;
+            }
+            pendingRenderContentRef.current = null;
+            buffer.reset();
+            ingestedLengthRef.current = 0;
+            lastRenderUpdateAtRef.current = Date.now();
+            setRenderedContentIfChanged(content);
+        }
+
+        prevStreamingRef.current = isStreaming;
+        prevContentRef.current = content;
+    }, [content, isStreaming, setRenderedContentIfChanged]);
+
+    useEffect(() => {
+        return () => {
+            if (pendingRenderTimeoutRef.current) {
+                clearTimeout(pendingRenderTimeoutRef.current);
+                pendingRenderTimeoutRef.current = null;
+            }
+            pendingRenderContentRef.current = null;
+        };
+    }, []);
 
     // Parse markdown
     const parsed = useMemo((): ParsedMarkdown => {
@@ -192,6 +289,7 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
                             language={block.language}
                             showLineNumbers={showLineNumbers}
                             isComplete={block.isComplete !== false}
+                            isStreaming={isStreaming}
                         />
                     );
 

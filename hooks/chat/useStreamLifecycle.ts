@@ -216,8 +216,8 @@ export function useStreamLifecycle(
   // ===========================================================================
 
   const eventLogRef = useRef<StreamLifecycleLogEntry[]>([]);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const maxDurationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const maxDurationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastChunkTimeRef = useRef<number>(0);
   const isDoneSignalReceivedRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
@@ -304,9 +304,14 @@ export function useStreamLifecycle(
         isDoneSignalReceived: isDoneSignalReceivedRef.current,
       });
 
-      // If no chunks received for timeoutMs, consider stream complete
+      // If no chunks received for timeoutMs, fail this stream and abort IO
       if (!isDoneSignalReceivedRef.current) {
-        transitionTo("completing", { reason: "timeout" });
+        const timeoutError = new Error("Stream timed out while waiting for data");
+        setAbortController((current) => {
+          current?.abort();
+          return null;
+        });
+        transitionTo("error", { error: timeoutError, reason: "timeout", timeoutMs });
       }
     }, timeoutMs);
 
@@ -319,8 +324,14 @@ export function useStreamLifecycle(
         maxDurationMs: MAX_STREAM_DURATION_MS,
       });
 
+      const durationError = new Error("Stream exceeded maximum duration");
+      setAbortController((current) => {
+        current?.abort();
+        return null;
+      });
       transitionTo("error", {
-        message: "Stream exceeded maximum duration",
+        error: durationError,
+        message: durationError.message,
         maxDurationMs: MAX_STREAM_DURATION_MS,
       });
     }, MAX_STREAM_DURATION_MS);
@@ -413,7 +424,7 @@ export function useStreamLifecycle(
   const markError = useCallback(
     (error: Error) => {
       clearTimeouts();
-      transitionTo("error", { error: error.message, stack: error.stack });
+      transitionTo("error", { error, message: error.message, stack: error.stack });
 
       // Clean up abort controller
       setAbortController((current) => {

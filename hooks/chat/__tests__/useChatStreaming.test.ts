@@ -245,6 +245,35 @@ describe('useChatStreaming', () => {
       expect(setMessagesMock).toHaveBeenCalledTimes(3);
     });
 
+    it('emits lifecycle callbacks through successful stream completion', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const lifecycleEvents: string[] = [];
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            onChunkReceived: () => lifecycleEvents.push('chunk'),
+            onDoneSignalReceived: () => lifecycleEvents.push('done'),
+            onStreamCompleted: () => lifecycleEvents.push('completed'),
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(lifecycleEvents).toEqual([
+        'chunk',
+        'chunk',
+        'chunk',
+        'chunk',
+        'done',
+        'completed',
+      ]);
+    });
+
     it('should stream reasoning chunks when provided', async () => {
       const { result } = renderHook(() => useChatStreaming());
 

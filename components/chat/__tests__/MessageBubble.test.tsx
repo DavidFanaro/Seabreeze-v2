@@ -437,6 +437,24 @@ describe("MessageBubble Component", () => {
     expect(getByTestId("thinking-output-content")).toBeDefined();
   });
 
+  it("renders thinking output as plain text while streaming code", () => {
+    const { getByTestId } = render(
+      <MessageBubble
+        content={"```zig\nconst std = @import(\"std\");"}
+        isUser={false}
+        isStreaming={true}
+        thinkingOutput="Live reasoning details"
+      />
+    );
+
+    expect(getByTestId("thinking-output-content-plain")).toBeDefined();
+
+    const thinkingMarkdownCalls = mockCustomMarkdown.mock.calls.filter(
+      ([props]) => props?.content === "Live reasoning details"
+    );
+    expect(thinkingMarkdownCalls).toHaveLength(0);
+  });
+
   /**
    * Test: Auto-expanded thinking output collapses once streaming ends
    */

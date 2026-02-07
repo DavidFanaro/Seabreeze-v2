@@ -4,10 +4,17 @@
  * Handles both user and assistant messages with streaming support for real-time responses.
  */
 
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useEffect } from "react";
 import { FlashList } from "@shopify/flash-list";
 import type { FlashListRef } from "@shopify/flash-list";
-import { ActivityIndicator, Text, View, ViewStyle } from "react-native";
+import {
+    ActivityIndicator,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    Text,
+    View,
+    ViewStyle,
+} from "react-native";
 import { ModelMessage } from "ai";
 import { MessageBubble } from "./MessageBubble";
 import { useTheme } from "@/components/ui/ThemeProvider";
@@ -27,6 +34,11 @@ interface MessageListProps {
     isStreaming?: boolean;
     isThinking?: boolean;
 }
+
+const NEAR_BOTTOM_THRESHOLD_PX = 100;
+const AUTO_SCROLL_THROTTLE_MS = 100;
+const TERMINAL_SETTLE_WINDOW_MS = 500;
+const TERMINAL_SETTLE_DELAY_MS = 120;
 
 /**
  * MessageList Component
@@ -51,6 +63,13 @@ export const MessageList: React.FC<MessageListProps> = ({
     // ============================================================================
     // Reference to the FlashList component for potential scroll interactions
     const flashListRef = useRef<FlashListRef<ModelMessage>>(null);
+    const isNearBottomRef = useRef(true);
+    const lastAutoScrollAtRef = useRef(0);
+    const previousMessageCountRef = useRef(messages.length);
+    const previousLastMessageContentRef = useRef<string>((messages[messages.length - 1]?.content as string) ?? "");
+    const previousWasStreamingRef = useRef(isStreaming);
+    const terminalSettleUntilRef = useRef(0);
+    const terminalSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Theme object containing spacing, colors, and other design tokens
     const { theme } = useTheme();
     const emptyStateColor = theme.colors.textSecondary ?? theme.colors.text;
@@ -85,6 +104,97 @@ export const MessageList: React.FC<MessageListProps> = ({
             />
         );
     }, [messages.length, isStreaming, thinkingOutput]);
+
+    const scrollToBottom = useCallback((force = false, animated = true, bypassThrottle = false) => {
+        if (!force && !isNearBottomRef.current) {
+            return;
+        }
+
+        const now = Date.now();
+        if (!bypassThrottle && now - lastAutoScrollAtRef.current < AUTO_SCROLL_THROTTLE_MS) {
+            return;
+        }
+
+        lastAutoScrollAtRef.current = now;
+        flashListRef.current?.scrollToEnd({ animated });
+    }, []);
+
+    const scheduleTerminalSettleScroll = useCallback(() => {
+        if (!isNearBottomRef.current) {
+            return;
+        }
+
+        terminalSettleUntilRef.current = Date.now() + TERMINAL_SETTLE_WINDOW_MS;
+
+        if (terminalSettleTimeoutRef.current) {
+            clearTimeout(terminalSettleTimeoutRef.current);
+            terminalSettleTimeoutRef.current = null;
+        }
+
+        scrollToBottom(false, false, true);
+
+        terminalSettleTimeoutRef.current = setTimeout(() => {
+            terminalSettleTimeoutRef.current = null;
+            scrollToBottom(false, false, true);
+        }, TERMINAL_SETTLE_DELAY_MS);
+    }, [scrollToBottom]);
+
+    const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const {
+            contentSize,
+            contentOffset,
+            layoutMeasurement,
+        } = event.nativeEvent;
+
+        const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+        isNearBottomRef.current = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
+    }, []);
+
+    const handleContentSizeChange = useCallback(() => {
+        if (Date.now() > terminalSettleUntilRef.current) {
+            return;
+        }
+
+        scrollToBottom(false, false, true);
+    }, [scrollToBottom]);
+
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1];
+        const lastMessageContent = (lastMessage?.content as string) ?? "";
+        const previousMessageCount = previousMessageCountRef.current;
+        const previousLastMessageContent = previousLastMessageContentRef.current;
+        const previousWasStreaming = previousWasStreamingRef.current;
+
+        const messageCountIncreased = messages.length > previousMessageCount;
+        const isNewUserMessage = messageCountIncreased && lastMessage?.role === "user";
+        const isStreamingAssistantUpdate =
+            isStreaming
+            && lastMessage?.role === "assistant"
+            && lastMessageContent !== previousLastMessageContent;
+        const didStreamingEnd = previousWasStreaming && !isStreaming;
+
+        if (isNewUserMessage) {
+            scrollToBottom(true);
+        } else if (isStreamingAssistantUpdate) {
+            scrollToBottom();
+        } else if (didStreamingEnd) {
+            scrollToBottom();
+            scheduleTerminalSettleScroll();
+        }
+
+        previousMessageCountRef.current = messages.length;
+        previousLastMessageContentRef.current = lastMessageContent;
+        previousWasStreamingRef.current = isStreaming;
+    }, [messages, isStreaming, scheduleTerminalSettleScroll, scrollToBottom]);
+
+    useEffect(() => {
+        return () => {
+            if (terminalSettleTimeoutRef.current) {
+                clearTimeout(terminalSettleTimeoutRef.current);
+                terminalSettleTimeoutRef.current = null;
+            }
+        };
+    }, []);
 
     // ============================================================================
     // KEY EXTRACTOR SECTION
@@ -161,6 +271,9 @@ export const MessageList: React.FC<MessageListProps> = ({
             ]}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="interactive"
+            onScroll={handleScroll}
+            onContentSizeChange={handleContentSizeChange}
+            scrollEventThrottle={16}
             style={style}
         />
     );

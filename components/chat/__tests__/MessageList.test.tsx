@@ -4,9 +4,12 @@
  */
 
 import React from "react";
-import { render } from "@testing-library/react-native";
+import { render, act } from "@testing-library/react-native";
 import type { ModelMessage } from "ai";
 import { MessageList } from "../MessageList";
+
+const mockScrollToEnd = jest.fn();
+let latestFlashListProps: any = null;
 
 // Mock FlashList component
 jest.mock("@shopify/flash-list", () => {
@@ -14,7 +17,13 @@ jest.mock("@shopify/flash-list", () => {
   const { View } = jest.requireActual("react-native");
 
   return {
-    FlashList: ({ data, renderItem, ListEmptyComponent }: any) => {
+    FlashList: React.forwardRef(({ data, renderItem, ListEmptyComponent, ...rest }: any, ref: any) => {
+      latestFlashListProps = rest;
+
+      React.useImperativeHandle(ref, () => ({
+        scrollToEnd: mockScrollToEnd,
+      }));
+
       if (!data || data.length === 0) {
         return <ListEmptyComponent />;
       }
@@ -26,7 +35,7 @@ jest.mock("@shopify/flash-list", () => {
           )}
         </View>
       );
-    },
+    }),
   };
 });
 
@@ -83,6 +92,11 @@ describe("MessageList Component", () => {
     { role: "user", content: "Can you help me with something?" },
     { role: "assistant", content: "Of course! What do you need help with?" },
   ];
+
+  beforeEach(() => {
+    mockScrollToEnd.mockClear();
+    latestFlashListProps = null;
+  });
 
   /**
    * Test: Component renders with messages
@@ -504,5 +518,184 @@ describe("MessageList Component", () => {
     );
 
     expect(firstRender).toBeDefined();
+  });
+
+  it("auto-scrolls during streaming when near bottom", () => {
+    const streamingMessages: ModelMessage[] = [
+      { role: "user", content: "write a server" },
+      { role: "assistant", content: "```zig\nconst" },
+    ];
+
+    const { rerender } = render(
+      <MessageList messages={streamingMessages} isStreaming={true} />
+    );
+
+    act(() => {
+      latestFlashListProps.onScroll({
+        nativeEvent: {
+          contentSize: { width: 320, height: 1600 },
+          contentOffset: { x: 0, y: 1450 },
+          layoutMeasurement: { width: 320, height: 120 },
+        },
+      });
+    });
+
+    rerender(
+      <MessageList
+        messages={[
+          streamingMessages[0],
+          { role: "assistant", content: "```zig\nconst std = @import(\"std\");" },
+        ]}
+        isStreaming={true}
+      />
+    );
+
+    expect(mockScrollToEnd).toHaveBeenCalled();
+  });
+
+  it("does not auto-scroll during streaming when user is far from bottom", () => {
+    const streamingMessages: ModelMessage[] = [
+      { role: "user", content: "write a server" },
+      { role: "assistant", content: "```zig\nconst" },
+    ];
+
+    const { rerender } = render(
+      <MessageList messages={streamingMessages} isStreaming={true} />
+    );
+
+    act(() => {
+      latestFlashListProps.onScroll({
+        nativeEvent: {
+          contentSize: { width: 320, height: 2200 },
+          contentOffset: { x: 0, y: 600 },
+          layoutMeasurement: { width: 320, height: 500 },
+        },
+      });
+    });
+
+    rerender(
+      <MessageList
+        messages={[
+          streamingMessages[0],
+          { role: "assistant", content: "```zig\nconst std = @import(\"std\");\nconst net" },
+        ]}
+        isStreaming={true}
+      />
+    );
+
+    expect(mockScrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("force-scrolls when a new user message is appended", () => {
+    const initialMessages: ModelMessage[] = [
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "hi" },
+    ];
+
+    const { rerender } = render(
+      <MessageList messages={initialMessages} isStreaming={false} />
+    );
+
+    act(() => {
+      latestFlashListProps.onScroll({
+        nativeEvent: {
+          contentSize: { width: 320, height: 2200 },
+          contentOffset: { x: 0, y: 400 },
+          layoutMeasurement: { width: 320, height: 500 },
+        },
+      });
+    });
+
+    rerender(
+      <MessageList
+        messages={[
+          ...initialMessages,
+          { role: "user", content: "new question" },
+        ]}
+        isStreaming={false}
+      />
+    );
+
+    expect(mockScrollToEnd).toHaveBeenCalled();
+  });
+
+  it("performs terminal settle scroll when stream finishes near bottom", () => {
+    jest.useFakeTimers();
+
+    try {
+      const baseMessages: ModelMessage[] = [
+        { role: "user", content: "write a server" },
+        { role: "assistant", content: "```zig\nconst std = @import(\"std\");" },
+      ];
+
+      const { rerender } = render(
+        <MessageList messages={baseMessages} isStreaming={true} />
+      );
+
+      act(() => {
+        latestFlashListProps.onScroll({
+          nativeEvent: {
+            contentSize: { width: 320, height: 1600 },
+            contentOffset: { x: 0, y: 1450 },
+            layoutMeasurement: { width: 320, height: 120 },
+          },
+        });
+      });
+
+      rerender(<MessageList messages={baseMessages} isStreaming={false} />);
+
+      const callsAfterEnd = mockScrollToEnd.mock.calls.length;
+      expect(callsAfterEnd).toBeGreaterThan(0);
+
+      act(() => {
+        latestFlashListProps.onContentSizeChange(320, 1650);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(130);
+      });
+
+      expect(mockScrollToEnd.mock.calls.length).toBeGreaterThan(callsAfterEnd + 1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("does not run terminal settle scroll when stream finishes far from bottom", () => {
+    jest.useFakeTimers();
+
+    try {
+      const baseMessages: ModelMessage[] = [
+        { role: "user", content: "write a server" },
+        { role: "assistant", content: "```zig\nconst std = @import(\"std\");" },
+      ];
+
+      const { rerender } = render(
+        <MessageList messages={baseMessages} isStreaming={true} />
+      );
+
+      act(() => {
+        latestFlashListProps.onScroll({
+          nativeEvent: {
+            contentSize: { width: 320, height: 2200 },
+            contentOffset: { x: 0, y: 700 },
+            layoutMeasurement: { width: 320, height: 500 },
+          },
+        });
+      });
+
+      rerender(<MessageList messages={baseMessages} isStreaming={false} />);
+
+      const callsAfterEnd = mockScrollToEnd.mock.calls.length;
+
+      act(() => {
+        latestFlashListProps.onContentSizeChange(320, 2250);
+        jest.advanceTimersByTime(130);
+      });
+
+      expect(mockScrollToEnd.mock.calls.length).toBe(callsAfterEnd);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

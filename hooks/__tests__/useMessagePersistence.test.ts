@@ -171,4 +171,73 @@ describe("useMessagePersistence", () => {
       );
     });
   });
+
+  it("automatically persists when stream transitions to completed", async () => {
+    const baseProps = {
+      chatIdParam: "new",
+      messages: [{ role: "user", content: "persist me" }] as ModelMessage[],
+      thinkingOutput: [] as string[],
+      providerId: "apple" as const,
+      modelId: "apple.on.device",
+      title: "Chat",
+      enabled: true,
+    };
+
+    let streamState: "streaming" | "completed" = "streaming";
+
+    const { rerender } = renderHook(() =>
+      useMessagePersistence({
+        ...baseProps,
+        streamState,
+      })
+    );
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(0);
+    });
+
+    streamState = "completed";
+    rerender(undefined);
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("persists meaningful partial assistant output when stream errors", async () => {
+    const baseProps = {
+      chatIdParam: "new",
+      thinkingOutput: [] as string[],
+      providerId: "apple" as const,
+      modelId: "apple.on.device",
+      title: "Chat",
+      enabled: true,
+    };
+
+    const messages = [
+      { role: "user", content: "write a http server in zig" },
+      { role: "assistant", content: "```zig\nconst std = @import(\"std\");" },
+    ] as ModelMessage[];
+
+    let streamState: "streaming" | "error" = "streaming";
+
+    const { rerender } = renderHook(() =>
+      useMessagePersistence({
+        ...baseProps,
+        messages,
+        streamState,
+      })
+    );
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(0);
+    });
+
+    streamState = "error";
+    rerender(undefined);
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });
