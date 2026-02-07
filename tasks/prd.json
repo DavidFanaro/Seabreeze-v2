@@ -1,113 +1,260 @@
 {
-  "name": "Chat Screen Stream Completion Fix",
-  "description": "Fix critical issues in the chat screen where streaming responses fail to complete properly and markdown doesn't update during the streaming process",
-  "branchName": "ralph/chat-stream-completion-fix",
+  "name": "Repository-Wide Race Condition Remediation and Concurrency Hardening",
+  "description": "Repository-wide remediation of race conditions with shared concurrency primitives, subsystem hardening, and deterministic regression coverage.",
+  "branchName": "ralph/repository-wide-race-condition-remediation-and-concurrency-hardening",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Implement reliable stream completion detection",
-      "description": "As a user, I want chat streams to always complete fully so that I never lose partial AI responses.",
+      "title": "Define Concurrency Taxonomy and Audit Baseline",
+      "description": "As an engineer, I want a repository-wide catalog of race classes and vulnerable flows so that remediation is complete and traceable.",
       "acceptanceCriteria": [
-        "Detect stream end using both `done` signal and fallback timeout (30s)",
-        "Handle stream interruption scenarios: app backgrounding, network drops, component unmount",
-        "Add stream state tracking (`streaming` | `completing` | `completed` | `error`)",
-        "Cancel in-progress streams gracefully when user navigates away",
-        "Log stream lifecycle events for debugging",
-        "npx tsc --noEmit passes",
+        "Create a race-condition taxonomy document covering at least: stale-response overwrite, double-submit, out-of-order stream events, fallback duplication, hydration/write conflicts, and cancellation leaks.",
+        "Produce an inventory mapping vulnerable flows to modules/files in app/, hooks/, stores/, providers/, db/, and lib/.",
+        "Tag each entry with severity, reproducibility, and owner subsystem.",
+        "Define fixed evidence requirements per race class.",
         "npm run lint passes",
-        "All existing Jest tests pass"
+        "npx tsc --noEmit passes",
+        "npm test passes"
       ],
       "priority": 1,
       "passes": true,
       "notes": "",
       "dependsOn": [],
-      "labels": [
-        "core",
-        "state-management"
-      ],
       "completionNotes": "Completed by agent"
     },
     {
       "id": "US-002",
-      "title": "Fix race condition between stream and save operations",
-      "description": "As a user, I want my chat history to persist reliably so that no messages are lost.",
+      "title": "Establish Shared Concurrency Primitives",
+      "description": "As an engineer, I want shared utilities for cancellation, sequencing, and idempotency so that all subsystems use consistent race-safe mechanisms.",
       "acceptanceCriteria": [
-        "Queue save operation to run only after stream reaches `completed` state",
-        "Implement atomic 'stream complete → save message' transaction",
-        "Handle save failures with 3 retry attempts and exponential backoff",
-        "Show user-friendly error if save fails after retries",
-        "Ensure partial stream content is preserved even if save fails",
-        "npx tsc --noEmit passes",
+        "Introduce reusable primitives for request tokens/sequence guards, abort handling, and idempotency keys.",
+        "Provide typed interfaces and usage patterns consumable by hooks/providers/stores.",
+        "Add unit tests validating primitive behavior under out-of-order and aborted async scenarios.",
+        "Document required usage rules for contributors.",
         "npm run lint passes",
-        "All existing Jest tests pass"
+        "npx tsc --noEmit passes",
+        "npm test passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
-      ],
-      "labels": [
-        "database",
-        "reliability"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
-      "title": "Add stream cancellation and cleanup",
-      "description": "As a user, I want to cancel ongoing streams so that I can start fresh conversations.",
+      "title": "Harden Chat Send/Stream Lifecycle Ordering",
+      "description": "As a user, I want messages and stream updates to appear in correct order so that chat state is consistent under rapid interactions.",
       "acceptanceCriteria": [
-        "Add cancel button visible during active streaming",
-        "Cancel button stops stream and preserves partial content",
-        "Cleanup all stream resources (abort controllers, timers, subscriptions)",
-        "Update UI state immediately on cancel (show 'Stopped' indicator)",
-        "Prevent memory leaks from uncleaned stream handlers",
-        "npx tsc --noEmit passes",
+        "Prevent stale stream chunks from mutating newer conversation state.",
+        "Enforce per-conversation sequencing for send/stream completion events.",
+        "Ensure stream cancellation guarantees no post-cancel state mutation.",
+        "Add deterministic tests for rapid send, stream overlap, and stop/start scenarios.",
         "npm run lint passes",
-        "All existing Jest tests pass"
+        "npx tsc --noEmit passes",
+        "npm test passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
-        "US-001"
-      ],
-      "labels": [
-        "ui",
-        "cleanup"
-      ],
-      "completionNotes": "Completed by agent"
+        "US-002"
+      ]
     },
     {
       "id": "US-004",
-      "title": "Improve error recovery for failed streams",
-      "description": "As a user, I want clear feedback when streams fail so that I know what happened.",
+      "title": "Make Retry and Re-send Idempotent",
+      "description": "As a user, I want retry operations to avoid duplicates so that failed/retried messages do not create conflicting states.",
       "acceptanceCriteria": [
-        "Display error message when stream fails mid-response",
-        "Show 'Retry' button for failed messages",
-        "Preserve partial stream content on failure (don't discard)",
-        "Log detailed error info for debugging (provider, timestamp, error type)",
-        "Gracefully degrade to showing raw text if markdown render fails",
-        "npx tsc --noEmit passes",
+        "Implement idempotent retry semantics for message sends.",
+        "Guarantee retry cannot duplicate assistant/user entries for the same logical operation.",
+        "Handle retry while previous attempts are inflight without state corruption.",
+        "Add tests for repeated retries, quick taps, and network-flap recovery.",
         "npm run lint passes",
-        "All existing Jest tests pass"
+        "npx tsc --noEmit passes",
+        "npm test passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
-        "US-001",
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Stabilize Provider Fallback and Model Selection Races",
+      "description": "As a user, I want provider fallback to choose one authoritative execution path so that responses are not duplicated or interleaved incorrectly.",
+      "acceptanceCriteria": [
+        "Ensure only one provider response pipeline commits final state per request.",
+        "Prevent stale fallback branches from overriding active branch state.",
+        "Protect provider-cache/model-selection from concurrent mutation anomalies.",
+        "Add tests covering timeout-triggered fallback, late success, and cache contention.",
+        "npm run lint passes",
+        "npx tsc --noEmit passes",
+        "npm test passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
         "US-002"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Protect Zustand Hydration vs Runtime Mutation",
+      "description": "As a user, I want persisted state hydration to merge safely with live updates so that startup and resume do not lose or regress state.",
+      "acceptanceCriteria": [
+        "Define and enforce deterministic precedence rules between hydration and runtime writes.",
+        "Prevent hydration completion from overwriting newer in-memory updates.",
+        "Add guards for multi-store cross-dependency initialization order.",
+        "Add tests for cold start, resume, and simultaneous store updates.",
+        "npm run lint passes",
+        "npx tsc --noEmit passes",
+        "npm test passes"
       ],
-      "labels": [
-        "error-handling",
-        "ux"
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Serialize Critical DB Write Paths",
+      "description": "As an engineer, I want atomic/serialized DB operations in critical flows so that concurrent writes cannot create inconsistent records.",
+      "acceptanceCriteria": [
+        "Identify DB operations requiring serialization or transactional grouping.",
+        "Implement ordering/locking strategy for critical write/read-modify-write paths.",
+        "Ensure duplicate logical operations are deduplicated at persistence boundaries.",
+        "Add tests for concurrent writes and interrupted operations.",
+        "npm run lint passes",
+        "npx tsc --noEmit passes",
+        "npm test passes"
       ],
-      "completionNotes": "Completed by agent"
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Eliminate Non-Atomic Derived State Updates",
+      "description": "As an engineer, I want derived state updates to be atomic so that UI and business logic never observe impossible intermediate states.",
+      "acceptanceCriteria": [
+        "Refactor multi-step async state transitions into atomic commit phases where needed.",
+        "Remove unsafe read-modify-write patterns in asynchronous closures.",
+        "Add selector-level tests asserting invariant preservation under concurrent triggers.",
+        "Document module-level invariants for updated state domains.",
+        "npm run lint passes",
+        "npx tsc --noEmit passes",
+        "npm test passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Add Cross-Subsystem Concurrency Regression Suite",
+      "description": "As an engineer, I want broad race-focused tests across repo subsystems so that known race classes cannot regress.",
+      "acceptanceCriteria": [
+        "Create deterministic tests for each race class in the taxonomy.",
+        "Cover chat/hooks, providers, stores, DB, and utility async flows.",
+        "Include timing-control techniques (fake timers/mocks/barriers) to reproduce ordering bugs.",
+        "Ensure tests fail before fixes and pass after fixes for representative cases.",
+        "npm run lint passes",
+        "npx tsc --noEmit passes",
+        "npm test passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003",
+        "US-004",
+        "US-005",
+        "US-006",
+        "US-007",
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Add Stress and Interleaving Scenarios",
+      "description": "As an engineer, I want stress-style async interleaving tests so that subtle concurrency bugs surface before release.",
+      "acceptanceCriteria": [
+        "Implement practical stress scenarios with repeated randomized-but-seeded operation orderings.",
+        "Capture flaky patterns and convert reproducible failures into deterministic regression tests.",
+        "Gate stress scenarios to run reliably in CI without nondeterministic failures.",
+        "Publish guidance for extending stress cases safely.",
+        "npm run lint passes",
+        "npx tsc --noEmit passes",
+        "npm test passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Concurrency Invariants Documentation by Critical Module",
+      "description": "As a maintainer, I want documented invariants per critical module so that future changes preserve concurrency correctness.",
+      "acceptanceCriteria": [
+        "Document invariants for chat orchestration, provider fallback, store hydration, and DB boundaries.",
+        "Link each invariant to guarding code paths and regression tests.",
+        "Define anti-patterns and required patterns for new async code.",
+        "Ensure docs are discoverable from contributor workflow docs.",
+        "npm run lint passes",
+        "npx tsc --noEmit passes",
+        "npm test passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003",
+        "US-005",
+        "US-006",
+        "US-007",
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Initiative Closure and Verification",
+      "description": "As a team, I want a formal closure checklist so that the initiative is only complete when all race-hardening outcomes are verifiably achieved.",
+      "acceptanceCriteria": [
+        "Confirm no known race-condition bugs remain in tracked inventory.",
+        "Confirm invariants docs exist for all designated critical modules.",
+        "Confirm automated regression coverage exists for all identified race classes.",
+        "Produce a final report mapping fixed issues to tests and invariants.",
+        "npm run lint passes",
+        "npx tsc --noEmit passes",
+        "npm test passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009",
+        "US-010",
+        "US-011"
+      ]
     }
   ],
   "metadata": {
-    "updatedAt": "2026-02-07T00:20:36.247Z"
+    "updatedAt": "2026-02-07T01:31:10.551Z"
   }
 }

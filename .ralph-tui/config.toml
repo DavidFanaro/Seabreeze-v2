@@ -7,5 +7,5 @@ defaultAgent = "opencode"
 subagentTracingDetail = "minimal"
 
 [agentOptions]
-model = "opencode/kimi-k2.5-free"
+model = "openai/gpt-5.3-codex"
 [trackerOptions]
