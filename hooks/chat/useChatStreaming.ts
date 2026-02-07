@@ -392,6 +392,18 @@ export function useChatStreaming() {
 
                 // If retry failed but we have an error to handle
                 if (!retryResult.success && retryResult.error) {
+                    // Log detailed error info for debugging
+                    console.error("[useChatStreaming] Streaming error after retries:", {
+                        provider: effectiveProviderId,
+                        model: currentModel.modelId,
+                        errorType: retryResult.error.category,
+                        errorMessage: retryResult.error.message,
+                        attempts: retryResult.attempts,
+                        accumulatedLength: accumulated.length,
+                        timestamp: new Date().toISOString(),
+                        hasFallbackAvailable: enableFallback,
+                    });
+
                     const errorResult = await handleStreamingError(
                         retryResult.error,
                         activeProvider,
@@ -408,6 +420,13 @@ export function useChatStreaming() {
                             // Mark current provider as failed
                             failedProvidersRef.current.push(activeProvider);
                             shouldRetryWithFallback = true;
+                            
+                            console.log("[useChatStreaming] Falling back to provider:", {
+                                from: activeProvider,
+                                to: errorResult.nextProvider,
+                                reason: retryResult.error.message,
+                                timestamp: new Date().toISOString(),
+                            });
                         } else {
                             // No fallback available, show user-friendly error
                             const errorMessage = formatErrorForChat(retryResult.error, activeProvider);
@@ -416,11 +435,16 @@ export function useChatStreaming() {
                                 ? `${errorMessage}\n\n*Tip: ${providerHint}*`
                                 : errorMessage;
 
+                            // Preserve partial content and append error message
+                            const partialContent = accumulated.length > 0 
+                                ? `${accumulated}\n\n---\n\n**Error:** ${fullErrorMessage}`
+                                : fullErrorMessage;
+
                             setMessages((prev) => {
                                 const next = [...prev];
                                 next[assistantIndex] = {
                                     role: "assistant",
-                                    content: fullErrorMessage,
+                                    content: partialContent,
                                 };
                                 return next;
                             });
@@ -432,6 +456,18 @@ export function useChatStreaming() {
                 await streamOperation();
             }
         } catch (err) {
+            // Log detailed error info for debugging
+            const classification = classifyError(err);
+            console.error("[useChatStreaming] Unexpected streaming error:", {
+                provider: effectiveProviderId,
+                model: currentModel.modelId,
+                errorType: classification.category,
+                errorMessage: classification.message,
+                accumulatedLength: accumulated.length,
+                timestamp: new Date().toISOString(),
+                stack: err instanceof Error ? err.stack : undefined,
+            });
+
             // Handle unexpected errors that weren't caught by the retry mechanism
             const errorResult = await handleStreamingError(
                 err,
@@ -447,6 +483,13 @@ export function useChatStreaming() {
                 // We have a fallback provider available
                 failedProvidersRef.current.push(activeProvider);
                 shouldRetryWithFallback = true;
+                
+                console.log("[useChatStreaming] Falling back to provider after error:", {
+                    from: activeProvider,
+                    to: errorResult.nextProvider,
+                    reason: classification.message,
+                    timestamp: new Date().toISOString(),
+                });
             } else {
                 // No fallback available, format and display the error
                 const errorMessage = formatErrorForChat(err, activeProvider);
@@ -455,11 +498,16 @@ export function useChatStreaming() {
                     ? `${errorMessage}\n\n*Tip: ${providerHint}*`
                     : errorMessage;
 
+                // Preserve partial content and append error message
+                const partialContent = accumulated.length > 0 
+                    ? `${accumulated}\n\n---\n\n**Error:** ${fullErrorMessage}`
+                    : fullErrorMessage;
+
                 setMessages((prev) => {
                     const next = [...prev];
                     next[assistantIndex] = {
                         role: "assistant",
-                        content: fullErrorMessage,
+                        content: partialContent,
                     };
                     return next;
                 });

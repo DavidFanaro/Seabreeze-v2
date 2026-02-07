@@ -3,10 +3,10 @@
   "sessionId": "881800b9-9698-45ee-9c0d-f4e0ac7b91d1",
   "status": "running",
   "startedAt": "2026-02-06T23:51:20.378Z",
-  "updatedAt": "2026-02-07T00:10:03.126Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-02-07T00:20:36.250Z",
+  "currentIteration": 3,
   "maxIterations": 0,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "opencode",
   "trackerState": {
@@ -34,6 +34,16 @@
       "durationMs": 433868,
       "startedAt": "2026-02-06T23:59:33.316Z",
       "endedAt": "2026-02-07T00:06:47.184Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "US-003",
+      "taskTitle": "Add stream cancellation and cleanup",
+      "taskCompleted": true,
+      "durationMs": 194748,
+      "startedAt": "2026-02-07T00:06:48.375Z",
+      "endedAt": "2026-02-07T00:10:03.123Z"
     }
   ],
   "skippedTaskIds": [],

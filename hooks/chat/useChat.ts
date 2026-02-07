@@ -110,6 +110,8 @@ export interface UseChatReturn {
     retryLastMessage: () => Promise<void>;
     /** Whether retry is available for the last message */
     canRetry: boolean;
+    /** Error message for display when stream fails */
+    errorMessage: string | null;
 }
 
 // =============================================================================
@@ -210,6 +212,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     // Retry and cancellation tracking
     const lastUserMessageRef = useRef<string | null>(null); // Store last user message for retry
     const [canRetry, setCanRetry] = useState<boolean>(false); // Whether retry is available
+    const [errorMessage, setErrorMessage] = useState<string | null>(null); // Error message for display
     const canceledRef = useRef<boolean>(false);             // Track if streaming was canceled
 
     // =============================================================================
@@ -348,6 +351,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         failedProvidersRef.current = [];         // Clear failed providers list
         lastUserMessageRef.current = null;       // Clear retry message
         setCanRetry(false);                      // Disable retry capability
+        setErrorMessage(null);                   // Clear error message
     }, [effectiveProviderId, effectiveModelId, setTitle]);
 
     /**
@@ -488,10 +492,14 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 onError: (error: unknown) => {
                     if (error instanceof Error) {
                         markError(error);
+                        setErrorMessage(error.message);
+                        setCanRetry(true);
                         onError?.(error);
                     } else {
                         const wrappedError = new Error(String(error));
                         markError(wrappedError);
+                        setErrorMessage(wrappedError.message);
+                        setCanRetry(true);
                         onError?.(wrappedError);
                     }
                 },
@@ -605,8 +613,9 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             return prev;
         });
 
-        // Reset retry state and resend the message
+        // Reset retry state and clear error message
         setCanRetry(false);
+        setErrorMessage(null);
         await sendMessage(lastUserMessageRef.current);
     }, [canRetry, sendMessage]);
 
@@ -658,6 +667,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         // ────────────────────────────────────────────────────────────────
         retryLastMessage,               // Retry last message
         canRetry,                       // Whether retry is available
+        errorMessage,                   // Error message for display
     };
 }
 

@@ -32,7 +32,91 @@ interface CustomMarkdownProps {
     isUser?: boolean;
 }
 
-export const CustomMarkdown: React.FC<CustomMarkdownProps> = ({
+interface MarkdownErrorBoundaryState {
+    hasError: boolean;
+    error: Error | null;
+}
+
+interface MarkdownErrorBoundaryProps {
+    children: React.ReactNode;
+    fallback: React.ReactNode;
+}
+
+/**
+ * Error Boundary for Markdown rendering
+ * Catches errors during markdown parsing/rendering and shows raw text fallback
+ */
+class MarkdownErrorBoundary extends React.Component<
+    MarkdownErrorBoundaryProps,
+    MarkdownErrorBoundaryState
+> {
+    constructor(props: MarkdownErrorBoundaryProps) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error): MarkdownErrorBoundaryState {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        // Log detailed error info for debugging
+        console.error("[CustomMarkdown] Rendering error:", {
+            error: error.message,
+            stack: error.stack,
+            componentStack: errorInfo.componentStack,
+            timestamp: new Date().toISOString(),
+        });
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return this.props.fallback;
+        }
+        return this.props.children;
+    }
+}
+
+/**
+ * Raw text fallback component shown when markdown rendering fails
+ */
+const MarkdownErrorFallback: React.FC<{ content: string; style?: ViewStyle; isUser?: boolean }> = ({
+    content,
+    style,
+    isUser = false,
+}) => {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createMarkdownStyles(theme), [theme]);
+
+    return (
+        <View style={[styles.container, style]}>
+            <Text style={[styles.text, { fontFamily: "monospace" }]}>
+                {content}
+            </Text>
+            {!isUser && (
+                <View
+                    style={{
+                        marginTop: 8,
+                        padding: 8,
+                        backgroundColor: theme.colors.error + "15",
+                        borderRadius: 4,
+                    }}
+                >
+                    <Text
+                        style={{
+                            color: theme.colors.error,
+                            fontSize: 12,
+                        }}
+                    >
+                        Note: Markdown rendering failed. Showing raw text.
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+};
+
+const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
     content,
     isStreaming = false,
     showCopyAll = true,
@@ -235,5 +319,25 @@ export const CustomMarkdown: React.FC<CustomMarkdownProps> = ({
                 </View>
             )}
         </View>
+    );
+};
+
+/**
+ * Exported CustomMarkdown component wrapped with Error Boundary
+ * Provides graceful degradation to raw text if markdown rendering fails
+ */
+export const CustomMarkdown: React.FC<CustomMarkdownProps> = (props) => {
+    return (
+        <MarkdownErrorBoundary
+            fallback={
+                <MarkdownErrorFallback
+                    content={props.content}
+                    style={props.style}
+                    isUser={props.isUser}
+                />
+            }
+        >
+            <CustomMarkdownInner {...props} />
+        </MarkdownErrorBoundary>
     );
 };

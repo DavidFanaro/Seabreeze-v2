@@ -64,6 +64,7 @@ export default function Chat() {
         currentModel,
         retryLastMessage,
         canRetry,
+        errorMessage,
         cancel,
     } = useChat({ 
         chatId: chatIdParam,
@@ -274,6 +275,7 @@ export default function Chat() {
                      <RetryBanner 
                          canRetry={canRetry}
                          onRetry={retryLastMessage}
+                         errorMessage={errorMessage}
                      />
 
                      {/* ================================================================== */}

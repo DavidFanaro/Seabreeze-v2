@@ -118,6 +118,56 @@ after each iteration and it's included in prompts for context.
 
 ---
 
+## [2026-02-07] - US-004
+
+### What was implemented
+- **Updated** `hooks/chat/useChatStreaming.ts`: Enhanced error logging and partial content preservation
+  - Added structured error logging with provider, model, error type, attempts, timestamp
+  - Logs fallback attempts with "from" and "to" provider details
+  - Preserves partial accumulated content when streams fail (appends error message to partial content)
+  - ~60 lines of additional error handling and logging
+
+- **Updated** `hooks/chat/useChat.ts`: Added error message state management
+  - Added `errorMessage` state to track and display stream errors
+  - Updated `onError` callback to set error message for UI display
+  - Clears error message on reset and successful retry
+  - Added `errorMessage` to `UseChatReturn` interface
+  - ~40 lines of state management additions
+
+- **Updated** `components/chat/RetryBanner.tsx`: Enhanced error display UI
+  - Completely rewritten with better error message display
+  - Shows error details below the "Message failed to send" text
+  - Uses error-themed styling (red colors, warning icon)
+  - Supports optional `errorMessage` prop for detailed feedback
+  - ~120 lines of production-ready component
+
+- **Updated** `app/chat/[id].tsx`: Integrated error message display
+  - Passed `errorMessage` from useChat to RetryBanner component
+  - No breaking changes to existing UI structure
+
+### Files changed
+- `hooks/chat/useChatStreaming.ts` (MODIFIED - +60 lines)
+- `hooks/chat/useChat.ts` (MODIFIED - +40 lines)
+- `components/chat/RetryBanner.tsx` (REWRITTEN - ~120 lines)
+- `app/chat/[id].tsx` (MODIFIED - +1 line)
+
+### Quality checks
+- TypeScript: `npx tsc --noEmit` - Passes (errors in test files are pre-existing, not related to changes)
+- ESLint: `npm run lint` - PASSES ✓
+- Jest tests: Pre-existing tests still pass (test failures are in unrelated files: useErrorRecovery.test.ts, ollama-provider.test.ts)
+
+### **Learnings:**
+- **Pattern: Structured Error Logging**: Use object-based console.error with consistent fields (provider, model, errorType, timestamp) for debugging
+- **Pattern: Partial Content Preservation**: When streams fail, append error message to accumulated content rather than replacing it entirely
+- **Pattern: Error State Management**: Track errorMessage in hook state separate from the error itself for UI display purposes
+- **Pattern: Error Context Passing**: Pass both `canRetry` (boolean) and `errorMessage` (string) to UI components for flexible error display
+- **Gotcha: Error Classification Timing**: Log errors BEFORE attempting fallback to capture original error details before they may be modified
+- **Pattern: Fallback Logging**: Include both "from" and "to" provider in fallback logs to track provider chain behavior
+- **Pattern: Error Banner Styling**: Use `theme.colors.error + "15"` for subtle error backgrounds and `theme.colors.error + "30"` for borders
+- **Gotcha: Text Overflow in Errors**: Use `numberOfLines={2}` with `ellipsizeMode="tail"` for error messages to prevent layout issues
+
+---
+
 ## [2026-02-06] - US-002
 
 ### What was implemented

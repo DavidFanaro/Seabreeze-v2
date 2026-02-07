@@ -1,66 +1,121 @@
 /**
  * @file RetryBanner.tsx
- * @purpose Displays retry option when AI response fails
- * @connects-to useChat (retryLastMessage, canRetry)
+ * @purpose Displays a retry button when the last message fails to send.
+ * Shows error message details and allows the user to retry the failed message.
  */
 
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import { SymbolView } from "expo-symbols";
 import { useTheme } from "@/components/ui/ThemeProvider";
+import { SymbolView } from "expo-symbols";
 
 interface RetryBannerProps {
+    /** Whether the retry button should be shown */
     canRetry: boolean;
+    /** Callback when the user taps the retry button */
     onRetry: () => void;
-    errorMessage?: string;
+    /** Error message to display (optional) */
+    errorMessage?: string | null;
 }
 
-export function RetryBanner({ canRetry, onRetry, errorMessage }: RetryBannerProps) {
+/**
+ * RetryBanner Component
+ *
+ * A non-intrusive banner that appears when a message fails to send.
+ * Provides:
+ * - Visual error indication with warning icon
+ * - Optional error message details
+ * - Retry button to re-send the failed message
+ *
+ * The banner only renders when canRetry is true, keeping the UI clean
+ * during normal operation.
+ *
+ * @example
+ * ```tsx
+ * <RetryBanner
+ *   canRetry={true}
+ *   onRetry={() => retryLastMessage()}
+ *   errorMessage="Network timeout"
+ * />
+ * ```
+ */
+export const RetryBanner: React.FC<RetryBannerProps> = ({
+    canRetry,
+    onRetry,
+    errorMessage,
+}) => {
     const { theme } = useTheme();
-    
-    // Early return: only render banner if retry is available
-    if (!canRetry) return null;
+
+    // Don't render anything if retry is not available
+    if (!canRetry) {
+        return null;
+    }
 
     return (
-        // Main container: error banner with semi-transparent error background
-        // - Horizontal padding (px-4) and vertical padding (py-3) for spacing
-        // - Rounded corners (rounded-md) for visual polish
-        // - Margin (mx-4 mb-2) for positioning relative to parent
-        // - Background uses theme error color at 20% opacity for subtle alert appearance
         <View
-            className="px-4 py-3 rounded-md mx-4 mb-2"
-            style={{ backgroundColor: theme.colors.error + "20" }}
+            className="flex-row items-center justify-between px-4 py-3 mx-4 mb-2 rounded-lg"
+            style={{
+                backgroundColor: theme.colors.error + "15",
+                borderWidth: 1,
+                borderColor: theme.colors.error + "30",
+            }}
+            testID="retry-banner"
         >
-            {/* Content row container: flexbox layout for banner content */}
-            {/* - flex-row: arranges children horizontally */}
-            {/* - items-center: vertically centers all children */}
-            {/* - justify-between: spaces icon and button to opposite ends */}
-            {/* - gap-3: adds consistent spacing between children */}
-            <View className="flex-row items-center justify-between gap-3">
+            <View className="flex-row items-center gap-3 flex-1">
                 {/* Icon section: warning/error indicator */}
-                {/* - Displays exclamation triangle symbol in error color */}
-                {/* - Size 20px provides visual prominence without overwhelming banner */}
-                {/* - Uses theme error color to reinforce error state */}
-                <SymbolView name="exclamationmark.triangle" size={20} tintColor={theme.colors.error} />
-                
-                {/* Retry button: interactive element to retry the failed action */}
-                {/* - TouchableOpacity provides visual feedback on press */}
-                {/* - flex-row items-center: horizontally aligns icon and text */}
-                {/* - gap-1.5: small spacing between retry text and icon */}
-                <TouchableOpacity onPress={onRetry} className="flex-row items-center gap-1.5">
-                    {/* Retry label text */}
-                    {/* - text-[16px]: larger font size for readability */}
-                    {/* - font-semibold: bold weight to emphasize action */}
-                    {/* - Styled with theme accent color to indicate interactive element */}
-                    <Text className="text-[16px] font-semibold" style={{ color: theme.colors.accent }}>Retry</Text>
-                    
-                    {/* Retry action icon: refresh/clockwise arrow */}
-                    {/* - arrow.clockwise: visually communicates retry/refresh action */}
-                    {/* - Size 16px complements the text size */}
-                    {/* - Uses theme accent color for visual consistency with button text */}
-                    <SymbolView name="arrow.clockwise" size={16} tintColor={theme.colors.accent} />
-                </TouchableOpacity>
+                <SymbolView
+                    name="exclamationmark.triangle"
+                    size={20}
+                    tintColor={theme.colors.error}
+                />
+
+                {/* Text section: error description */}
+                <View className="flex-1">
+                    <Text style={{ color: theme.colors.text }}>
+                        Message failed to send
+                    </Text>
+                    {errorMessage && (
+                        <Text
+                            style={{
+                                color: theme.colors.textSecondary,
+                                fontSize: 12,
+                                marginTop: 2,
+                            }}
+                            numberOfLines={2}
+                            ellipsizeMode="tail"
+                        >
+                            {errorMessage}
+                        </Text>
+                    )}
+                </View>
             </View>
+
+            {/* Retry button */}
+            <TouchableOpacity
+                onPress={onRetry}
+                className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-md"
+                style={{
+                    backgroundColor: theme.colors.error + "25",
+                }}
+                testID="retry-button"
+            >
+                <SymbolView
+                    name="arrow.clockwise"
+                    size={14}
+                    tintColor={theme.colors.error}
+                />
+                <Text
+                    style={{
+                        color: theme.colors.error,
+                        fontWeight: "600",
+                        fontSize: 14,
+                    }}
+                >
+                    Retry
+                </Text>
+            </TouchableOpacity>
         </View>
     );
-}
+};
+
+export default RetryBanner;
