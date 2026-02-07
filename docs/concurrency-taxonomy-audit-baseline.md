@@ -130,3 +130,22 @@ These requirements are mandatory before closing remediation for any entry in a c
 - This inventory is an audit baseline, not a final defect verdict.
 - Entries are prioritized for remediation planning in subsequent user stories.
 - Severity/reproducibility values should be updated after deterministic repro harnesses are added.
+
+## Closure Verification Snapshot (US-012)
+
+Date: 2026-02-07
+
+| ID | Closure Status | Verification Notes |
+| --- | --- | --- |
+| RC-001 | Fixed | Covered by chat orchestration mutation-gate and retry-idempotency regressions in `hooks/chat/__tests__/useChat.test.ts`. |
+| RC-002 | Fixed | Covered by latest-token/stale-callback rejection in chat stream suites and concurrency primitive tests. |
+| RC-003 | Fixed | Covered by deterministic stale chunk/error ordering guards in `hooks/chat/__tests__/useChatStreaming.test.ts`. |
+| RC-004 | Fixed | Covered by fallback-order/no-duplication regressions in `providers/__tests__/fallback-chain.test.ts` and chat retry/fallback suites. |
+| RC-005 | Fixed | Covered by hydration-write precedence and dependency sequencing in `stores/__tests__/hydrationGuards.test.ts`. |
+| RC-006 | Fixed | Covered by cancel/abort mutation-blocking regressions across chat + retry + concurrency suites. |
+| RC-007 | Fixed | Covered by serialized persistence + dedupe boundary tests in `hooks/__tests__/useMessagePersistence.test.ts`. |
+| RC-008 | Fixed | Covered by stale-write isolation/supersession checks in persistence + concurrency regression suites. |
+| RC-009 | Fixed | Covered by provider cache contention/dedupe tests in `providers/__tests__/provider-cache.test.ts`. |
+| RC-010 | Fixed | Covered by retry-state cancellation selector invariants in `hooks/__tests__/useErrorRecovery.test.ts`. |
+
+Reference report: `docs/concurrency-initiative-closure-report.md`.

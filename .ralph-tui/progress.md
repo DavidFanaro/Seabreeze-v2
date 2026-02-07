@@ -18,6 +18,7 @@ after each iteration and it's included in prompts for context.
 - For regression closure across subsystems, map each taxonomy race class to at least one deterministic suite (deferred/barrier/fake-timer controlled) and keep a representative matrix spanning hooks/chat, providers, stores, DB persistence, and shared concurrency utilities.
 - For stress-style race surfacing, use seeded prerequisite-aware operation scheduling (instead of wall-clock timing) and convert any failing seed/order into a fixed `regression:` test with invariant assertions.
 - For critical-module docs, record each invariant as a triad: invariant statement, guarding code paths, and deterministic regression tests; this keeps async refactors reviewable and evidence-backed.
+- For final initiative closure, maintain a living RC-ID evidence matrix (`inventory issue -> guard path -> deterministic tests -> invariant anchor`) and run global quality gates in the same pass so closure state is auditable from one artifact.
 
 ---
 
@@ -230,4 +231,20 @@ after each iteration and it's included in prompts for context.
     - Invariant docs stay actionable when each item is anchored to both the code-level guard seam and at least one deterministic regression test title.
   - Gotchas encountered
     - Discoverability should be wired into contributor workflow docs, not only placed inside `docs/`, or invariants get bypassed during routine refactors.
+---
+
+## 2026-02-07 - US-012
+- What was implemented
+  - Added formal closure artifact `docs/concurrency-initiative-closure-report.md` with checklist status, RC-001..RC-010 fixed mapping, and explicit links from inventory issues to deterministic tests and invariant documentation.
+  - Updated `docs/concurrency-taxonomy-audit-baseline.md` with a US-012 closure verification snapshot marking all tracked inventory IDs as Fixed and pointing to representative regression evidence.
+  - Executed quality gates for closure verification: `npm run lint` (pass), `npx tsc --noEmit` (fails on pre-existing baseline TypeScript issues), and `npm test -- --watchAll=false` (fails on pre-existing baseline Jest suite issues).
+- Files changed
+  - `docs/concurrency-initiative-closure-report.md`
+  - `docs/concurrency-taxonomy-audit-baseline.md`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - A single closure report that co-locates checklist status, race-inventory closure mapping, and command-gate outcomes is the most durable handoff artifact for initiative sign-off.
+  - Gotchas encountered
+    - Story-level closure evidence can be complete while repository-wide type/test baselines remain red from unrelated legacy debt; reports must separate race-hardening closure from global CI health.
 ---
