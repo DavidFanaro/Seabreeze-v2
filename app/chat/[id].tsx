@@ -5,7 +5,7 @@ import { useChatState } from "@/hooks/useChatState";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useMessagePersistence } from "@/hooks/useMessagePersistence";
 import { eq } from "drizzle-orm";
-import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Platform, View } from "react-native";
 import { KeyboardAvoidingView, KeyboardStickyView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
@@ -116,29 +116,6 @@ export default function Chat() {
     const sendChatMessages = useCallback(async () => {
         await sendMessage();
     }, [sendMessage]);
-
-    // Update title in database when title changes (only when screen is focused)
-    useFocusEffect(
-        useCallback(() => {
-            if (isInitializing || (chatIdParam !== "new" && chatID === 0)) return;
-            let isActive = true;
-            const updateTitle = async () => {
-                if (!isActive) return;
-                // Only update if we have a valid chat ID and a non-default title
-                // Note: Main message save is handled by useMessagePersistence hook
-                if (chatID !== 0 && title && title !== "Chat") {
-                    await db
-                        .update(chat)
-                        .set({ title: title, updatedAt: new Date() })
-                        .where(eq(chat.id, chatID));
-                }
-            };
-            updateTitle();
-            return () => {
-                isActive = false;
-            };
-        }, [title, chatID, db, isInitializing, chatIdParam])
-    );
 
     // Sync chatID with lastSavedChatId when persistence succeeds for new chats
     useEffect(() => {

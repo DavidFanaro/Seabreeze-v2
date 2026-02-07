@@ -13,6 +13,7 @@ after each iteration and it's included in prompts for context.
 - For retry UX, persist a retryable logical operation key on failure and run retry cleanup/send through an in-flight idempotency registry keyed by that operation so rapid taps collapse into one execution.
 - For fallback chains, keep retries inside the same send token and pass explicit `nextProvider`/`nextModel` metadata back to the orchestrator so fallback attempts reuse the same assistant slot instead of recursively starting a new send.
 - For persisted Zustand stores, include a monotonic `writeVersion` metadata field and a custom `persist.merge` that keeps runtime state when `persisted.writeVersion < runtime.writeVersion`; use `partialize` to persist only `writeVersion` from metadata.
+- For critical DB write paths, build a deterministic persistence snapshot key and route writes through a single serialized queue plus a key-scoped in-flight idempotency registry; keep authoritative record identity in a mutable ref so queued post-insert writes promote to update instead of issuing duplicate inserts.
 
 ---
 
@@ -139,4 +140,23 @@ after each iteration and it's included in prompts for context.
   - Gotchas encountered
     - Recursive fallback retries in the orchestrator can accidentally enqueue duplicate user/assistant entries even when per-chunk mutation guards exist; retries must stay inside the original send transaction.
     - Repository-wide `npx tsc --noEmit` and `npm test` still fail because of unrelated pre-existing issues in other suites/files, so story-level verification required targeted tests for modified modules.
+---
+
+## 2026-02-06 - US-007
+- What was implemented
+  - Serialized critical chat persistence writes inside `useMessagePersistence` by introducing snapshot-based deduplication, key-scoped in-flight idempotency, and a single FIFO write queue so overlapping save triggers cannot race each other.
+  - Eliminated duplicate-new-chat insert races by promoting post-insert queued writes to updates via an authoritative `activeChatIdRef` and by persisting title/provider/model/message/thinking state in one atomic save path.
+  - Removed competing title-only DB writes from `app/chat/[id].tsx` so persistence boundary logic is centralized in the serialized hook path.
+  - Added concurrency tests covering duplicate concurrent save requests and interrupted/superseding save sequencing to verify dedupe and ordered write behavior.
+- Files changed
+  - `hooks/useMessagePersistence.ts`
+  - `app/chat/[id].tsx`
+  - `hooks/__tests__/useMessagePersistence.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Persistence-level dedupe is most reliable when the key includes the full logical record payload (title/provider/model/messages/thinking output) rather than only message content.
+    - Serializing writes with a queue and retaining resolved row identity in a ref closes the common "double insert before first ID returns" race in new-record flows.
+  - Gotchas encountered
+    - Full-repo `npx tsc --noEmit` and `npm test -- --watchAll=false` remain red from unrelated baseline issues (existing `useErrorRecovery`/`ollama-provider` typing failures and multiple UI test expectation mismatches), so US-007 validation relied on targeted persistence tests in addition to the required global command attempts.
 ---

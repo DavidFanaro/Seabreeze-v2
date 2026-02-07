@@ -27,6 +27,7 @@ import { getHumanReadableError } from "@/lib/error-messages";
 import type { StreamState } from "./chat/useStreamLifecycle";
 import type { ProviderId } from "@/types/provider.types";
 import type { ErrorCategory } from "@/providers/fallback-chain";
+import { createIdempotencyKey, createIdempotencyRegistry } from "@/lib/concurrency";
 import { chat } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -133,6 +134,24 @@ function formatSaveError(error: unknown): string {
   return "Failed to save chat. Please try again.";
 }
 
+interface SaveSnapshot {
+  key: string;
+  messages: ModelMessage[];
+  thinkingOutput: string[];
+  title: string | null;
+  providerId: ProviderId;
+  modelId: string;
+}
+
+function normalizeTitle(rawTitle: string): string | null {
+  const trimmedTitle = rawTitle.trim();
+  if (!trimmedTitle || trimmedTitle === "Chat") {
+    return null;
+  }
+
+  return trimmedTitle;
+}
+
 // =============================================================================
 // MAIN HOOK IMPLEMENTATION
 // =============================================================================
@@ -180,7 +199,10 @@ export function useMessagePersistence(
   const isMountedRef = useRef(true);
   const pendingSaveRef = useRef<Promise<void> | null>(null);
   const hasCompletedStreamRef = useRef(false);
-  const lastSavedMessagesRef = useRef<string>("");
+  const lastPersistedSnapshotKeyRef = useRef<string | null>(null);
+  const activeChatIdRef = useRef<number | null>(null);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveRegistryRef = useRef(createIdempotencyRegistry<void>());
 
   // ===========================================================================
   // DATABASE ACCESS
@@ -195,22 +217,46 @@ export function useMessagePersistence(
   /**
    * Execute the actual database save operation
    */
-  const executeSave = useCallback(async (): Promise<SaveResult> => {
+  const createSnapshot = useCallback((): SaveSnapshot => {
+    const titleForPersistence = normalizeTitle(title);
+    const thinkingJson = JSON.stringify(thinkingOutput);
+    const messagesJson = JSON.stringify(messages);
+    const chatIdentity = activeChatIdRef.current ?? chatIdParam;
+
+    return {
+      key: createIdempotencyKey("chat-persistence", [
+        chatIdentity,
+        titleForPersistence ?? "",
+        providerId,
+        modelId,
+        messagesJson,
+        thinkingJson,
+      ]),
+      messages,
+      thinkingOutput,
+      title: titleForPersistence,
+      providerId,
+      modelId,
+    };
+  }, [chatIdParam, messages, modelId, providerId, thinkingOutput, title]);
+
+  const executeSave = useCallback(async (snapshot: SaveSnapshot): Promise<SaveResult> => {
     const now = new Date();
+    const resolvedChatId = activeChatIdRef.current ?? (chatIdParam === "new" ? null : Number(chatIdParam));
 
     // Determine if this is a new chat or an update
-    const isNewChat = chatIdParam === "new" || lastSavedChatId === null;
+    const isNewChat = resolvedChatId === null || Number.isNaN(resolvedChatId);
 
     if (isNewChat) {
       // Insert new chat
       const result = await db
         .insert(chat)
         .values({
-          messages: messages,
-          thinkingOutput: thinkingOutput,
-          title: title === "Chat" ? null : title,
-          providerId: providerId,
-          modelId: modelId,
+          messages: snapshot.messages,
+          thinkingOutput: snapshot.thinkingOutput,
+          title: snapshot.title,
+          providerId: snapshot.providerId,
+          modelId: snapshot.modelId,
           providerMetadata: {},
           createdAt: now,
           updatedAt: now,
@@ -221,6 +267,8 @@ export function useMessagePersistence(
         throw new Error("Failed to insert new chat - no ID returned");
       }
 
+      activeChatIdRef.current = result[0].id;
+
       return {
         success: true,
         chatId: result[0].id,
@@ -228,7 +276,7 @@ export function useMessagePersistence(
       };
     } else {
       // Update existing chat
-      const chatId = lastSavedChatId ?? parseInt(chatIdParam, 10);
+      const chatId = resolvedChatId;
 
       if (isNaN(chatId)) {
         throw new Error(`Invalid chat ID: ${chatIdParam}`);
@@ -237,10 +285,11 @@ export function useMessagePersistence(
       await db
         .update(chat)
         .set({
-          messages: messages,
-          thinkingOutput: thinkingOutput,
-          providerId: providerId,
-          modelId: modelId,
+          messages: snapshot.messages,
+          thinkingOutput: snapshot.thinkingOutput,
+          title: snapshot.title,
+          providerId: snapshot.providerId,
+          modelId: snapshot.modelId,
           updatedAt: now,
         })
         .where(eq(chat.id, chatId));
@@ -251,20 +300,19 @@ export function useMessagePersistence(
         attempts: 1,
       };
     }
-  }, [db, chatIdParam, messages, thinkingOutput, title, providerId, modelId, lastSavedChatId]);
+  }, [db, chatIdParam]);
 
   /**
    * Save with retry logic
    */
-  const saveWithRetry = useCallback(async (): Promise<void> => {
+  const saveWithRetry = useCallback(async (snapshot: SaveSnapshot): Promise<void> => {
     if (!isMountedRef.current) return;
 
     // Don't save if no messages
-    if (messages.length === 0) return;
+    if (snapshot.messages.length === 0) return;
 
-    // Don't save if messages haven't changed
-    const messagesJson = JSON.stringify(messages);
-    if (messagesJson === lastSavedMessagesRef.current && saveStatus === "saved") {
+    // Don't save if this snapshot is already persisted
+    if (snapshot.key === lastPersistedSnapshotKeyRef.current) {
       return;
     }
 
@@ -273,7 +321,7 @@ export function useMessagePersistence(
 
     try {
       const result = await executeWithRetry(
-        executeSave,
+        () => executeSave(snapshot),
         SAVE_RETRY_CONFIG,
         (attemptNumber, delay) => {
           if (isMountedRef.current) {
@@ -293,7 +341,8 @@ export function useMessagePersistence(
         setSaveStatus("saved");
         setSaveAttempts(result.attempts);
         setLastSavedChatId(result.data.chatId);
-        lastSavedMessagesRef.current = messagesJson;
+        activeChatIdRef.current = result.data.chatId;
+        lastPersistedSnapshotKeyRef.current = snapshot.key;
         onSaveComplete?.(result.data.chatId);
       } else {
         // Save failed after retries
@@ -316,26 +365,35 @@ export function useMessagePersistence(
     }
   }, [
     executeSave,
-    messages,
     saveAttempts,
-    saveStatus,
     onSaveComplete,
     onSaveError,
   ]);
+
+  const runSerializedSave = useCallback(
+    (snapshot: SaveSnapshot): Promise<void> => {
+      if (snapshot.key === lastPersistedSnapshotKeyRef.current) {
+        return Promise.resolve();
+      }
+
+      return saveRegistryRef.current.run(snapshot.key, async () => {
+        const queuedSave = writeQueueRef.current.then(() => saveWithRetry(snapshot));
+        writeQueueRef.current = queuedSave.catch(() => undefined);
+        await queuedSave;
+      });
+    },
+    [saveWithRetry]
+  );
 
   /**
    * Trigger a manual save
    */
   const triggerSave = useCallback(async (): Promise<void> => {
-    if (pendingSaveRef.current) {
-      // Wait for pending save to complete
-      await pendingSaveRef.current;
-    }
-
-    pendingSaveRef.current = saveWithRetry();
+    const snapshot = createSnapshot();
+    pendingSaveRef.current = runSerializedSave(snapshot);
     await pendingSaveRef.current;
     pendingSaveRef.current = null;
-  }, [saveWithRetry]);
+  }, [createSnapshot, runSerializedSave]);
 
   /**
    * Clear error state
@@ -363,14 +421,14 @@ export function useMessagePersistence(
       setSaveStatus("queued");
 
       // Execute save
-      pendingSaveRef.current = saveWithRetry();
+      pendingSaveRef.current = runSerializedSave(createSnapshot());
     }
 
     // Reset completion flag when stream starts again
     if (streamState === "streaming") {
       hasCompletedStreamRef.current = false;
     }
-  }, [streamState, enabled, saveWithRetry]);
+  }, [streamState, enabled, createSnapshot, runSerializedSave]);
 
   // ===========================================================================
   // MESSAGES CHANGE MONITORING
@@ -384,19 +442,41 @@ export function useMessagePersistence(
     if (streamState !== "completed" && streamState !== "idle") return;
     if (messages.length === 0) return;
 
-    // Only save if messages changed and we haven't saved this version
-    const messagesJson = JSON.stringify(messages);
-    if (messagesJson !== lastSavedMessagesRef.current) {
-      // Messages changed, trigger a save
-      const timeoutId = setTimeout(() => {
-        if (isMountedRef.current) {
-          pendingSaveRef.current = saveWithRetry();
-        }
-      }, 100); // Small debounce
-
-      return () => clearTimeout(timeoutId);
+    const nextSnapshot = createSnapshot();
+    if (nextSnapshot.key === lastPersistedSnapshotKeyRef.current) {
+      return;
     }
-  }, [messages, thinkingOutput, streamState, enabled, saveWithRetry]);
+
+    const timeoutId = setTimeout(() => {
+      if (isMountedRef.current) {
+        pendingSaveRef.current = runSerializedSave(nextSnapshot);
+      }
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [messages, thinkingOutput, title, providerId, modelId, streamState, enabled, createSnapshot, runSerializedSave]);
+
+  useEffect(() => {
+    hasCompletedStreamRef.current = false;
+    lastPersistedSnapshotKeyRef.current = null;
+    saveRegistryRef.current.clear();
+
+    if (chatIdParam === "new") {
+      activeChatIdRef.current = null;
+      setLastSavedChatId(null);
+      return;
+    }
+
+    const numericChatId = Number(chatIdParam);
+    if (Number.isNaN(numericChatId)) {
+      activeChatIdRef.current = null;
+      setLastSavedChatId(null);
+      return;
+    }
+
+    activeChatIdRef.current = numericChatId;
+    setLastSavedChatId(numericChatId);
+  }, [chatIdParam]);
 
   // ===========================================================================
   // CLEANUP
