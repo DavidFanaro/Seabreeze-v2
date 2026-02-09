@@ -9,6 +9,7 @@ after each iteration and it's included in prompts for context.
 
 - Per-chat persistence orchestration pattern (`hooks/useMessagePersistence.ts`): build deterministic snapshot key via `createIdempotencyKey`, dedupe in-flight saves with `createIdempotencyRegistry`, serialize writes with `writeQueueRef` promise chaining, and promote queued post-insert saves to update using `activeChatIdRef` once insert returns the canonical chat ID.
 - Chat-switch stale result guard pattern (`hooks/useMessagePersistence.ts`): stamp each snapshot with `chatScope` (`chatIdParam` at snapshot creation) and ignore completion/error state updates when the snapshot scope no longer matches `activeChatScopeRef`, preventing late writes from prior chats from mutating the current chat UI state.
+- Deterministic hydration guard pattern (`app/chat/[id].tsx`): start each chat-load attempt with `createSequenceGuard("chat-hydration")` token, reject stale post-await continuations via `isCurrent(token)`, normalize DB payloads into one immutable snapshot, then commit related state updates in one `unstable_batchedUpdates` block so metadata + messages hydrate atomically.
 
 ---
 
@@ -44,4 +45,21 @@ after each iteration and it's included in prompts for context.
     - Explicitly resetting queue/error refs on chat changes keeps per-chat ordering deterministic while avoiding stale UI status bleed into the next chat session.
   - Gotchas encountered
     - Repository-wide `npx tsc --noEmit` and `npm run lint` still fail due pre-existing unrelated issues (e.g. `app/index.tsx`, `hooks/__tests__/useErrorRecovery.test.ts`, `providers/__tests__/ollama-provider.test.ts`, `components/chat/__tests__/MessageList.test.tsx`), so full acceptance checks cannot be green from US-002 changes alone.
+---
+
+## 2026-02-09 - US-003
+- What was implemented
+  - Hardened `app/chat/[id].tsx` hydration flow to load existing chats through a deterministic guard token (`createSequenceGuard`) so stale async loads cannot mutate current chat state after navigation changes.
+  - Added snapshot normalization for DB payloads (`messages`, `thinkingOutput`, `title`) and idempotent hydration signature checks to avoid replaying stale/equivalent hydrations.
+  - Committed hydration state atomically using `unstable_batchedUpdates` for reset + apply paths, ensuring metadata and message history become visible together as one consistent snapshot.
+  - Added recoverable hydration failure UX: invalid IDs and DB-read failures now set explicit hydration errors, reset to safe empty state, unblock initialization, and expose a retry path through `RetryBanner`.
+- Files changed
+  - `app/chat/[id].tsx`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Route-driven hydration is safest when it mirrors persistence guards: tokenized load attempts + stale-result rejection + atomic state commit prevent partial/stale UI snapshots.
+    - Reusing existing retry surfaces (here `RetryBanner`) for hydration failures gives a low-friction recovery path without introducing another transient-error component.
+  - Gotchas encountered
+    - Repository-wide `npx tsc --noEmit` and `npm run lint` still fail on pre-existing unrelated files (same baseline issues, plus lint error in `components/chat/__tests__/MessageList.test.tsx`), so acceptance checks remain blocked outside US-003 scope.
 ---

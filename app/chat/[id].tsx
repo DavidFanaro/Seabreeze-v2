@@ -7,7 +7,7 @@ import { useMessagePersistence } from "@/hooks/useMessagePersistence";
 import { eq } from "drizzle-orm";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { Platform, View } from "react-native";
+import { Platform, View, unstable_batchedUpdates } from "react-native";
 import { KeyboardAvoidingView, KeyboardStickyView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated";
@@ -15,6 +15,7 @@ import { ModelMessage } from "ai";
 import { MessageList, MessageInput, useTheme, ChatContextMenu, RetryBanner } from "@/components";
 import { SaveErrorBanner } from "@/components/chat/SaveErrorBanner";
 import { StreamControlBanner } from "@/components/chat/StreamControlBanner";
+import { createIdempotencyKey, createSequenceGuard } from "@/lib/concurrency";
 import { ProviderId } from "@/types/provider.types";
 
 export default function Chat() {
@@ -41,7 +42,10 @@ export default function Chat() {
     // Local state only for database ID (not provider/model)
     const [chatID, setChatID] = useState(0);
     const [isInitializing, setIsInitializing] = useState(false);
-    const loadIdRef = useRef(0);
+    const [hydrationError, setHydrationError] = useState<string | null>(null);
+    const [hydrationAttempt, setHydrationAttempt] = useState(0);
+    const hydrationGuardRef = useRef(createSequenceGuard("chat-hydration"));
+    const lastHydratedSignatureRef = useRef<string | null>(null);
     const currentChatIdRef = useRef<string | null>(null);
     
     // Initialize useChat with chatId for unified state management
@@ -117,6 +121,48 @@ export default function Chat() {
         await sendMessage();
     }, [sendMessage]);
 
+    const resetHydratedState = useCallback((nextChatScope: string | null) => {
+        unstable_batchedUpdates(() => {
+            setMessages([]);
+            setThinkingOutput([]);
+            setTitle("Chat");
+            setText("");
+            setChatID(0);
+        });
+        clearOverride();
+        currentChatIdRef.current = nextChatScope;
+        lastHydratedSignatureRef.current = null;
+    }, [setMessages, setThinkingOutput, setTitle, setText, clearOverride]);
+
+    const applyHydrationSnapshot = useCallback((snapshot: {
+        signature: string;
+        chatScope: string;
+        chatId: number;
+        messages: ModelMessage[];
+        thinkingOutput: string[];
+        title: string;
+        providerId: ProviderId | null;
+        modelId: string | null;
+    }) => {
+        if (snapshot.signature === lastHydratedSignatureRef.current) {
+            return;
+        }
+
+        unstable_batchedUpdates(() => {
+            setMessages(snapshot.messages);
+            setThinkingOutput(snapshot.thinkingOutput);
+            setTitle(snapshot.title);
+            setChatID(snapshot.chatId);
+            setHydrationError(null);
+        });
+        currentChatIdRef.current = snapshot.chatScope;
+        lastHydratedSignatureRef.current = snapshot.signature;
+
+        if (snapshot.providerId && snapshot.modelId) {
+            syncFromDatabase(snapshot.providerId, snapshot.modelId);
+        }
+    }, [setMessages, setThinkingOutput, setTitle, syncFromDatabase]);
+
     // Sync chatID with lastSavedChatId when persistence succeeds for new chats
     useEffect(() => {
         if (lastSavedChatId && chatID === 0) {
@@ -130,21 +176,54 @@ export default function Chat() {
             return;
         }
         setIsInitializing(true);
-        setMessages([]);
-        setThinkingOutput([]);
-        setTitle("Chat");
-        setText("");
-        setChatID(0);
-        clearOverride();
-    }, [chatIdParam, setMessages, setThinkingOutput, setTitle, setText, clearOverride]);
+        setHydrationError(null);
+        resetHydratedState(null);
+    }, [chatIdParam, resetHydratedState]);
 
     // Load existing chat data
     useEffect(() => {
-        const loadId = loadIdRef.current + 1;
-        loadIdRef.current = loadId;
+        const token = hydrationGuardRef.current.next();
+
+        const normalizeMessages = (value: unknown): ModelMessage[] => {
+            if (!Array.isArray(value)) {
+                return [];
+            }
+
+            return value
+                .filter((message): message is ModelMessage => (
+                    typeof message === "object"
+                    && message !== null
+                    && "role" in message
+                    && "content" in message
+                    && typeof (message as { role?: unknown }).role === "string"
+                ))
+                .map((message) => ({
+                    ...message,
+                }));
+        };
+
+        const normalizeThinkingOutput = (value: unknown): string[] => {
+            if (!Array.isArray(value)) {
+                return [];
+            }
+
+            return value.filter((entry): entry is string => typeof entry === "string");
+        };
+
         const setupChat = async () => {
             if (chatIdParam !== "new") {
                 const id = Number(chatIdParam);
+                if (Number.isNaN(id)) {
+                    if (!hydrationGuardRef.current.isCurrent(token)) {
+                        return;
+                    }
+
+                    setHydrationError("Invalid chat id. Please reopen from chat history.");
+                    resetHydratedState(null);
+                    setIsInitializing(false);
+                    return;
+                }
+
                 try {
                     const data = await db
                         .select()
@@ -152,50 +231,65 @@ export default function Chat() {
                         .where(eq(chat.id, id))
                         .get();
 
-                    if (loadId !== loadIdRef.current) return;
+                    if (!hydrationGuardRef.current.isCurrent(token)) return;
 
                     if (data) {
-                        const messages = data.messages as ModelMessage[];
-                        const thinkingOutput = Array.isArray(data.thinkingOutput)
-                            ? (data.thinkingOutput as string[])
-                            : [];
-                        setMessages(messages);
-                        setThinkingOutput(thinkingOutput);
-                        setTitle(data.title as string);
-                        setChatID(id);
-                        currentChatIdRef.current = chatIdParam;
+                        const messages = normalizeMessages(data.messages);
+                        const thinkingOutput = normalizeThinkingOutput(data.thinkingOutput);
+                        const title = typeof data.title === "string" && data.title.trim().length > 0
+                            ? data.title
+                            : "Chat";
 
-                        // Sync provider/model from database to unified state
-                        if (data.providerId && data.modelId) {
-                            syncFromDatabase(
-                                data.providerId as ProviderId,
-                                data.modelId
-                            );
-                        }
+                        const signature = createIdempotencyKey("chat-hydration", [
+                            chatIdParam,
+                            String(data.updatedAt?.toISOString?.() ?? ""),
+                            JSON.stringify(messages),
+                            JSON.stringify(thinkingOutput),
+                            title,
+                            String(data.providerId ?? ""),
+                            String(data.modelId ?? ""),
+                        ]);
+
+                        applyHydrationSnapshot({
+                            signature,
+                            chatScope: chatIdParam,
+                            chatId: id,
+                            messages,
+                            thinkingOutput,
+                            title,
+                            providerId: (data.providerId as ProviderId | null) ?? null,
+                            modelId: data.modelId,
+                        });
                     } else {
-                        setMessages([]);
-                        setThinkingOutput([]);
-                        setTitle("Chat");
-                        setChatID(0);
-                        clearOverride();
-                        currentChatIdRef.current = null;
+                        resetHydratedState(null);
                     }
                 } catch {
-                    // Error handling for failed chat loading
+                    if (!hydrationGuardRef.current.isCurrent(token)) {
+                        return;
+                    }
+
+                    resetHydratedState(null);
+                    setHydrationError("Unable to hydrate this chat right now. You can keep using a new chat and try reopening this conversation.");
                 } finally {
-                    if (loadId === loadIdRef.current) {
+                    if (hydrationGuardRef.current.isCurrent(token)) {
                         setIsInitializing(false);
                     }
                 }
             } else {
+                if (!hydrationGuardRef.current.isCurrent(token)) {
+                    return;
+                }
+
                 currentChatIdRef.current = "new";
+                setHydrationError(null);
+                lastHydratedSignatureRef.current = null;
                 setThinkingOutput([]);
                 setIsInitializing(false);
             }
         };
         setupChat();
         // Only run when params.id changes to load a different chat
-    }, [chatIdParam, db, setMessages, setThinkingOutput, setTitle, syncFromDatabase, clearOverride]);
+    }, [chatIdParam, db, setThinkingOutput, applyHydrationSnapshot, hydrationAttempt, resetHydratedState]);
 
      return (
          <>
@@ -250,10 +344,10 @@ export default function Chat() {
                      {/* Shows retry button when last message fails, allows re-sending failed msg */}
                      {/* ================================================================== */}
                      <RetryBanner 
-                         canRetry={canRetry}
-                         onRetry={retryLastMessage}
-                         errorMessage={errorMessage}
-                     />
+                          canRetry={canRetry || !!hydrationError}
+                          onRetry={hydrationError ? (() => setHydrationAttempt((attempt) => attempt + 1)) : retryLastMessage}
+                          errorMessage={hydrationError ?? errorMessage}
+                      />
 
                      {/* ================================================================== */}
                      {/* STREAM CONTROL BANNER SECTION */}
