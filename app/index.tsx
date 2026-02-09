@@ -18,6 +18,12 @@ import {
 import { ModelMessage } from "ai";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { SymbolView } from "expo-symbols";
+import {
+  failPersistenceOperation,
+  startPersistenceOperation,
+  succeedPersistenceOperation,
+  type PersistenceOperationContext,
+} from "@/lib/persistence-telemetry";
 
 interface ChatListRow {
   id: number;
@@ -160,6 +166,7 @@ export default function Home() {
   const [refreshError, setRefreshError] = React.useState<string | null>(null);
   const [deletingIds, setDeletingIds] = React.useState<Set<number>>(new Set());
   const createNavigationRegistryRef = React.useRef(createIdempotencyRegistry<void>());
+  const listQueryOperationRef = React.useRef<PersistenceOperationContext | null>(null);
 
   // Live query: Fetches all chats ordered by most recently updated
   // Automatically re-renders when chat data changes
@@ -245,6 +252,38 @@ export default function Home() {
 
     return chatsQuery.data.length - chatRows.length;
   }, [chatRows.length, chatsQuery.data]);
+
+  React.useEffect(() => {
+    listQueryOperationRef.current = startPersistenceOperation("list", {
+      refreshNonce,
+      isScreenFocused,
+    });
+  }, [refreshNonce, isScreenFocused]);
+
+  React.useEffect(() => {
+    const operation = listQueryOperationRef.current;
+    if (!operation) {
+      return;
+    }
+
+    if (chatsQuery.error) {
+      failPersistenceOperation(operation, chatsQuery.error, {
+        refreshNonce,
+      });
+      listQueryOperationRef.current = null;
+      return;
+    }
+
+    if (Array.isArray(chatsQuery.data)) {
+      succeedPersistenceOperation(operation, {
+        refreshNonce,
+        rowCount: chatsQuery.data.length,
+        normalizedRowCount: chatRows.length,
+        droppedRowCount,
+      });
+      listQueryOperationRef.current = null;
+    }
+  }, [chatRows.length, chatsQuery.data, chatsQuery.error, droppedRowCount, refreshNonce]);
 
   const handleRefresh = React.useCallback(async () => {
     setIsRefreshing(true);

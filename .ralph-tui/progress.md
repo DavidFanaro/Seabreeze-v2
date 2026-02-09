@@ -15,6 +15,7 @@ after each iteration and it's included in prompts for context.
 - Title sentinel normalization pattern (`lib/chat-title.ts`): keep `"Chat"` as an internal/default sentinel, map it to `null` at persistence boundaries (`normalizeTitleForPersistence`) and to an explicit UX fallback label at render boundaries (`getChatTitleForDisplay`) so failed auto-title generation never blocks chat flows and untitled chats stay rename-safe.
 - Additive migration safety pattern (`drizzle/__tests__/schemaCompatibility.test.ts`): treat migration SQL as a pre-release contract by scanning every journaled migration for destructive statements and asserting each statement matches additive forms only, then compare legacy/current snapshots to guarantee original chat columns remain readable after upgrade.
 - Shared chat flow lock pattern (`lib/chat-persistence-coordinator.ts`): serialize list-level operations with `runListOperation`, serialize per-chat checkpoint/delete mutations with `runChatOperation`, and guard open/checkpoint writes during delete windows via `acquireChatDeleteLock` + `isChatDeleteLocked`.
+- Structured persistence telemetry wrapper pattern (`lib/persistence-telemetry.ts`): model each operation as a started/succeeded/failed lifecycle with one generated `correlationId`, always emit `errorClassification` (`"none"` for non-failures), and centralize success/failure counters plus latency histogram bucket updates in shared helpers to keep instrumentation consistent across hooks/screens.
 
 ---
 
@@ -171,7 +172,30 @@ after each iteration and it's included in prompts for context.
   - Patterns discovered
     - Unifying list/open/delete sequencing and persistence checkpoint sequencing behind a shared coordinator removes cross-surface race windows that per-hook local queues cannot see.
     - Delete-lock checks are a practical defensive guard for unknown race windows: no-oping stale open/checkpoint writes during active delete avoids inconsistent UI/database recovery paths.
+- Gotchas encountered
+  - `components/chat/__tests__/ChatListItem.test.tsx` appears to have existing test-environment instability around gesture-handler swipeable rendering; US-008 regression verification was anchored in deterministic coordinator/persistence tests instead.
+  - Repository-wide `npx tsc --noEmit` remains blocked by pre-existing type errors outside US-008 scope.
+---
+
+## 2026-02-09 - US-009
+- What was implemented
+  - Added a shared telemetry module (`lib/persistence-telemetry.ts`) for persistence operation lifecycles that emits structured started/succeeded/failed events with `correlationId`, `errorClassification`, operation metadata, and latency.
+  - Wired save telemetry into `useMessagePersistence` so each save attempt emits structured events and records success/failure counters plus latency histogram buckets.
+  - Wired load telemetry into `app/chat/[id].tsx` hydration flow (including invalid ID and DB-read failure paths).
+  - Wired list telemetry into `app/index.tsx` list-query lifecycle so refresh/initial list fetches emit started/succeeded/failed events with row-count metadata.
+  - Wired title-generation and manual-rename telemetry into `hooks/chat/useTitleGeneration.ts` for both retry and non-retry paths.
+- Files changed
+  - `lib/persistence-telemetry.ts`
+  - `hooks/useMessagePersistence.ts`
+  - `app/chat/[id].tsx`
+  - `app/index.tsx`
+  - `hooks/chat/useTitleGeneration.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Keeping telemetry lifecycle primitives (`start/succeed/fail`) in one module avoids per-feature drift and guarantees required fields (`correlationId`, `errorClassification`) are present consistently.
+    - Query-style flows (`useLiveQuery`) are easiest to instrument by pairing an explicit "start" trigger (dependency change) with a resolution effect that marks success/failure once data or error lands.
   - Gotchas encountered
-    - `components/chat/__tests__/ChatListItem.test.tsx` appears to have existing test-environment instability around gesture-handler swipeable rendering; US-008 regression verification was anchored in deterministic coordinator/persistence tests instead.
-    - Repository-wide `npx tsc --noEmit` remains blocked by pre-existing type errors outside US-008 scope.
+    - `npx tsc --noEmit` still fails on pre-existing unrelated test typing issues in `hooks/__tests__/useErrorRecovery.test.ts` and `providers/__tests__/ollama-provider.test.ts`.
+    - `npm run lint` passes with one pre-existing warning in `components/chat/CustomMarkdown/CustomMarkdown.tsx` (`react-hooks/exhaustive-deps`).
 ---

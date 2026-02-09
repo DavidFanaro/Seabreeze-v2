@@ -18,6 +18,11 @@ import { StreamControlBanner } from "@/components/chat/StreamControlBanner";
 import { createIdempotencyKey, createSequenceGuard } from "@/lib/concurrency";
 import { DEFAULT_CHAT_TITLE, getChatTitleForDisplay } from "@/lib/chat-title";
 import { ProviderId } from "@/types/provider.types";
+import {
+    failPersistenceOperation,
+    startPersistenceOperation,
+    succeedPersistenceOperation,
+} from "@/lib/persistence-telemetry";
 
 export default function Chat() {
     const db = useDatabase();
@@ -225,12 +230,19 @@ export default function Chat() {
 
         const setupChat = async () => {
             if (chatIdParam !== "new") {
+                const loadOperation = startPersistenceOperation("load", {
+                    chatScope: chatIdParam,
+                    hydrationAttempt,
+                });
                 const id = Number(chatIdParam);
                 if (Number.isNaN(id)) {
                     if (!hydrationGuardRef.current.isCurrent(token)) {
                         return;
                     }
 
+                    failPersistenceOperation(loadOperation, new Error(`Invalid chat id: ${chatIdParam}`), {
+                        chatScope: chatIdParam,
+                    });
                     setHydrationError("Invalid chat id. Please reopen from chat history.");
                     resetHydratedState(null);
                     setIsInitializing(false);
@@ -273,14 +285,27 @@ export default function Chat() {
                             providerId: (data.providerId as ProviderId | null) ?? null,
                             modelId: data.modelId,
                         });
+                        succeedPersistenceOperation(loadOperation, {
+                            chatId: id,
+                            chatFound: true,
+                            messageCount: messages.length,
+                            thinkingOutputCount: thinkingOutput.length,
+                        });
                     } else {
                         resetHydratedState(null);
+                        succeedPersistenceOperation(loadOperation, {
+                            chatId: id,
+                            chatFound: false,
+                        });
                     }
-                } catch {
+                } catch (error) {
                     if (!hydrationGuardRef.current.isCurrent(token)) {
                         return;
                     }
 
+                    failPersistenceOperation(loadOperation, error, {
+                        chatId: id,
+                    });
                     resetHydratedState(null);
                     setHydrationError("Unable to hydrate this chat right now. You can keep using a new chat and try reopening this conversation.");
                 } finally {

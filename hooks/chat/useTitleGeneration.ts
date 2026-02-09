@@ -30,6 +30,11 @@ import {
     type RetryConfig 
 } from "@/hooks/useErrorRecovery";
 import { DEFAULT_CHAT_TITLE } from "@/lib/chat-title";
+import {
+    failPersistenceOperation,
+    startPersistenceOperation,
+    succeedPersistenceOperation,
+} from "@/lib/persistence-telemetry";
 
 /**
  * Hook for generating chat titles from conversation messages
@@ -61,8 +66,23 @@ export function useTitleGeneration(
     }, [title]);
 
     const setTitle = useCallback((nextTitle: string) => {
-        titleVersionRef.current += 1;
-        setTitleState(nextTitle);
+        const operation = startPersistenceOperation("manual_rename", {
+            titleLength: nextTitle.trim().length,
+            wasDefaultTitle: titleRef.current === DEFAULT_CHAT_TITLE,
+        });
+
+        try {
+            titleVersionRef.current += 1;
+            setTitleState(nextTitle);
+            succeedPersistenceOperation(operation, {
+                titleLength: nextTitle.trim().length,
+            });
+        } catch (error) {
+            failPersistenceOperation(operation, error, {
+                titleLength: nextTitle.trim().length,
+            });
+            throw error;
+        }
     }, []);
 
     // ===== CONFIGURATION =====
@@ -104,6 +124,10 @@ export function useTitleGeneration(
             return "";
         }
 
+        const operation = startPersistenceOperation("title_generation", {
+            messageCount: messages.length,
+        });
+
         try {
             // Core title generation operation
             const titleOperation = async () => {
@@ -130,8 +154,15 @@ export function useTitleGeneration(
                         titleVersionRef.current += 1;
                         setTitleState(retryResult.data);
                     }
+                    succeedPersistenceOperation(operation, {
+                        generatedTitleLength: retryResult.data.length,
+                    });
                     return retryResult.data;
                 }
+
+                failPersistenceOperation(operation, retryResult.error ?? new Error("Title generation failed"), {
+                    attempts: retryResult.attempts,
+                });
                 
                 // Failure case: Return empty string to signal failure
                 return "";
@@ -143,10 +174,16 @@ export function useTitleGeneration(
                         titleVersionRef.current += 1;
                         setTitleState(generatedTitle);
                     }
+                    succeedPersistenceOperation(operation, {
+                        generatedTitleLength: generatedTitle.length,
+                    });
+                } else {
+                    failPersistenceOperation(operation, new Error("Empty title generated"));
                 }
                 return generatedTitle;
             }
-        } catch {
+        } catch (error) {
+            failPersistenceOperation(operation, error);
             // Catch-all error handler
             // In production, this could be enhanced with specific error logging
             return "";

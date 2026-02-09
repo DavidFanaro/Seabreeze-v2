@@ -32,6 +32,11 @@ import { normalizeTitleForPersistence } from "@/lib/chat-title";
 import { chat } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { isChatDeleteLocked, runChatOperation } from "@/lib/chat-persistence-coordinator";
+import {
+  failPersistenceOperation,
+  startPersistenceOperation,
+  succeedPersistenceOperation,
+} from "@/lib/persistence-telemetry";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -340,6 +345,16 @@ export function useMessagePersistence(
       return;
     }
 
+    const operation = startPersistenceOperation("save", {
+      chatScope: snapshot.chatScope,
+      queueScope: snapshot.queueScope,
+      messageCount: snapshot.messages.length,
+      thinkingOutputCount: snapshot.thinkingOutput.length,
+      providerId: snapshot.providerId,
+      modelId: snapshot.modelId,
+      hasTitle: snapshot.title !== null,
+    });
+
     setSaveStatus("saving");
     setSaveError(null);
 
@@ -367,6 +382,11 @@ export function useMessagePersistence(
         if (result.data.skipped) {
           setSaveStatus("idle");
           setSaveAttempts(result.attempts);
+          succeedPersistenceOperation(operation, {
+            attempts: result.attempts,
+            skipped: true,
+            chatId: result.data.chatId,
+          });
           return;
         }
 
@@ -376,6 +396,11 @@ export function useMessagePersistence(
         setLastSavedChatId(result.data.chatId);
         activeChatIdRef.current = result.data.chatId;
         lastPersistedSnapshotKeyRef.current = snapshot.key;
+        succeedPersistenceOperation(operation, {
+          attempts: result.attempts,
+          chatId: result.data.chatId,
+          skipped: false,
+        });
         onSaveComplete?.(result.data.chatId);
       } else {
         // Save failed after retries
@@ -386,6 +411,9 @@ export function useMessagePersistence(
         setSaveStatus("error");
         setSaveError(error);
         setSaveAttempts(result.attempts);
+        failPersistenceOperation(operation, error, {
+          attempts: result.attempts,
+        });
         onSaveError?.(error, result.attempts);
       }
     } catch (err) {
@@ -398,6 +426,9 @@ export function useMessagePersistence(
       setSaveStatus("error");
       setSaveError(error);
       setSaveAttempts(1);
+      failPersistenceOperation(operation, error, {
+        attempts: 1,
+      });
       onSaveError?.(error, 1);
     }
   }, [
