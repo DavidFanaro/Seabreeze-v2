@@ -16,6 +16,7 @@ after each iteration and it's included in prompts for context.
 - Additive migration safety pattern (`drizzle/__tests__/schemaCompatibility.test.ts`): treat migration SQL as a pre-release contract by scanning every journaled migration for destructive statements and asserting each statement matches additive forms only, then compare legacy/current snapshots to guarantee original chat columns remain readable after upgrade.
 - Shared chat flow lock pattern (`lib/chat-persistence-coordinator.ts`): serialize list-level operations with `runListOperation`, serialize per-chat checkpoint/delete mutations with `runChatOperation`, and guard open/checkpoint writes during delete windows via `acquireChatDeleteLock` + `isChatDeleteLocked`.
 - Structured persistence telemetry wrapper pattern (`lib/persistence-telemetry.ts`): model each operation as a started/succeeded/failed lifecycle with one generated `correlationId`, always emit `errorClassification` (`"none"` for non-failures), and centralize success/failure counters plus latency histogram bucket updates in shared helpers to keep instrumentation consistent across hooks/screens.
+- Persistence alert hook pattern (`lib/persistence-telemetry.ts`): register alert consumers through a shared `registerPersistenceAlertHook` registry and evaluate alerting rules in the same success/failure lifecycle path so failure-rate spikes, SLA latency regressions, and repeated softlock signatures are emitted uniformly for all instrumented persistence flows.
 
 ---
 
@@ -198,4 +199,24 @@ after each iteration and it's included in prompts for context.
   - Gotchas encountered
     - `npx tsc --noEmit` still fails on pre-existing unrelated test typing issues in `hooks/__tests__/useErrorRecovery.test.ts` and `providers/__tests__/ollama-provider.test.ts`.
     - `npm run lint` passes with one pre-existing warning in `components/chat/CustomMarkdown/CustomMarkdown.tsx` (`react-hooks/exhaustive-deps`).
+---
+
+## 2026-02-09 - US-010
+- What was implemented
+  - Added persistence alert hook support in `lib/persistence-telemetry.ts` via `registerPersistenceAlertHook` and structured alert event types for three regression classes: `failure_rate_spike`, `latency_regression`, and `repeated_softlock_signature`.
+  - Added in-module alerting rules for critical persistence flows (`save`, `load`, `list`) that detect rolling-window failure-rate spikes and SLA latency regressions, and emit alert events through a shared alert dispatcher.
+  - Added softlock regression alerting support via metadata signature extraction in normal failure telemetry and explicit `reportSoftlockSignatureEvent` reporting for repeated signature detection within a bounded time window.
+  - Added focused regression tests in `lib/__tests__/persistence-telemetry.test.ts` to verify all three alert hook paths.
+  - Ran `npm run lint` (passes with existing warning) and `npx tsc --noEmit` (still fails on pre-existing unrelated test typing issues).
+- Files changed
+  - `lib/persistence-telemetry.ts`
+  - `lib/__tests__/persistence-telemetry.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Keeping alert-rule evaluation colocated with shared telemetry lifecycle handlers prevents instrumentation drift and guarantees each persistence surface inherits the same regression detection behavior.
+    - Event-signature windows (e.g., softlock signature rolling counts) are a lightweight way to turn repeated low-level failures into actionable higher-level regression signals.
+  - Gotchas encountered
+    - `npx tsc --noEmit` remains blocked by pre-existing test typing failures in `hooks/__tests__/useErrorRecovery.test.ts` and `providers/__tests__/ollama-provider.test.ts`, outside US-010 scope.
+    - `npm run lint` passes but retains one existing warning in `components/chat/CustomMarkdown/CustomMarkdown.tsx` (`react-hooks/exhaustive-deps`).
 ---
