@@ -3,6 +3,7 @@ import type { ModelMessage } from "ai";
 
 import { useMessagePersistence } from "../useMessagePersistence";
 import useDatabase from "../useDatabase";
+import { executeWithRetry } from "../useErrorRecovery";
 
 jest.mock("../useDatabase", () => ({
   __esModule: true,
@@ -60,6 +61,7 @@ describe("useMessagePersistence", () => {
   const updateWhereMock = jest.fn(async () => undefined);
   const updateSetMock = jest.fn(() => ({ where: updateWhereMock }));
   const updateMock = jest.fn(() => ({ set: updateSetMock }));
+  const executeWithRetryMock = executeWithRetry as unknown as jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -69,6 +71,30 @@ describe("useMessagePersistence", () => {
     (useDatabase as jest.Mock).mockReturnValue({
       insert: insertMock,
       update: updateMock,
+    });
+
+    executeWithRetryMock.mockImplementation(async (runner: () => Promise<unknown>) => {
+      try {
+        const data = await runner();
+        return {
+          success: true,
+          data,
+          attempts: 1,
+          shouldFallback: false,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: {
+            category: "unknown",
+            isRetryable: true,
+            shouldFallback: true,
+            message: error instanceof Error ? error.message : String(error),
+          },
+          attempts: 1,
+          shouldFallback: true,
+        };
+      }
     });
   });
 
@@ -239,5 +265,134 @@ describe("useMessagePersistence", () => {
     await waitFor(() => {
       expect(insertMock).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("does not persist placeholder-only assistant output on stream error", async () => {
+    const baseProps = {
+      chatIdParam: "new",
+      thinkingOutput: [] as string[],
+      providerId: "apple" as const,
+      modelId: "apple.on.device",
+      title: "Chat",
+      enabled: true,
+    };
+
+    const messages = [
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "..." },
+    ] as ModelMessage[];
+
+    let streamState: "streaming" | "error" = "streaming";
+
+    const { rerender } = renderHook(() =>
+      useMessagePersistence({
+        ...baseProps,
+        messages,
+        streamState,
+      })
+    );
+
+    streamState = "error";
+    rerender(undefined);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(insertMock).toHaveBeenCalledTimes(0);
+    expect(updateMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores stale save completion after chat scope changes", async () => {
+    const deferredInsert = createDeferred<{ id: number }[]>();
+    insertReturningMock.mockReturnValue(deferredInsert.promise);
+
+    const baseProps = {
+      streamState: "idle" as const,
+      thinkingOutput: [] as string[],
+      providerId: "apple" as const,
+      modelId: "apple.on.device",
+      title: "Chat",
+      enabled: true,
+    };
+
+    let chatIdParam = "new";
+    let messages: ModelMessage[] = [{ role: "user", content: "old chat message" }];
+
+    const { result, rerender } = renderHook(() =>
+      useMessagePersistence({
+        ...baseProps,
+        chatIdParam,
+        messages,
+      })
+    );
+
+    let oldSave!: Promise<void>;
+    act(() => {
+      oldSave = result.current.triggerSave();
+    });
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(1);
+    });
+
+    chatIdParam = "42";
+    messages = [{ role: "user", content: "loaded chat" }];
+    rerender(undefined);
+
+    deferredInsert.resolve([{ id: 777 }]);
+
+    await act(async () => {
+      await oldSave;
+    });
+
+    expect(result.current.lastSavedChatId).toBe(42);
+    expect(result.current.lastSavedChatId).not.toBe(777);
+  });
+
+  it("surfaces save failure as non-blocking error state and allows recovery", async () => {
+    executeWithRetryMock.mockResolvedValueOnce({
+      success: false,
+      error: {
+        category: "unknown",
+        isRetryable: true,
+        shouldFallback: true,
+        message: "disk write failed",
+      },
+      attempts: 3,
+      shouldFallback: true,
+    });
+
+    const { result } = renderHook(() =>
+      useMessagePersistence({
+        streamState: "idle",
+        chatIdParam: "42",
+        messages: [{ role: "user", content: "hello" }],
+        thinkingOutput: [],
+        providerId: "apple",
+        modelId: "apple.on.device",
+        title: "Chat",
+        enabled: true,
+      })
+    );
+
+    await act(async () => {
+      await result.current.triggerSave();
+    });
+
+    expect(result.current.hasSaveError).toBe(true);
+    expect(result.current.saveStatus).toBe("error");
+
+    act(() => {
+      result.current.clearError();
+    });
+
+    expect(result.current.saveStatus).toBe("idle");
+    expect(result.current.hasSaveError).toBe(false);
+
+    await act(async () => {
+      await result.current.triggerSave();
+    });
+
+    expect(result.current.saveStatus).toBe("saved");
+    expect(updateMock).toHaveBeenCalled();
   });
 });

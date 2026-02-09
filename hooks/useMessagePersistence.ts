@@ -149,6 +149,7 @@ function formatSaveError(error: unknown): string {
 
 interface SaveSnapshot {
   key: string;
+  chatScope: string;
   messages: ModelMessage[];
   thinkingOutput: string[];
   title: string | null;
@@ -214,6 +215,7 @@ export function useMessagePersistence(
   const hasCompletedStreamRef = useRef(false);
   const lastPersistedSnapshotKeyRef = useRef<string | null>(null);
   const activeChatIdRef = useRef<number | null>(null);
+  const activeChatScopeRef = useRef(chatIdParam);
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const saveRegistryRef = useRef(createIdempotencyRegistry<void>());
 
@@ -245,6 +247,7 @@ export function useMessagePersistence(
         messagesJson,
         thinkingJson,
       ]),
+      chatScope: chatIdParam,
       messages,
       thinkingOutput,
       title: titleForPersistence,
@@ -348,6 +351,9 @@ export function useMessagePersistence(
       );
 
       if (!isMountedRef.current) return;
+      if (snapshot.chatScope !== activeChatScopeRef.current) {
+        return;
+      }
 
       if (result.success && result.data) {
         // Save successful
@@ -370,15 +376,18 @@ export function useMessagePersistence(
       }
     } catch (err) {
       if (!isMountedRef.current) return;
+      if (snapshot.chatScope !== activeChatScopeRef.current) {
+        return;
+      }
 
       const error = err instanceof Error ? err : new Error(String(err));
       setSaveStatus("error");
       setSaveError(error);
-      onSaveError?.(error, saveAttempts);
+      setSaveAttempts(1);
+      onSaveError?.(error, 1);
     }
   }, [
     executeSave,
-    saveAttempts,
     onSaveComplete,
     onSaveError,
   ]);
@@ -486,9 +495,15 @@ export function useMessagePersistence(
   }, [messages, thinkingOutput, title, providerId, modelId, streamState, enabled, createSnapshot, runSerializedSave]);
 
   useEffect(() => {
+    activeChatScopeRef.current = chatIdParam;
     hasCompletedStreamRef.current = false;
     lastPersistedSnapshotKeyRef.current = null;
+    writeQueueRef.current = Promise.resolve();
     saveRegistryRef.current.clear();
+    pendingSaveRef.current = null;
+    setSaveStatus("idle");
+    setSaveAttempts(0);
+    setSaveError(null);
 
     if (chatIdParam === "new") {
       activeChatIdRef.current = null;
