@@ -29,9 +29,9 @@ jest.mock('expo/fetch', () => ({
     fetch: jest.fn(),
 }));
 
-const mockedCreateOllama = createOllama as jest.MockedFunction<typeof createOllama>;
-const mockedGetProviderAuth = getProviderAuth as jest.MockedFunction<typeof getProviderAuth>;
-const mockedExpoFetch = expoFetch as jest.MockedFunction<typeof expoFetch>;
+const mockedCreateOllama: any = createOllama;
+const mockedGetProviderAuth: any = getProviderAuth;
+const mockedExpoFetch: any = expoFetch;
 
 describe('Ollama Provider', () => {
     beforeEach(() => {
@@ -352,7 +352,7 @@ describe('Ollama Provider', () => {
             const mockData = ['llama3.2', 'mistral', 'codellama'];
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue(mockData as any),
+                json: jest.fn(async () => mockData as any),
             } as any;
             mockedExpoFetch.mockResolvedValue(mockResponse);
 
@@ -379,7 +379,7 @@ describe('Ollama Provider', () => {
             };
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue(mockData as any),
+                json: jest.fn(async () => mockData as any),
             } as any;
             mockedExpoFetch.mockResolvedValue(mockResponse);
 
@@ -397,7 +397,7 @@ describe('Ollama Provider', () => {
             ];
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue(mockData as any),
+                json: jest.fn(async () => mockData as any),
             } as any;
             mockedExpoFetch.mockResolvedValue(mockResponse);
 
@@ -430,9 +430,10 @@ describe('Ollama Provider', () => {
         it('should handle JSON parsing errors', async () => {
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockRejectedValue(new Error('Invalid JSON')),
+                json: jest.fn(async () => {
+                    throw new Error('Invalid JSON');
+                }),
             };
-            (mockResponse.json as jest.MockedFunction<typeof mockResponse.json>) = mockResponse.json;
             mockedExpoFetch.mockResolvedValue(mockResponse as any);
 
             const result = await fetchOllamaModels('http://localhost:11434');
@@ -472,9 +473,8 @@ describe('Ollama Provider', () => {
             const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue({ models: [] }),
+                json: jest.fn(async () => ({ models: [] })),
             };
-            (mockResponse.json as jest.MockedFunction<typeof mockResponse.json>) = mockResponse.json;
             mockedExpoFetch.mockResolvedValue(mockResponse as any);
 
             await fetchOllamaModels('http://localhost:11434');
@@ -486,9 +486,8 @@ describe('Ollama Provider', () => {
         it('should normalize URL correctly', async () => {
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue({ models: [] }),
+                json: jest.fn(async () => ({ models: [] })),
             };
-            (mockResponse.json as jest.MockedFunction<typeof mockResponse.json>) = mockResponse.json;
             mockedExpoFetch.mockResolvedValue(mockResponse as any);
 
             await fetchOllamaModels('http://localhost:11434/');
@@ -502,9 +501,8 @@ describe('Ollama Provider', () => {
         it('should handle empty response data', async () => {
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue({}),
+                json: jest.fn(async () => ({})),
             };
-            (mockResponse.json as jest.MockedFunction<typeof mockResponse.json>) = mockResponse.json;
             mockedExpoFetch.mockResolvedValue(mockResponse as any);
 
             const result = await fetchOllamaModels('http://localhost:11434');
@@ -515,9 +513,8 @@ describe('Ollama Provider', () => {
         it('should handle null response data', async () => {
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue(null),
+                json: jest.fn(async () => null),
             };
-            (mockResponse.json as jest.MockedFunction<typeof mockResponse.json>) = mockResponse.json;
             mockedExpoFetch.mockResolvedValue(mockResponse as any);
 
             const result = await fetchOllamaModels('http://localhost:11434');
@@ -544,9 +541,9 @@ describe('Ollama Provider', () => {
             // Step 3: Fetch models
             const mockModelsResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue({
+                json: jest.fn(async () => ({
                     models: [{ name: 'llama3.2' }, { name: 'mistral' }],
-                } as any),
+                } as any)),
             } as any;
             mockedExpoFetch.mockResolvedValue(mockModelsResponse);
             const models = await fetchOllamaModels('http://localhost:11434');
@@ -597,7 +594,7 @@ describe('Ollama Provider', () => {
             
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue({ models: largeModelList } as any),
+                json: jest.fn(async () => ({ models: largeModelList } as any)),
             } as any;
             mockedExpoFetch.mockResolvedValue(mockResponse);
 
@@ -632,7 +629,7 @@ describe('Ollama Provider', () => {
 
             const mockResponse = {
                 ok: true,
-                json: jest.fn().mockResolvedValue({ models: specialModels } as any),
+                json: jest.fn(async () => ({ models: specialModels } as any)),
             } as any;
             mockedExpoFetch.mockResolvedValue(mockResponse);
 

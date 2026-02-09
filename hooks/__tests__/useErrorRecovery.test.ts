@@ -73,7 +73,7 @@ describe("useErrorRecovery", () => {
   // ============================================================================
   describe("executeWithRetry", () => {
     it("should return success on first attempt", async () => {
-      const mockOperation = jest.fn().mockResolvedValue("success");
+      const mockOperation = jest.fn<() => Promise<string>>().mockResolvedValue("success");
       (classifyError as jest.Mock).mockReturnValue({
         category: "unknown",
         isRetryable: false,
@@ -93,7 +93,7 @@ describe("useErrorRecovery", () => {
       jest.useRealTimers();
 
       const mockOperation = jest
-        .fn()
+        .fn<() => Promise<string>>()
         .mockRejectedValueOnce(new Error("First failure"))
         .mockRejectedValueOnce(new Error("Second failure"))
         .mockResolvedValue("success");
@@ -126,7 +126,7 @@ describe("useErrorRecovery", () => {
     });
 
     it("should not retry non-retryable errors", async () => {
-      const mockOperation = jest.fn().mockRejectedValue(new Error("Auth error"));
+      const mockOperation = jest.fn<() => Promise<string>>().mockRejectedValue(new Error("Auth error"));
       (classifyError as jest.Mock).mockReturnValue({
         category: "authentication",
         isRetryable: false,
@@ -146,7 +146,7 @@ describe("useErrorRecovery", () => {
     it("should respect max retries limit", async () => {
       jest.useRealTimers();
 
-      const mockOperation = jest.fn().mockRejectedValue(new Error("Always fails"));
+      const mockOperation = jest.fn<() => Promise<string>>().mockRejectedValue(new Error("Always fails"));
       (classifyError as jest.Mock).mockReturnValue({
         category: "network",
         isRetryable: true,
@@ -191,7 +191,7 @@ describe("useErrorRecovery", () => {
     });
 
     it("should handle successful operation", async () => {
-      const mockOperation = jest.fn().mockResolvedValue("success");
+      const mockOperation = jest.fn<() => Promise<string>>().mockResolvedValue("success");
       (classifyError as jest.Mock).mockReturnValue({
         category: "unknown",
         isRetryable: false,
@@ -259,7 +259,7 @@ describe("useErrorRecovery", () => {
     });
 
     it("should handle concurrent execution attempts", async () => {
-      const mockOperation = jest.fn().mockResolvedValue("success");
+      const mockOperation = jest.fn<() => Promise<string>>().mockResolvedValue("success");
       (classifyError as jest.Mock).mockReturnValue({
         category: "unknown",
         isRetryable: false,
@@ -484,7 +484,7 @@ describe("useErrorRecovery", () => {
   // ============================================================================
   describe("Integration and Edge Cases", () => {
     it("should handle errors without classification", async () => {
-      const mockOperation = jest.fn().mockRejectedValue(new Error("Unknown error"));
+      const mockOperation = jest.fn<() => Promise<string>>().mockRejectedValue(new Error("Unknown error"));
       (classifyError as jest.Mock).mockReturnValue(null as any);
 
       const result = await executeWithRetry(mockOperation);
@@ -495,7 +495,7 @@ describe("useErrorRecovery", () => {
     });
 
     it("should handle very long delays correctly", async () => {
-      const mockOperation = jest.fn().mockRejectedValue(new Error("Always fails"));
+      const mockOperation = jest.fn<() => Promise<string>>().mockRejectedValue(new Error("Always fails"));
       (classifyError as jest.Mock).mockReturnValue({
         category: "rate_limit",
         isRetryable: true,

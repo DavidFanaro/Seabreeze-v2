@@ -17,6 +17,7 @@ after each iteration and it's included in prompts for context.
 - Shared chat flow lock pattern (`lib/chat-persistence-coordinator.ts`): serialize list-level operations with `runListOperation`, serialize per-chat checkpoint/delete mutations with `runChatOperation`, and guard open/checkpoint writes during delete windows via `acquireChatDeleteLock` + `isChatDeleteLocked`.
 - Structured persistence telemetry wrapper pattern (`lib/persistence-telemetry.ts`): model each operation as a started/succeeded/failed lifecycle with one generated `correlationId`, always emit `errorClassification` (`"none"` for non-failures), and centralize success/failure counters plus latency histogram bucket updates in shared helpers to keep instrumentation consistent across hooks/screens.
 - Persistence alert hook pattern (`lib/persistence-telemetry.ts`): register alert consumers through a shared `registerPersistenceAlertHook` registry and evaluate alerting rules in the same success/failure lifecycle path so failure-rate spikes, SLA latency regressions, and repeated softlock signatures are emitted uniformly for all instrumented persistence flows.
+- Cutover validation evidence pattern (`docs/persistence-cutover-release-validation.md`): capture release readiness in one artifact with dataset coverage matrix, explicit warm/cold p95 target-vs-measured table, softlock reproducibility outcomes, rollback playbook, and quality-gate command results so big-bang launch decisions are auditable.
 
 ---
 
@@ -219,4 +220,22 @@ after each iteration and it's included in prompts for context.
   - Gotchas encountered
     - `npx tsc --noEmit` remains blocked by pre-existing test typing failures in `hooks/__tests__/useErrorRecovery.test.ts` and `providers/__tests__/ollama-provider.test.ts`, outside US-010 scope.
     - `npm run lint` passes but retains one existing warning in `components/chat/CustomMarkdown/CustomMarkdown.tsx` (`react-hooks/exhaustive-deps`).
+---
+
+## 2026-02-09 - US-011
+- What was implemented
+  - Added a dedicated cutover validation artifact (`docs/persistence-cutover-release-validation.md`) that records representative dataset coverage (small, large, legacy), warm/cold p95 target-vs-measured outcomes, blocking softlock reproducibility results, and an explicit severe-regression rollback procedure.
+  - Cleared repository-wide TypeScript gate blockers in test suites by tightening async mock typings in `hooks/__tests__/useErrorRecovery.test.ts` and simplifying strict mock typing usage in `providers/__tests__/ollama-provider.test.ts`.
+  - Re-ran release quality gates: `npm run lint` and `npx tsc --noEmit`.
+- Files changed
+  - `docs/persistence-cutover-release-validation.md`
+  - `hooks/__tests__/useErrorRecovery.test.ts`
+  - `providers/__tests__/ollama-provider.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - A single release-validation artifact that combines performance evidence, softlock findings, and rollback steps is easier to operationalize than spreading evidence across multiple docs.
+    - In strict Jest + TypeScript setups, defining async mocks with explicit function signatures (instead of untyped `jest.fn()`) avoids `never`-typed mock helper regressions during typecheck gates.
+  - Gotchas encountered
+    - `expo lint` reports one existing warning in `components/chat/CustomMarkdown/CustomMarkdown.tsx` (`react-hooks/exhaustive-deps`), but no lint errors.
 ---
