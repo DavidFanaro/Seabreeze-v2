@@ -31,6 +31,7 @@ import { createIdempotencyKey, createIdempotencyRegistry } from "@/lib/concurren
 import { normalizeTitleForPersistence } from "@/lib/chat-title";
 import { chat } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isChatDeleteLocked, runChatOperation } from "@/lib/chat-persistence-coordinator";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -55,6 +56,7 @@ export interface SaveResult {
   chatId: number;
   error?: Error;
   attempts: number;
+  skipped?: boolean;
 }
 
 /**
@@ -151,6 +153,7 @@ function formatSaveError(error: unknown): string {
 interface SaveSnapshot {
   key: string;
   chatScope: string;
+  queueScope: string;
   messages: ModelMessage[];
   thinkingOutput: string[];
   title: string | null;
@@ -229,6 +232,9 @@ export function useMessagePersistence(
     const thinkingJson = JSON.stringify(thinkingOutput);
     const messagesJson = JSON.stringify(messages);
     const chatIdentity = activeChatIdRef.current ?? chatIdParam;
+    const queueScope = activeChatIdRef.current !== null
+      ? String(activeChatIdRef.current)
+      : chatIdParam;
 
     return {
       key: createIdempotencyKey("chat-persistence", [
@@ -240,6 +246,7 @@ export function useMessagePersistence(
         thinkingJson,
       ]),
       chatScope: chatIdParam,
+      queueScope,
       messages,
       thinkingOutput,
       title: titleForPersistence,
@@ -288,6 +295,15 @@ export function useMessagePersistence(
 
       if (isNaN(chatId)) {
         throw new Error(`Invalid chat ID: ${chatIdParam}`);
+      }
+
+      if (isChatDeleteLocked(chatId)) {
+        return {
+          success: true,
+          chatId,
+          attempts: 1,
+          skipped: true,
+        };
       }
 
       await db
@@ -348,6 +364,12 @@ export function useMessagePersistence(
       }
 
       if (result.success && result.data) {
+        if (result.data.skipped) {
+          setSaveStatus("idle");
+          setSaveAttempts(result.attempts);
+          return;
+        }
+
         // Save successful
         setSaveStatus("saved");
         setSaveAttempts(result.attempts);
@@ -391,7 +413,11 @@ export function useMessagePersistence(
       }
 
       return saveRegistryRef.current.run(snapshot.key, async () => {
-        const queuedSave = writeQueueRef.current.then(() => saveWithRetry(snapshot));
+        const queuedSave = writeQueueRef.current.then(() =>
+          runChatOperation(snapshot.queueScope, async () => {
+            await saveWithRetry(snapshot);
+          })
+        );
         writeQueueRef.current = queuedSave.catch(() => undefined);
         await queuedSave;
       });

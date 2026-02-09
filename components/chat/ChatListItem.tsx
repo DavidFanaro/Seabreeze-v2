@@ -23,6 +23,8 @@ interface ChatListItemProps {
     preview?: string | null; // Preview of the latest message
     timestamp?: Date | null; // Last updated timestamp
     onDelete: (id: number) => void; // Callback triggered when user swipes to delete
+    onOpen?: (id: number) => void; // Callback triggered when user taps to open chat
+    isDeleting?: boolean; // Whether delete flow is currently in progress for this row
     isScreenFocused: boolean; // Indicates if the parent screen is currently focused
     style?: ViewStyle; // Optional custom styling
 }
@@ -111,6 +113,8 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
     preview,
     timestamp,
     onDelete,
+    onOpen,
+    isDeleting = false,
     isScreenFocused,
     style,
 }) => {
@@ -154,7 +158,16 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
      * Resets pressed state before navigating
      */
     const handleNavigate = () => {
+        if (isDeleting) {
+            return;
+        }
+
         setIsPressed(false);
+        if (onOpen) {
+            onOpen(id);
+            return;
+        }
+
         router.push(`/chat/${id}`);
     };
 
@@ -179,6 +192,10 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 dragX={dragX}
                 theme={theme}
                 onPress={() => {
+                    if (isDeleting) {
+                        return;
+                    }
+
                     // Trigger error haptic feedback
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                     // Call parent delete handler
@@ -200,13 +217,18 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 overshootRight={false}
                 friction={2}
                 rightThreshold={40}
-                enabled={isScreenFocused} // Disable swiping when screen is not focused
+                enabled={isScreenFocused && !isDeleting} // Disable swiping when screen is not focused or deleting
                 containerStyle={{ backgroundColor: "transparent" }}
             >
                 {/* MAIN TOUCHABLE AREA - Navigates to chat detail on tap */}
                 <Pressable
                     onPress={handleNavigate}
+                    disabled={!isScreenFocused || isDeleting}
                     onPressIn={() => {
+                        if (isDeleting) {
+                            return;
+                        }
+
                         setIsPressed(true);
                         // Haptic feedback on press for tactile response
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -216,7 +238,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                         style,
                         {
                             // Reduce opacity for pressed state visual feedback
-                            opacity: isPressed ? 0.6 : 1,
+                            opacity: isDeleting ? 0.45 : isPressed ? 0.6 : 1,
                             paddingHorizontal: 20,
                             paddingVertical: 8,
                             minHeight: 100,

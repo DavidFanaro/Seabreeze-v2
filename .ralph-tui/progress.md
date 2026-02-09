@@ -14,6 +14,7 @@ after each iteration and it's included in prompts for context.
 - Resilient list row normalization pattern (`app/index.tsx`): normalize unknown DB rows through a strict adapter (`normalizeChatRow` + `coerceTimestamp`) and drop malformed entries before render so one corrupt row cannot crash/blank an entire list; pair with a lightweight banner to communicate partial visibility.
 - Title sentinel normalization pattern (`lib/chat-title.ts`): keep `"Chat"` as an internal/default sentinel, map it to `null` at persistence boundaries (`normalizeTitleForPersistence`) and to an explicit UX fallback label at render boundaries (`getChatTitleForDisplay`) so failed auto-title generation never blocks chat flows and untitled chats stay rename-safe.
 - Additive migration safety pattern (`drizzle/__tests__/schemaCompatibility.test.ts`): treat migration SQL as a pre-release contract by scanning every journaled migration for destructive statements and asserting each statement matches additive forms only, then compare legacy/current snapshots to guarantee original chat columns remain readable after upgrade.
+- Shared chat flow lock pattern (`lib/chat-persistence-coordinator.ts`): serialize list-level operations with `runListOperation`, serialize per-chat checkpoint/delete mutations with `runChatOperation`, and guard open/checkpoint writes during delete windows via `acquireChatDeleteLock` + `isChatDeleteLocked`.
 
 ---
 
@@ -146,6 +147,31 @@ after each iteration and it's included in prompts for context.
   - Patterns discovered
     - Journal-driven migration tests are a reliable pre-release guardrail: they catch destructive SQL before release and make compatibility requirements executable.
     - Snapshot-diff assertions (legacy vs latest) provide a low-friction contract that upgrades preserve read-shape compatibility for existing records.
+- Gotchas encountered
+  - Repository-wide lint/typecheck remain red due unrelated baseline issues in existing test files outside US-007 scope.
+---
+
+## 2026-02-09 - US-008
+- What was implemented
+  - Added explicit lock + ordering semantics for persistence-adjacent chat flows via new coordinator module (`runListOperation`, `runChatOperation`, delete lock helpers) and wired it into list refresh, open, create navigation, and delete paths in `app/index.tsx`.
+  - Hardened delete/open race window by locking chat IDs during delete and skipping stale open attempts while delete is active.
+  - Hardened persistence checkpoints during delete races by queueing save work through `runChatOperation` and short-circuiting update checkpoints when `isChatDeleteLocked(chatId)` is true in `hooks/useMessagePersistence.ts`.
+  - Added deterministic regression coverage for ordering + lock lifecycle (`lib/__tests__/chat-persistence-coordinator.test.ts`) and delete-lock checkpoint suppression (`hooks/__tests__/useMessagePersistence.test.ts`).
+  - Cleared the long-standing lint error in `components/chat/__tests__/MessageList.test.tsx` by assigning a display name to the mocked `FlashList` forwardRef component.
+  - Ran checks: `npm run lint` (passes with one existing warning in `components/chat/CustomMarkdown/CustomMarkdown.tsx`) and `npx tsc --noEmit` (still fails on pre-existing unrelated test typing errors in `hooks/__tests__/useErrorRecovery.test.ts` and `providers/__tests__/ollama-provider.test.ts`).
+- Files changed
+  - `lib/chat-persistence-coordinator.ts`
+  - `app/index.tsx`
+  - `hooks/useMessagePersistence.ts`
+  - `lib/__tests__/chat-persistence-coordinator.test.ts`
+  - `hooks/__tests__/useMessagePersistence.test.ts`
+  - `components/chat/__tests__/MessageList.test.tsx`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Unifying list/open/delete sequencing and persistence checkpoint sequencing behind a shared coordinator removes cross-surface race windows that per-hook local queues cannot see.
+    - Delete-lock checks are a practical defensive guard for unknown race windows: no-oping stale open/checkpoint writes during active delete avoids inconsistent UI/database recovery paths.
   - Gotchas encountered
-    - Repository-wide lint/typecheck remain red due unrelated baseline issues in existing test files outside US-007 scope.
+    - `components/chat/__tests__/ChatListItem.test.tsx` appears to have existing test-environment instability around gesture-handler swipeable rendering; US-008 regression verification was anchored in deterministic coordinator/persistence tests instead.
+    - Repository-wide `npx tsc --noEmit` remains blocked by pre-existing type errors outside US-008 scope.
 ---

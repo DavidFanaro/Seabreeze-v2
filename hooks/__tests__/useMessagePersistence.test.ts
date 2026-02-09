@@ -4,6 +4,7 @@ import type { ModelMessage } from "ai";
 import { useMessagePersistence } from "../useMessagePersistence";
 import useDatabase from "../useDatabase";
 import { executeWithRetry } from "../useErrorRecovery";
+import { acquireChatDeleteLock } from "@/lib/chat-persistence-coordinator";
 
 jest.mock("../useDatabase", () => ({
   __esModule: true,
@@ -438,5 +439,33 @@ describe("useMessagePersistence", () => {
         title: "Renamed Chat",
       })
     );
+  });
+
+  it("skips chat checkpoint writes while delete lock is active", async () => {
+    const releaseDeleteLock = acquireChatDeleteLock(42);
+
+    const { result } = renderHook(() =>
+      useMessagePersistence({
+        streamState: "idle",
+        chatIdParam: "42",
+        messages: [{ role: "user", content: "hello" }],
+        thinkingOutput: [],
+        providerId: "apple",
+        modelId: "apple.on.device",
+        title: "Chat",
+        enabled: true,
+      })
+    );
+
+    try {
+      await act(async () => {
+        await result.current.triggerSave();
+      });
+
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(result.current.saveStatus).toBe("idle");
+    } finally {
+      releaseDeleteLock();
+    }
   });
 });

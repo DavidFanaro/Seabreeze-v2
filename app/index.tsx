@@ -8,6 +8,13 @@ import { chat } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { IconButton, ChatListItem, useTheme } from "@/components";
 import { normalizeTitleForPersistence } from "@/lib/chat-title";
+import { createIdempotencyRegistry } from "@/lib/concurrency";
+import {
+  acquireChatDeleteLock,
+  isChatDeleteLocked,
+  runChatOperation,
+  runListOperation,
+} from "@/lib/chat-persistence-coordinator";
 import { ModelMessage } from "ai";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { SymbolView } from "expo-symbols";
@@ -151,6 +158,8 @@ export default function Home() {
   const [refreshNonce, setRefreshNonce] = React.useState(0);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [refreshError, setRefreshError] = React.useState<string | null>(null);
+  const [deletingIds, setDeletingIds] = React.useState<Set<number>>(new Set());
+  const createNavigationRegistryRef = React.useRef(createIdempotencyRegistry<void>());
 
   // Live query: Fetches all chats ordered by most recently updated
   // Automatically re-renders when chat data changes
@@ -163,9 +172,61 @@ export default function Home() {
   );
 
   // Delete handler: Removes a chat from database by ID
-  const deleteChat = async (id: number) => {
-    await db.delete(chat).where(eq(chat.id, id));
-  };
+  const deleteChat = React.useCallback(async (id: number) => {
+    await runListOperation(async () => {
+      if (isChatDeleteLocked(id)) {
+        return;
+      }
+
+      const releaseDeleteLock = acquireChatDeleteLock(id);
+      setDeletingIds((current) => {
+        const next = new Set(current);
+        next.add(id);
+        return next;
+      });
+
+      try {
+        await runChatOperation(String(id), async () => {
+          await db.delete(chat).where(eq(chat.id, id));
+        });
+      } finally {
+        releaseDeleteLock();
+        setDeletingIds((current) => {
+          if (!current.has(id)) {
+            return current;
+          }
+
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
+      }
+    });
+  }, [db]);
+
+  const openChat = React.useCallback((id: number) => {
+    if (isChatDeleteLocked(id)) {
+      return;
+    }
+
+    void runListOperation(async () => {
+      if (isChatDeleteLocked(id)) {
+        return;
+      }
+
+      router.push(`/chat/${id}`);
+    });
+  }, [router]);
+
+  const openNewChat = React.useCallback(() => {
+    const key = "open-new-chat";
+
+    void createNavigationRegistryRef.current.run(key, async () => {
+      await runListOperation(async () => {
+        router.push("/chat/new");
+      });
+    });
+  }, [router]);
 
   const chatRows = React.useMemo(() => {
     if (!Array.isArray(chatsQuery.data)) {
@@ -190,11 +251,13 @@ export default function Home() {
     setRefreshError(null);
 
     try {
-      setRefreshNonce((current) => current + 1);
-      await db
-        .select()
-        .from(chat)
-        .orderBy(desc(chat.updatedAt));
+      await runListOperation(async () => {
+        setRefreshNonce((current) => current + 1);
+        await db
+          .select()
+          .from(chat)
+          .orderBy(desc(chat.updatedAt));
+      });
     } catch {
       setRefreshError(REFRESH_ERROR_MESSAGE);
     } finally {
@@ -223,7 +286,7 @@ export default function Home() {
           headerRight: () => (
             <IconButton
               icon="plus"
-              onPress={() => router.push("/chat/new")}
+              onPress={openNewChat}
               style={{ marginLeft: 6 }}
             />
           ),
@@ -266,6 +329,8 @@ export default function Home() {
               preview={item.preview}
               timestamp={item.timestamp}
               onDelete={deleteChat}
+              onOpen={openChat}
+              isDeleting={deletingIds.has(item.id)}
               isScreenFocused={isScreenFocused}
             />
           )}

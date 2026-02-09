@@ -16,26 +16,30 @@ jest.mock("@shopify/flash-list", () => {
   const React = jest.requireActual("react");
   const { View } = jest.requireActual("react-native");
 
+  const MockFlashList = React.forwardRef(({ data, renderItem, ListEmptyComponent, ...rest }: any, ref: any) => {
+    latestFlashListProps = rest;
+
+    React.useImperativeHandle(ref, () => ({
+      scrollToEnd: mockScrollToEnd,
+    }));
+
+    if (!data || data.length === 0) {
+      return <ListEmptyComponent />;
+    }
+
+    return (
+      <View>
+        {data.map((item: any, index: number) =>
+          renderItem({ item, index })
+        )}
+      </View>
+    );
+  });
+
+  MockFlashList.displayName = "MockFlashList";
+
   return {
-    FlashList: React.forwardRef(({ data, renderItem, ListEmptyComponent, ...rest }: any, ref: any) => {
-      latestFlashListProps = rest;
-
-      React.useImperativeHandle(ref, () => ({
-        scrollToEnd: mockScrollToEnd,
-      }));
-
-      if (!data || data.length === 0) {
-        return <ListEmptyComponent />;
-      }
-
-      return (
-        <View>
-          {data.map((item: any, index: number) =>
-            renderItem({ item, index })
-          )}
-        </View>
-      );
-    }),
+    FlashList: MockFlashList,
   };
 });
 
