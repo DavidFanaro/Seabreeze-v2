@@ -3,7 +3,7 @@
  * @purpose Database schema definitions for Seabreeze chat application using Drizzle ORM and SQLite.
  */
 
-import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, int, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { ProviderId } from "@/types/provider.types";
 
 /**
@@ -45,31 +45,40 @@ import { ProviderId } from "@/types/provider.types";
  * - thinkingOutput stores model reasoning output when available
  * - Timestamps use Unix epoch format for SQLite compatibility
  */
-export const chat = sqliteTable("chat", {
+export const chat = sqliteTable(
+  "chat",
+  {
     /** Primary identifier - Auto-incrementing integer for unique chat records */
     id: int().primaryKey({ autoIncrement: true }),
-    
+
     /** User-facing title - Displayed in chat list, can be null initially */
     title: text(),
-    
+
     /** Message history - JSON array containing all messages in the conversation */
     messages: text({ mode: "json" }).notNull(),
 
     /** Model thinking output - JSON array of reasoning chunks aligned with messages */
     thinkingOutput: text({ mode: "json" }).notNull(),
-    
+
     /** AI provider used - Enum constraint ensures valid provider selection */
-    providerId: text({ enum: ["apple", "openai", "openrouter", "ollama"] }).$type<ProviderId>().notNull(),
-    
+    providerId: text({ enum: ["apple", "openai", "openrouter", "ollama"] })
+      .$type<ProviderId>()
+      .notNull(),
+
     /** Model identifier - Specific model name/version used for the conversation */
     modelId: text().notNull(),
-    
+
     /** Provider-specific data - JSON object with provider configuration and metadata */
     providerMetadata: text({ mode: "json" }).notNull(),
-    
+
     /** Creation timestamp - When the chat was first created (Unix epoch) */
     createdAt: int({ mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
-    
+
     /** Last update timestamp - When the chat was last modified (Unix epoch) */
     updatedAt: int({ mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
-});
+  },
+  (table) => ({
+    updatedAtIdx: index("chat_updated_at_idx").on(table.updatedAt),
+    providerIdIdx: index("chat_provider_id_idx").on(table.providerId),
+  }),
+);

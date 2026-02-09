@@ -13,6 +13,7 @@ after each iteration and it's included in prompts for context.
 - Retrieval recovery UX split pattern (`app/chat/[id].tsx`): keep retrieval/hydration failures on a dedicated recovery surface (`RetrievalRecoveryView`) with its own retry trigger, while preserving `RetryBanner` only for send-stream failures so users get context-specific error messaging and retry behavior.
 - Resilient list row normalization pattern (`app/index.tsx`): normalize unknown DB rows through a strict adapter (`normalizeChatRow` + `coerceTimestamp`) and drop malformed entries before render so one corrupt row cannot crash/blank an entire list; pair with a lightweight banner to communicate partial visibility.
 - Title sentinel normalization pattern (`lib/chat-title.ts`): keep `"Chat"` as an internal/default sentinel, map it to `null` at persistence boundaries (`normalizeTitleForPersistence`) and to an explicit UX fallback label at render boundaries (`getChatTitleForDisplay`) so failed auto-title generation never blocks chat flows and untitled chats stay rename-safe.
+- Additive migration safety pattern (`drizzle/__tests__/schemaCompatibility.test.ts`): treat migration SQL as a pre-release contract by scanning every journaled migration for destructive statements and asserting each statement matches additive forms only, then compare legacy/current snapshots to guarantee original chat columns remain readable after upgrade.
 
 ---
 
@@ -124,4 +125,27 @@ after each iteration and it's included in prompts for context.
     - Title-generation async results should be version-guarded against concurrent manual updates to avoid late AI responses clobbering user intent.
   - Gotchas encountered
     - Repository-wide `npm run lint` and `npx tsc --noEmit` still fail due pre-existing unrelated test issues (`components/chat/__tests__/MessageList.test.tsx`, `hooks/__tests__/useErrorRecovery.test.ts`, `providers/__tests__/ollama-provider.test.ts`).
+---
+
+## 2026-02-09 - US-007
+- What was implemented
+  - Added additive-only schema updates by introducing non-destructive chat indexes (`chat_updated_at_idx`, `chat_provider_id_idx`) in `db/schema.ts` and generating migration `drizzle/0001_boring_sabretooth.sql`.
+  - Updated Drizzle migration registry wiring in `drizzle/migrations.js` and journal metadata in `drizzle/meta/_journal.json` / `drizzle/meta/0001_snapshot.json`.
+  - Added pre-release compatibility validation in `drizzle/__tests__/schemaCompatibility.test.ts` that enforces migration SQL is additive-only and verifies legacy chat columns remain readable in the latest snapshot.
+  - Ran `npx jest drizzle/__tests__/schemaCompatibility.test.ts` (pass).
+  - Ran acceptance checks: `npm run lint` (fails on pre-existing lint error in `components/chat/__tests__/MessageList.test.tsx`, plus existing warning) and `npx tsc --noEmit` (fails on pre-existing test typing errors in `hooks/__tests__/useErrorRecovery.test.ts` and `providers/__tests__/ollama-provider.test.ts`).
+- Files changed
+  - `db/schema.ts`
+  - `drizzle/0001_boring_sabretooth.sql`
+  - `drizzle/meta/_journal.json`
+  - `drizzle/meta/0001_snapshot.json`
+  - `drizzle/migrations.js`
+  - `drizzle/__tests__/schemaCompatibility.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Journal-driven migration tests are a reliable pre-release guardrail: they catch destructive SQL before release and make compatibility requirements executable.
+    - Snapshot-diff assertions (legacy vs latest) provide a low-friction contract that upgrades preserve read-shape compatibility for existing records.
+  - Gotchas encountered
+    - Repository-wide lint/typecheck remain red due unrelated baseline issues in existing test files outside US-007 scope.
 ---
