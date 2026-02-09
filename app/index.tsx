@@ -11,17 +11,71 @@ import { ModelMessage } from "ai";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { SymbolView } from "expo-symbols";
 
+interface ChatListRow {
+  id: number;
+  title: string | null;
+  preview: string | null;
+  timestamp: Date | null;
+}
+
+const REFRESH_ERROR_MESSAGE = "Couldn't refresh chats right now. Pull to retry.";
+const PARTIAL_ROW_MESSAGE = "Some chats could not be displayed.";
+
 export const getPreview = (messages: unknown): string | null => {
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+  try {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return null;
+    }
+
+    const lastMessage = messages[messages.length - 1] as ModelMessage;
+    if (!lastMessage?.content) return null;
+
+    const content =
+      typeof lastMessage.content === "string"
+        ? lastMessage.content
+        : String(lastMessage.content);
+    return content.length > 80 ? content.slice(0, 80) + "..." : content;
+  } catch {
     return null;
   }
-  const lastMessage = messages[messages.length - 1] as ModelMessage;
-  if (!lastMessage?.content) return null;
-  const content =
-    typeof lastMessage.content === "string"
-      ? lastMessage.content
-      : String(lastMessage.content);
-  return content.length > 80 ? content.slice(0, 80) + "..." : content;
+};
+
+const coerceTimestamp = (value: unknown): Date | null => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
+};
+
+const normalizeChatRow = (row: unknown): ChatListRow | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  const id =
+    typeof record.id === "number"
+      ? record.id
+      : typeof record.id === "string"
+        ? Number(record.id)
+        : NaN;
+
+  if (!Number.isFinite(id)) {
+    return null;
+  }
+
+  return {
+    id,
+    title: typeof record.title === "string" ? record.title : null,
+    preview: getPreview(record.messages),
+    timestamp: coerceTimestamp(record.updatedAt),
+  };
 };
 
 /**
@@ -93,12 +147,18 @@ export default function Home() {
   // Track if screen is currently focused (for optimizing updates)
   const isScreenFocused = useIsFocused();
 
+  const [refreshNonce, setRefreshNonce] = React.useState(0);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [refreshError, setRefreshError] = React.useState<string | null>(null);
+
   // Live query: Fetches all chats ordered by most recently updated
   // Automatically re-renders when chat data changes
-  const chats = useLiveQuery(
-    db.query.chat.findMany({
-      orderBy: [desc(chat.updatedAt)],
-    }),
+  const chatsQuery = useLiveQuery(
+    db
+      .select()
+      .from(chat)
+      .orderBy(desc(chat.updatedAt)),
+    [refreshNonce],
   );
 
   // Delete handler: Removes a chat from database by ID
@@ -106,8 +166,45 @@ export default function Home() {
     await db.delete(chat).where(eq(chat.id, id));
   };
 
-  // Derived state: Determines if any chats exist
-  const hasChats = chats.data && chats.data.length > 0;
+  const chatRows = React.useMemo(() => {
+    if (!Array.isArray(chatsQuery.data)) {
+      return [] as ChatListRow[];
+    }
+
+    return chatsQuery.data
+      .map((row) => normalizeChatRow(row))
+      .filter((row): row is ChatListRow => row !== null);
+  }, [chatsQuery.data]);
+
+  const droppedRowCount = React.useMemo(() => {
+    if (!Array.isArray(chatsQuery.data)) {
+      return 0;
+    }
+
+    return chatsQuery.data.length - chatRows.length;
+  }, [chatRows.length, chatsQuery.data]);
+
+  const handleRefresh = React.useCallback(async () => {
+    setIsRefreshing(true);
+    setRefreshError(null);
+
+    try {
+      setRefreshNonce((current) => current + 1);
+      await db
+        .select()
+        .from(chat)
+        .orderBy(desc(chat.updatedAt));
+    } catch {
+      setRefreshError(REFRESH_ERROR_MESSAGE);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [db]);
+
+  const bannerMessage =
+    refreshError ||
+    (chatsQuery.error ? REFRESH_ERROR_MESSAGE : null) ||
+    (droppedRowCount > 0 ? PARTIAL_ROW_MESSAGE : null);
 
   return (
     // Root container: Full-screen view with background color from theme
@@ -142,31 +239,38 @@ export default function Home() {
 
       {/* Content section: Conditional rendering of chat list or empty state */}
       <View className="flex-1">
-        {hasChats ? (
-          // Chat list: Scrollable list of chat conversations
-          // Shows most recent chats at the top
-          <FlatList
-            className="flex-1"
-            contentContainerClassName="flex-grow pt-[125px] pb-5"
-            data={chats.data}
-            keyExtractor={(item) => item.id.toString()}
-            // Each list item: Chat preview with delete capability
-            renderItem={({ item }) => (
-              <ChatListItem
-                id={item.id}
-                title={item.title}
-                preview={getPreview(item.messages)}
-                timestamp={item.updatedAt}
-                onDelete={deleteChat}
-                isScreenFocused={isScreenFocused}
-              />
-            )}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          // Empty state: Friendly message when no chats exist
-          <EmptyState />
-        )}
+        {bannerMessage ? (
+          <View className="px-5 pt-[110px] pb-2">
+            <Text
+              className="text-[13px] leading-[18px]"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              {bannerMessage}
+            </Text>
+          </View>
+        ) : null}
+
+        <FlatList
+          className="flex-1"
+          contentContainerClassName="flex-grow pt-[125px] pb-5"
+          data={chatRows}
+          keyExtractor={(item) => item.id.toString()}
+          onRefresh={handleRefresh}
+          refreshing={isRefreshing}
+          // Each list item: Chat preview with delete capability
+          renderItem={({ item }) => (
+            <ChatListItem
+              id={item.id}
+              title={item.title}
+              preview={item.preview}
+              timestamp={item.timestamp}
+              onDelete={deleteChat}
+              isScreenFocused={isScreenFocused}
+            />
+          )}
+          ListEmptyComponent={EmptyState}
+          showsVerticalScrollIndicator={false}
+        />
       </View>
     </View>
   );

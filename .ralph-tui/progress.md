@@ -11,6 +11,7 @@ after each iteration and it's included in prompts for context.
 - Chat-switch stale result guard pattern (`hooks/useMessagePersistence.ts`): stamp each snapshot with `chatScope` (`chatIdParam` at snapshot creation) and ignore completion/error state updates when the snapshot scope no longer matches `activeChatScopeRef`, preventing late writes from prior chats from mutating the current chat UI state.
 - Deterministic hydration guard pattern (`app/chat/[id].tsx`): start each chat-load attempt with `createSequenceGuard("chat-hydration")` token, reject stale post-await continuations via `isCurrent(token)`, normalize DB payloads into one immutable snapshot, then commit related state updates in one `unstable_batchedUpdates` block so metadata + messages hydrate atomically.
 - Retrieval recovery UX split pattern (`app/chat/[id].tsx`): keep retrieval/hydration failures on a dedicated recovery surface (`RetrievalRecoveryView`) with its own retry trigger, while preserving `RetryBanner` only for send-stream failures so users get context-specific error messaging and retry behavior.
+- Resilient list row normalization pattern (`app/index.tsx`): normalize unknown DB rows through a strict adapter (`normalizeChatRow` + `coerceTimestamp`) and drop malformed entries before render so one corrupt row cannot crash/blank an entire list; pair with a lightweight banner to communicate partial visibility.
 
 ---
 
@@ -82,4 +83,21 @@ after each iteration and it's included in prompts for context.
     - Re-triggering retrieval through a monotonic attempt counter plus sequence-token stale guards gives safe retries without duplicating hydrated state.
   - Gotchas encountered
     - Repository-wide acceptance checks remain blocked by pre-existing issues: typecheck errors in `app/index.tsx`, `hooks/__tests__/useErrorRecovery.test.ts`, `providers/__tests__/ollama-provider.test.ts`, and lint error in `components/chat/__tests__/MessageList.test.tsx`.
+---
+
+## 2026-02-09 - US-005
+- What was implemented
+  - Hardened chat list rendering in `app/index.tsx` with row normalization (`normalizeChatRow`) and timestamp coercion (`coerceTimestamp`) so malformed/partial DB rows are safely skipped instead of breaking full-list rendering.
+  - Added safe preview extraction guards in `getPreview` to prevent unexpected message payload shapes from throwing during list render.
+  - Added non-blocking pull-to-refresh (`onRefresh`/`refreshing`) backed by `refreshNonce` re-query triggers and transient error handling that always clears refreshing state.
+  - Added lightweight banner messaging for transient list-refresh/query errors and partial-row drops, keeping the list interactive and visible during degraded states.
+- Files changed
+  - `app/index.tsx`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - `useLiveQuery` refreshes can be safely user-triggered by coupling a monotonic dependency nonce with a best-effort direct query, while keeping UI non-blocking via `finally`-driven refresh reset.
+    - Treating list rows as untrusted runtime data (even when typed) and adapting them into a strict view model prevents single-record corruption from escalating into full-screen failures.
+  - Gotchas encountered
+    - Repository-wide `npm run lint` and `npx tsc --noEmit` still fail due pre-existing unrelated issues in test files (`components/chat/__tests__/MessageList.test.tsx`, `hooks/__tests__/useErrorRecovery.test.ts`, `providers/__tests__/ollama-provider.test.ts`) outside US-005 scope.
 ---
