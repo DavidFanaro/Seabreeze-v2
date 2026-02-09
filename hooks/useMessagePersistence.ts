@@ -28,6 +28,7 @@ import type { StreamState } from "./chat/useStreamLifecycle";
 import type { ProviderId } from "@/types/provider.types";
 import type { ErrorCategory } from "@/providers/fallback-chain";
 import { createIdempotencyKey, createIdempotencyRegistry } from "@/lib/concurrency";
+import { normalizeTitleForPersistence } from "@/lib/chat-title";
 import { chat } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -157,15 +158,6 @@ interface SaveSnapshot {
   modelId: string;
 }
 
-function normalizeTitle(rawTitle: string): string | null {
-  const trimmedTitle = rawTitle.trim();
-  if (!trimmedTitle || trimmedTitle === "Chat") {
-    return null;
-  }
-
-  return trimmedTitle;
-}
-
 // =============================================================================
 // MAIN HOOK IMPLEMENTATION
 // =============================================================================
@@ -233,7 +225,7 @@ export function useMessagePersistence(
    * Execute the actual database save operation
    */
   const createSnapshot = useCallback((): SaveSnapshot => {
-    const titleForPersistence = normalizeTitle(title);
+    const titleForPersistence = normalizeTitleForPersistence(title);
     const thinkingJson = JSON.stringify(thinkingOutput);
     const messagesJson = JSON.stringify(messages);
     const chatIdentity = activeChatIdRef.current ?? chatIdParam;

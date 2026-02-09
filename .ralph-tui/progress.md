@@ -12,6 +12,7 @@ after each iteration and it's included in prompts for context.
 - Deterministic hydration guard pattern (`app/chat/[id].tsx`): start each chat-load attempt with `createSequenceGuard("chat-hydration")` token, reject stale post-await continuations via `isCurrent(token)`, normalize DB payloads into one immutable snapshot, then commit related state updates in one `unstable_batchedUpdates` block so metadata + messages hydrate atomically.
 - Retrieval recovery UX split pattern (`app/chat/[id].tsx`): keep retrieval/hydration failures on a dedicated recovery surface (`RetrievalRecoveryView`) with its own retry trigger, while preserving `RetryBanner` only for send-stream failures so users get context-specific error messaging and retry behavior.
 - Resilient list row normalization pattern (`app/index.tsx`): normalize unknown DB rows through a strict adapter (`normalizeChatRow` + `coerceTimestamp`) and drop malformed entries before render so one corrupt row cannot crash/blank an entire list; pair with a lightweight banner to communicate partial visibility.
+- Title sentinel normalization pattern (`lib/chat-title.ts`): keep `"Chat"` as an internal/default sentinel, map it to `null` at persistence boundaries (`normalizeTitleForPersistence`) and to an explicit UX fallback label at render boundaries (`getChatTitleForDisplay`) so failed auto-title generation never blocks chat flows and untitled chats stay rename-safe.
 
 ---
 
@@ -100,4 +101,27 @@ after each iteration and it's included in prompts for context.
     - Treating list rows as untrusted runtime data (even when typed) and adapting them into a strict view model prevents single-record corruption from escalating into full-screen failures.
   - Gotchas encountered
     - Repository-wide `npm run lint` and `npx tsc --noEmit` still fail due pre-existing unrelated issues in test files (`components/chat/__tests__/MessageList.test.tsx`, `hooks/__tests__/useErrorRecovery.test.ts`, `providers/__tests__/ollama-provider.test.ts`) outside US-005 scope.
+---
+
+## 2026-02-09 - US-006
+- What was implemented
+  - Added shared chat-title normalization utilities (`lib/chat-title.ts`) to separate internal title sentinel handling from persistence and display fallback behavior.
+  - Updated persistence and list/chat rendering to use the shared title helpers so untitled rows reliably render with fallback UX and default/sentinel titles persist as `null`.
+  - Hardened auto-title flow to be non-blocking and safer around manual title updates: auto-generation now triggers once per chat save lifecycle and ignores stale results after user/manual title changes.
+  - Added regression coverage proving untitled saves can later persist manual rename updates (`hooks/__tests__/useMessagePersistence.test.ts`).
+- Files changed
+  - `lib/chat-title.ts`
+  - `hooks/useMessagePersistence.ts`
+  - `app/chat/[id].tsx`
+  - `app/index.tsx`
+  - `components/chat/ChatListItem.tsx`
+  - `hooks/chat/useTitleGeneration.ts`
+  - `hooks/__tests__/useMessagePersistence.test.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Centralizing default-title sentinel rules in one helper avoids drift between DB serialization and UI fallback labels, which prevents untitled/renamed regressions.
+    - Title-generation async results should be version-guarded against concurrent manual updates to avoid late AI responses clobbering user intent.
+  - Gotchas encountered
+    - Repository-wide `npm run lint` and `npx tsc --noEmit` still fail due pre-existing unrelated test issues (`components/chat/__tests__/MessageList.test.tsx`, `hooks/__tests__/useErrorRecovery.test.ts`, `providers/__tests__/ollama-provider.test.ts`).
 ---

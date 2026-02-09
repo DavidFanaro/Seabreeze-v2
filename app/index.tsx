@@ -7,6 +7,7 @@ import useDatabase from "@/hooks/useDatabase";
 import { chat } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { IconButton, ChatListItem, useTheme } from "@/components";
+import { normalizeTitleForPersistence } from "@/lib/chat-title";
 import { ModelMessage } from "ai";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { SymbolView } from "expo-symbols";
@@ -72,7 +73,7 @@ const normalizeChatRow = (row: unknown): ChatListRow | null => {
 
   return {
     id,
-    title: typeof record.title === "string" ? record.title : null,
+    title: typeof record.title === "string" ? normalizeTitleForPersistence(record.title) : null,
     preview: getPreview(record.messages),
     timestamp: coerceTimestamp(record.updatedAt),
   };

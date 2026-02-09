@@ -13,6 +13,7 @@ import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import Animated, { SharedValue, useAnimatedStyle, withSpring, interpolate } from "react-native-reanimated";
 
+import { getChatTitleForDisplay } from "@/lib/chat-title";
 import { useTheme } from "@/components/ui/ThemeProvider";
 
 /** Props for the ChatListItem component */
@@ -124,6 +125,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
 
     // Display "No messages yet" if preview is empty
     const displayPreview = preview || "No messages yet";
+    const displayTitle = getChatTitleForDisplay(title);
 
     /**
      * Format timestamp into human-readable relative time
@@ -245,7 +247,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                                     }}
                                     numberOfLines={1}
                                 >
-                                    {title || "New Chat"}
+                                    {displayTitle}
                                 </Text>
                             </View>
 

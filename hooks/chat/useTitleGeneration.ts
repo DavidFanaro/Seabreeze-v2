@@ -29,6 +29,7 @@ import {
     DEFAULT_RETRY_CONFIG, 
     type RetryConfig 
 } from "@/hooks/useErrorRecovery";
+import { DEFAULT_CHAT_TITLE } from "@/lib/chat-title";
 
 /**
  * Hook for generating chat titles from conversation messages
@@ -51,7 +52,18 @@ export function useTitleGeneration(
      * Initialized to "Chat" as default fallback
      * Updated when title generation succeeds or when manually set
      */
-    const [title, setTitle] = useState<string>("Chat");
+    const [title, setTitleState] = useState<string>(DEFAULT_CHAT_TITLE);
+    const titleRef = useRef(title);
+    const titleVersionRef = useRef(0);
+
+    useEffect(() => {
+        titleRef.current = title;
+    }, [title]);
+
+    const setTitle = useCallback((nextTitle: string) => {
+        titleVersionRef.current += 1;
+        setTitleState(nextTitle);
+    }, []);
 
     // ===== CONFIGURATION =====
     /**
@@ -82,6 +94,8 @@ export function useTitleGeneration(
      * @returns Promise<string> - Generated title or empty string on failure
      */
     const generateTitle = useCallback(async (): Promise<string> => {
+        const generationVersion = titleVersionRef.current;
+
         // Guard clause: No messages to analyze
         if (messages.length === 0) return "";
         
@@ -112,7 +126,10 @@ export function useTitleGeneration(
                 
                 // Success case: Update state and return title
                 if (retryResult.success && retryResult.data) {
-                    setTitle(retryResult.data);
+                    if (titleVersionRef.current === generationVersion && titleRef.current === DEFAULT_CHAT_TITLE) {
+                        titleVersionRef.current += 1;
+                        setTitleState(retryResult.data);
+                    }
                     return retryResult.data;
                 }
                 
@@ -122,11 +139,14 @@ export function useTitleGeneration(
                 // Simple path: Direct execution without retry
                 const generatedTitle = await titleOperation();
                 if (generatedTitle) {
-                    setTitle(generatedTitle);
+                    if (titleVersionRef.current === generationVersion && titleRef.current === DEFAULT_CHAT_TITLE) {
+                        titleVersionRef.current += 1;
+                        setTitleState(generatedTitle);
+                    }
                 }
                 return generatedTitle;
             }
-        } catch (error) {
+        } catch {
             // Catch-all error handler
             // In production, this could be enhanced with specific error logging
             return "";
@@ -140,8 +160,8 @@ export function useTitleGeneration(
      * Wrapped in useCallback for performance optimization
      */
     const resetTitle = useCallback(() => {
-        setTitle("Chat");
-    }, []);
+        setTitle(DEFAULT_CHAT_TITLE);
+    }, [setTitle]);
 
     // ===== PUBLIC API =====
     /**

@@ -16,6 +16,7 @@ import { MessageList, MessageInput, useTheme, ChatContextMenu, RetrievalRecovery
 import { SaveErrorBanner } from "@/components/chat/SaveErrorBanner";
 import { StreamControlBanner } from "@/components/chat/StreamControlBanner";
 import { createIdempotencyKey, createSequenceGuard } from "@/lib/concurrency";
+import { DEFAULT_CHAT_TITLE, getChatTitleForDisplay } from "@/lib/chat-title";
 import { ProviderId } from "@/types/provider.types";
 
 export default function Chat() {
@@ -47,6 +48,7 @@ export default function Chat() {
     const hydrationGuardRef = useRef(createSequenceGuard("chat-hydration"));
     const lastHydratedSignatureRef = useRef<string | null>(null);
     const currentChatIdRef = useRef<string | null>(null);
+    const hasAttemptedAutoTitleRef = useRef(false);
     
     // Initialize useChat with chatId for unified state management
     const {
@@ -101,8 +103,9 @@ export default function Chat() {
                 setChatID(savedChatId);
             }
             // Generate title if needed
-            if (!title || title === "Chat") {
-                generateTitle();
+            if ((!title || title === DEFAULT_CHAT_TITLE) && !hasAttemptedAutoTitleRef.current) {
+                hasAttemptedAutoTitleRef.current = true;
+                void generateTitle();
             }
         },
         onSaveError: (error, attempts) => {
@@ -134,13 +137,14 @@ export default function Chat() {
         unstable_batchedUpdates(() => {
             setMessages([]);
             setThinkingOutput([]);
-            setTitle("Chat");
+            setTitle(DEFAULT_CHAT_TITLE);
             setText("");
             setChatID(0);
         });
         clearOverride();
         currentChatIdRef.current = nextChatScope;
         lastHydratedSignatureRef.current = null;
+        hasAttemptedAutoTitleRef.current = false;
     }, [setMessages, setThinkingOutput, setTitle, setText, clearOverride]);
 
     const applyHydrationSnapshot = useCallback((snapshot: {
@@ -247,7 +251,7 @@ export default function Chat() {
                         const thinkingOutput = normalizeThinkingOutput(data.thinkingOutput);
                         const title = typeof data.title === "string" && data.title.trim().length > 0
                             ? data.title
-                            : "Chat";
+                            : DEFAULT_CHAT_TITLE;
 
                         const signature = createIdempotencyKey("chat-hydration", [
                             chatIdParam,
@@ -307,9 +311,9 @@ export default function Chat() {
              {/* Configures the navigation stack screen header with the chat title and menu */}
              {/* ============================================================================ */}
              <Stack.Screen
-                 options={{
-                     /* Display the current chat title in the header */
-                     headerTitle: title,
+                  options={{
+                      /* Display the current chat title in the header */
+                      headerTitle: getChatTitleForDisplay(title),
                      /* Use transparent header to blend with app background */
                      headerTransparent: true,
                      /* Apply theme color to header text and back button */

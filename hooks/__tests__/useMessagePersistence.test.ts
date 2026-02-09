@@ -395,4 +395,48 @@ describe("useMessagePersistence", () => {
     expect(result.current.saveStatus).toBe("saved");
     expect(updateMock).toHaveBeenCalled();
   });
+
+  it("persists a manual rename after starting from an untitled chat", async () => {
+    const baseProps = {
+      streamState: "idle" as const,
+      chatIdParam: "42",
+      messages: [{ role: "user", content: "hello" }] as ModelMessage[],
+      thinkingOutput: [] as string[],
+      providerId: "apple" as const,
+      modelId: "apple.on.device",
+      enabled: true,
+    };
+
+    let title = "Chat";
+
+    const { result, rerender } = renderHook(() =>
+      useMessagePersistence({
+        ...baseProps,
+        title,
+      })
+    );
+
+    await act(async () => {
+      await result.current.triggerSave();
+    });
+
+    expect(updateSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: null,
+      })
+    );
+
+    title = "Renamed Chat";
+    rerender(undefined);
+
+    await act(async () => {
+      await result.current.triggerSave();
+    });
+
+    expect(updateSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: "Renamed Chat",
+      })
+    );
+  });
 });
