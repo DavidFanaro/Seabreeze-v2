@@ -4,4 +4,5 @@ export * from './MessageList';
 export * from './MessageBubble';
 export * from './MessageInput';
 export * from './ThemedMarkdown';
+export * from './RetrievalRecoveryView';
 export * from './RetryBanner';

@@ -14,6 +14,7 @@ export { ChatListItem } from "./chat/ChatListItem";
 export { MessageBubble } from "./chat/MessageBubble";
 export { MessageInput } from "./chat/MessageInput";
 export { MessageList } from "./chat/MessageList";
+export { RetrievalRecoveryView } from "./chat/RetrievalRecoveryView";
 export { RetryBanner } from "./chat/RetryBanner";
 export { StreamControlBanner } from "./chat/StreamControlBanner";
 

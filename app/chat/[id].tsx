@@ -12,7 +12,7 @@ import { KeyboardAvoidingView, KeyboardStickyView, useReanimatedKeyboardAnimatio
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated";
 import { ModelMessage } from "ai";
-import { MessageList, MessageInput, useTheme, ChatContextMenu, RetryBanner } from "@/components";
+import { MessageList, MessageInput, useTheme, ChatContextMenu, RetrievalRecoveryView, RetryBanner } from "@/components";
 import { SaveErrorBanner } from "@/components/chat/SaveErrorBanner";
 import { StreamControlBanner } from "@/components/chat/StreamControlBanner";
 import { createIdempotencyKey, createSequenceGuard } from "@/lib/concurrency";
@@ -120,6 +120,15 @@ export default function Chat() {
     const sendChatMessages = useCallback(async () => {
         await sendMessage();
     }, [sendMessage]);
+
+    const retryHydration = useCallback(() => {
+        if (isInitializing) {
+            return;
+        }
+
+        setIsInitializing(true);
+        setHydrationAttempt((attempt) => attempt + 1);
+    }, [isInitializing]);
 
     const resetHydratedState = useCallback((nextChatScope: string | null) => {
         unstable_batchedUpdates(() => {
@@ -338,16 +347,23 @@ export default function Chat() {
                         isThinking={isThinking}
                         isStreaming={isStreaming}
                       />
-                     
-                     {/* ================================================================== */}
-                     {/* RETRY BANNER SECTION */}
-                     {/* Shows retry button when last message fails, allows re-sending failed msg */}
-                     {/* ================================================================== */}
-                     <RetryBanner 
-                          canRetry={canRetry || !!hydrationError}
-                          onRetry={hydrationError ? (() => setHydrationAttempt((attempt) => attempt + 1)) : retryLastMessage}
-                          errorMessage={hydrationError ?? errorMessage}
+
+                      <RetrievalRecoveryView
+                          visible={!!hydrationError}
+                          errorMessage={hydrationError ?? "Unable to load this chat right now."}
+                          onRetry={retryHydration}
+                          retryDisabled={isInitializing}
                       />
+                     
+                      {/* ================================================================== */}
+                      {/* RETRY BANNER SECTION */}
+                      {/* Shows retry button when last message fails, allows re-sending failed msg */}
+                      {/* ================================================================== */}
+                      <RetryBanner 
+                           canRetry={canRetry}
+                           onRetry={retryLastMessage}
+                           errorMessage={errorMessage}
+                       />
 
                      {/* ================================================================== */}
                      {/* STREAM CONTROL BANNER SECTION */}

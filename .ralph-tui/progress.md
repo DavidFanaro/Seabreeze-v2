@@ -10,6 +10,7 @@ after each iteration and it's included in prompts for context.
 - Per-chat persistence orchestration pattern (`hooks/useMessagePersistence.ts`): build deterministic snapshot key via `createIdempotencyKey`, dedupe in-flight saves with `createIdempotencyRegistry`, serialize writes with `writeQueueRef` promise chaining, and promote queued post-insert saves to update using `activeChatIdRef` once insert returns the canonical chat ID.
 - Chat-switch stale result guard pattern (`hooks/useMessagePersistence.ts`): stamp each snapshot with `chatScope` (`chatIdParam` at snapshot creation) and ignore completion/error state updates when the snapshot scope no longer matches `activeChatScopeRef`, preventing late writes from prior chats from mutating the current chat UI state.
 - Deterministic hydration guard pattern (`app/chat/[id].tsx`): start each chat-load attempt with `createSequenceGuard("chat-hydration")` token, reject stale post-await continuations via `isCurrent(token)`, normalize DB payloads into one immutable snapshot, then commit related state updates in one `unstable_batchedUpdates` block so metadata + messages hydrate atomically.
+- Retrieval recovery UX split pattern (`app/chat/[id].tsx`): keep retrieval/hydration failures on a dedicated recovery surface (`RetrievalRecoveryView`) with its own retry trigger, while preserving `RetryBanner` only for send-stream failures so users get context-specific error messaging and retry behavior.
 
 ---
 
@@ -62,4 +63,23 @@ after each iteration and it's included in prompts for context.
     - Reusing existing retry surfaces (here `RetryBanner`) for hydration failures gives a low-friction recovery path without introducing another transient-error component.
   - Gotchas encountered
     - Repository-wide `npx tsc --noEmit` and `npm run lint` still fail on pre-existing unrelated files (same baseline issues, plus lint error in `components/chat/__tests__/MessageList.test.tsx`), so acceptance checks remain blocked outside US-003 scope.
+---
+
+## 2026-02-09 - US-004
+- What was implemented
+  - Added a dedicated retrieval recovery UI (`RetrievalRecoveryView`) that appears when chat hydration/retrieval fails, replacing the previous dead-end feeling of an empty chat with only generic retry messaging.
+  - Wired a safe hydration retry path in `app/chat/[id].tsx` (`retryHydration`) that re-runs retrieval by bumping `hydrationAttempt` while `createSequenceGuard` continues to reject stale async completions.
+  - Separated error surfaces so retrieval failures render in `RetrievalRecoveryView`, while `RetryBanner` now stays focused on send/retry-last-message failures to avoid mixed semantics.
+- Files changed
+  - `app/chat/[id].tsx`
+  - `components/chat/RetrievalRecoveryView.tsx`
+  - `components/index.ts`
+  - `components/chat/index.ts`
+  - `.ralph-tui/progress.md`
+- **Learnings:**
+  - Patterns discovered
+    - Keeping hydration retry UX separate from message-send retry UX reduces user confusion and avoids coupling unrelated retry pipelines.
+    - Re-triggering retrieval through a monotonic attempt counter plus sequence-token stale guards gives safe retries without duplicating hydrated state.
+  - Gotchas encountered
+    - Repository-wide acceptance checks remain blocked by pre-existing issues: typecheck errors in `app/index.tsx`, `hooks/__tests__/useErrorRecovery.test.ts`, `providers/__tests__/ollama-provider.test.ts`, and lint error in `components/chat/__tests__/MessageList.test.tsx`.
 ---
