@@ -528,7 +528,7 @@ export default function Chat() {
                                 value={text}
                                 onChangeText={setText}
                                 onSend={sendChatMessages}
-                                disabled={isStreaming}
+                                disabled={isInputLocked}
                                 isStreaming={isStreaming}
                                 onCancel={cancel}
                             />
@@ -540,7 +540,7 @@ export default function Chat() {
                             value={text}
                             onChangeText={setText}
                             onSend={sendChatMessages}
-                            disabled={isStreaming}
+                            disabled={isInputLocked}
                             isStreaming={isStreaming}
                             onCancel={cancel}
                         />

@@ -156,12 +156,17 @@ export const MessageList: React.FC<MessageListProps> = ({
     }, []);
 
     const handleContentSizeChange = useCallback(() => {
+        if (isStreaming) {
+            scrollToBottom(false, false, true);
+            return;
+        }
+
         if (Date.now() > terminalSettleUntilRef.current) {
             return;
         }
 
         scrollToBottom(false, false, true);
-    }, [scrollToBottom]);
+    }, [isStreaming, scrollToBottom]);
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1];
@@ -181,7 +186,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         if (isNewUserMessage) {
             scrollToBottom(true);
         } else if (isStreamingAssistantUpdate) {
-            scrollToBottom();
+            scrollToBottom(false, false, true);
         } else if (didStreamingEnd) {
             scrollToBottom();
             scheduleTerminalSettleScroll();

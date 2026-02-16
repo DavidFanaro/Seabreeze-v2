@@ -573,6 +573,7 @@ describe("MessageList Component", () => {
     );
 
     expect(mockScrollToEnd).toHaveBeenCalled();
+    expect(mockScrollToEnd).toHaveBeenLastCalledWith({ animated: false });
   });
 
   it("does not auto-scroll during streaming when user is far from bottom", () => {
@@ -604,6 +605,61 @@ describe("MessageList Component", () => {
         isStreaming={true}
       />
     );
+
+    expect(mockScrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("keeps follow mode during active stream on content size changes when near bottom", () => {
+    const streamingMessages: ModelMessage[] = [
+      { role: "user", content: "write a server" },
+      { role: "assistant", content: "```zig\nconst" },
+    ];
+
+    render(
+      <MessageList messages={streamingMessages} isStreaming={true} />
+    );
+
+    act(() => {
+      latestFlashListProps.onScroll({
+        nativeEvent: {
+          contentSize: { width: 320, height: 1600 },
+          contentOffset: { x: 0, y: 1450 },
+          layoutMeasurement: { width: 320, height: 120 },
+        },
+      });
+    });
+
+    act(() => {
+      latestFlashListProps.onContentSizeChange(320, 1650);
+    });
+
+    expect(mockScrollToEnd).toHaveBeenCalledTimes(1);
+    expect(mockScrollToEnd).toHaveBeenLastCalledWith({ animated: false });
+  });
+
+  it("pauses follow mode during active stream on content size changes when far from bottom", () => {
+    const streamingMessages: ModelMessage[] = [
+      { role: "user", content: "write a server" },
+      { role: "assistant", content: "```zig\nconst" },
+    ];
+
+    render(
+      <MessageList messages={streamingMessages} isStreaming={true} />
+    );
+
+    act(() => {
+      latestFlashListProps.onScroll({
+        nativeEvent: {
+          contentSize: { width: 320, height: 2200 },
+          contentOffset: { x: 0, y: 600 },
+          layoutMeasurement: { width: 320, height: 500 },
+        },
+      });
+    });
+
+    act(() => {
+      latestFlashListProps.onContentSizeChange(320, 2250);
+    });
 
     expect(mockScrollToEnd).not.toHaveBeenCalled();
   });
