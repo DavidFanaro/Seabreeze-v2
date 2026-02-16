@@ -118,6 +118,24 @@ describe("MessageList Component", () => {
     expect(aiMessages).toHaveLength(2);
   });
 
+  it("normalizes legacy non-string content before rendering", () => {
+    const legacyMessages: ModelMessage[] = [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "legacy " },
+          { type: "text", text: "message" },
+        ],
+      } as unknown as ModelMessage,
+    ];
+
+    const { getByText } = render(
+      <MessageList messages={legacyMessages} isStreaming={false} />
+    );
+
+    expect(getByText("legacy message")).toBeDefined();
+  });
+
   /**
    * Test: Empty message list shows empty component
    */

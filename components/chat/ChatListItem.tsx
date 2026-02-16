@@ -217,13 +217,17 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 overshootRight={false}
                 friction={2}
                 rightThreshold={40}
-                enabled={isScreenFocused && !isDeleting} // Disable swiping when screen is not focused or deleting
+                enabled={!isDeleting} // Disable swiping while deleting
                 containerStyle={{ backgroundColor: "transparent" }}
             >
                 {/* MAIN TOUCHABLE AREA - Navigates to chat detail on tap */}
-                <Pressable
+            <Pressable
+                    testID={`chat-list-item-${id}`}
                     onPress={handleNavigate}
-                    disabled={!isScreenFocused || isDeleting}
+                    disabled={isDeleting}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open chat ${displayTitle}`}
+                    accessibilityState={{ disabled: isDeleting }}
                     onPressIn={() => {
                         if (isDeleting) {
                             return;

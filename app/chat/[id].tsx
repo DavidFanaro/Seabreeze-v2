@@ -4,6 +4,11 @@ import useDatabase from "@/hooks/useDatabase";
 import { useChatState } from "@/hooks/useChatState";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useMessagePersistence } from "@/hooks/useMessagePersistence";
+import {
+    isChatDeleteLocked,
+    runChatOperation,
+} from "@/lib/chat-persistence-coordinator";
+import { normalizePersistedMessages } from "@/lib/chat-message-normalization";
 import { eq } from "drizzle-orm";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -23,6 +28,8 @@ import {
     startPersistenceOperation,
     succeedPersistenceOperation,
 } from "@/lib/persistence-telemetry";
+
+const AUTO_TITLE_MAX_ATTEMPTS = 3;
 
 export default function Chat() {
     const db = useDatabase();
@@ -53,7 +60,11 @@ export default function Chat() {
     const hydrationGuardRef = useRef(createSequenceGuard("chat-hydration"));
     const lastHydratedSignatureRef = useRef<string | null>(null);
     const currentChatIdRef = useRef<string | null>(null);
-    const hasAttemptedAutoTitleRef = useRef(false);
+    const autoTitleAttemptCountRef = useRef(0);
+    const isAutoTitleGenerationInFlightRef = useRef(false);
+    const autoTitleSucceededRef = useRef(false);
+    const lastAutoTitleTriggerSignatureRef = useRef<string | null>(null);
+    const backfilledChatIdsRef = useRef<Set<number>>(new Set());
     
     // Initialize useChat with chatId for unified state management
     const {
@@ -87,6 +98,43 @@ export default function Chat() {
         },
     });
 
+    const isInputLocked = streamState === "streaming" || streamState === "completing";
+
+    const attemptAutoTitleGeneration = useCallback(async () => {
+        if (messages.length === 0) {
+            return;
+        }
+
+        if (title && title !== DEFAULT_CHAT_TITLE) {
+            autoTitleSucceededRef.current = true;
+            return;
+        }
+
+        if (autoTitleSucceededRef.current) {
+            return;
+        }
+
+        if (isAutoTitleGenerationInFlightRef.current) {
+            return;
+        }
+
+        if (autoTitleAttemptCountRef.current >= AUTO_TITLE_MAX_ATTEMPTS) {
+            return;
+        }
+
+        autoTitleAttemptCountRef.current += 1;
+        isAutoTitleGenerationInFlightRef.current = true;
+
+        try {
+            const generatedTitle = await generateTitle();
+            if (generatedTitle.trim().length > 0) {
+                autoTitleSucceededRef.current = true;
+            }
+        } finally {
+            isAutoTitleGenerationInFlightRef.current = false;
+        }
+    }, [generateTitle, messages.length, title]);
+
     // Use atomic message persistence with retry logic
     const {
         saveStatus,
@@ -104,14 +152,8 @@ export default function Chat() {
         modelId: currentModel,
         title,
         onSaveComplete: (savedChatId) => {
-            if (chatID === 0) {
-                setChatID(savedChatId);
-            }
-            // Generate title if needed
-            if ((!title || title === DEFAULT_CHAT_TITLE) && !hasAttemptedAutoTitleRef.current) {
-                hasAttemptedAutoTitleRef.current = true;
-                void generateTitle();
-            }
+            setChatID((current) => (current === 0 ? savedChatId : current));
+            void attemptAutoTitleGeneration();
         },
         onSaveError: (error, attempts) => {
             console.error(`[Chat] Save failed after ${attempts} attempts:`, error);
@@ -125,8 +167,8 @@ export default function Chat() {
         clearOverride();
     }, [reset, clearOverride]);
 
-    const sendChatMessages = useCallback(async () => {
-        await sendMessage();
+    const sendChatMessages = useCallback(async (textOverride?: string) => {
+        await sendMessage(textOverride);
     }, [sendMessage]);
 
     const retryHydration = useCallback(() => {
@@ -149,7 +191,10 @@ export default function Chat() {
         clearOverride();
         currentChatIdRef.current = nextChatScope;
         lastHydratedSignatureRef.current = null;
-        hasAttemptedAutoTitleRef.current = false;
+        autoTitleAttemptCountRef.current = 0;
+        isAutoTitleGenerationInFlightRef.current = false;
+        autoTitleSucceededRef.current = false;
+        lastAutoTitleTriggerSignatureRef.current = null;
     }, [setMessages, setThinkingOutput, setTitle, setText, clearOverride]);
 
     const applyHydrationSnapshot = useCallback((snapshot: {
@@ -175,6 +220,10 @@ export default function Chat() {
         });
         currentChatIdRef.current = snapshot.chatScope;
         lastHydratedSignatureRef.current = snapshot.signature;
+        autoTitleAttemptCountRef.current = 0;
+        isAutoTitleGenerationInFlightRef.current = false;
+        autoTitleSucceededRef.current = snapshot.title !== DEFAULT_CHAT_TITLE;
+        lastAutoTitleTriggerSignatureRef.current = null;
 
         if (snapshot.providerId && snapshot.modelId) {
             syncFromDatabase(snapshot.providerId, snapshot.modelId);
@@ -187,6 +236,58 @@ export default function Chat() {
             setChatID(lastSavedChatId);
         }
     }, [lastSavedChatId, chatID]);
+
+    useEffect(() => {
+        if (isInitializing) {
+            return;
+        }
+
+        if (messages.length === 0) {
+            return;
+        }
+
+        if (title && title !== DEFAULT_CHAT_TITLE) {
+            autoTitleSucceededRef.current = true;
+            return;
+        }
+
+        if (
+            streamState !== "completed"
+            && streamState !== "error"
+            && streamState !== "cancelled"
+        ) {
+            return;
+        }
+
+        const lastMessage = messages[messages.length - 1];
+        const lastContent = typeof lastMessage?.content === "string"
+            ? lastMessage.content
+            : JSON.stringify(lastMessage?.content ?? "");
+        const triggerSignature = createIdempotencyKey("auto-title-trigger", [
+            chatIdParam,
+            String(lastSavedChatId ?? ""),
+            String(messages.length),
+            String(lastMessage?.role ?? ""),
+            lastContent,
+            streamState,
+            title,
+        ]);
+
+        if (lastAutoTitleTriggerSignatureRef.current === triggerSignature) {
+            return;
+        }
+
+        lastAutoTitleTriggerSignatureRef.current = triggerSignature;
+        void attemptAutoTitleGeneration();
+    }, [
+        attemptAutoTitleGeneration,
+        chatIdParam,
+        isInitializing,
+        lastSavedChatId,
+        messages,
+        streamState,
+        title,
+    ]);
 
     // Reset state immediately on chat change
     useEffect(() => {
@@ -201,24 +302,6 @@ export default function Chat() {
     // Load existing chat data
     useEffect(() => {
         const token = hydrationGuardRef.current.next();
-
-        const normalizeMessages = (value: unknown): ModelMessage[] => {
-            if (!Array.isArray(value)) {
-                return [];
-            }
-
-            return value
-                .filter((message): message is ModelMessage => (
-                    typeof message === "object"
-                    && message !== null
-                    && "role" in message
-                    && "content" in message
-                    && typeof (message as { role?: unknown }).role === "string"
-                ))
-                .map((message) => ({
-                    ...message,
-                }));
-        };
 
         const normalizeThinkingOutput = (value: unknown): string[] => {
             if (!Array.isArray(value)) {
@@ -259,7 +342,11 @@ export default function Chat() {
                     if (!hydrationGuardRef.current.isCurrent(token)) return;
 
                     if (data) {
-                        const messages = normalizeMessages(data.messages);
+                        const {
+                            messages,
+                            didCoerceContent,
+                            droppedMessages,
+                        } = normalizePersistedMessages(data.messages);
                         const thinkingOutput = normalizeThinkingOutput(data.thinkingOutput);
                         const title = typeof data.title === "string" && data.title.trim().length > 0
                             ? data.title
@@ -291,6 +378,31 @@ export default function Chat() {
                             messageCount: messages.length,
                             thinkingOutputCount: thinkingOutput.length,
                         });
+
+                        const shouldBackfillLegacyPayload = (didCoerceContent || droppedMessages > 0)
+                            && !backfilledChatIdsRef.current.has(id);
+
+                        if (shouldBackfillLegacyPayload) {
+                            backfilledChatIdsRef.current.add(id);
+
+                            void runChatOperation(String(id), async () => {
+                                if (isChatDeleteLocked(id)) {
+                                    backfilledChatIdsRef.current.delete(id);
+                                    return;
+                                }
+
+                                await db
+                                    .update(chat)
+                                    .set({
+                                        messages,
+                                        thinkingOutput,
+                                    })
+                                    .where(eq(chat.id, id));
+                            }).catch((error) => {
+                                backfilledChatIdsRef.current.delete(id);
+                                console.warn("[Chat] Failed to backfill legacy chat payload:", error);
+                            });
+                        }
                     } else {
                         resetHydratedState(null);
                         succeedPersistenceOperation(loadOperation, {
@@ -399,7 +511,7 @@ export default function Chat() {
                      {/* Shows cancel button during streaming and 'Stopped' when cancelled */}
                      {/* ================================================================== */}
                      <StreamControlBanner 
-                         isStreaming={isStreaming}
+                         isStreaming={isInputLocked}
                          streamState={streamState}
                          onCancel={cancel}
                      />
@@ -427,7 +539,7 @@ export default function Chat() {
                                 value={text}
                                 onChangeText={setText}
                                 onSend={sendChatMessages}
-                                disabled={isStreaming}
+                                disabled={isInputLocked}
                             />
                         </Animated.View>
                     </KeyboardStickyView>
@@ -437,7 +549,7 @@ export default function Chat() {
                             value={text}
                             onChangeText={setText}
                             onSend={sendChatMessages}
-                            disabled={isStreaming}
+                            disabled={isInputLocked}
                         />
                     </Animated.View>
                 )}

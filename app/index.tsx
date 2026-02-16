@@ -8,7 +8,6 @@ import { chat } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { IconButton, ChatListItem, useTheme } from "@/components";
 import { normalizeTitleForPersistence } from "@/lib/chat-title";
-import { createIdempotencyRegistry } from "@/lib/concurrency";
 import {
   acquireChatDeleteLock,
   isChatDeleteLocked,
@@ -165,7 +164,6 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [refreshError, setRefreshError] = React.useState<string | null>(null);
   const [deletingIds, setDeletingIds] = React.useState<Set<number>>(new Set());
-  const createNavigationRegistryRef = React.useRef(createIdempotencyRegistry<void>());
   const listQueryOperationRef = React.useRef<PersistenceOperationContext | null>(null);
 
   // Live query: Fetches all chats ordered by most recently updated
@@ -195,7 +193,7 @@ export default function Home() {
       try {
         await runChatOperation(String(id), async () => {
           await db.delete(chat).where(eq(chat.id, id));
-        });
+        }, "list");
       } finally {
         releaseDeleteLock();
         setDeletingIds((current) => {
@@ -216,23 +214,11 @@ export default function Home() {
       return;
     }
 
-    void runListOperation(async () => {
-      if (isChatDeleteLocked(id)) {
-        return;
-      }
-
-      router.push(`/chat/${id}`);
-    });
+    router.push(`/chat/${id}`);
   }, [router]);
 
   const openNewChat = React.useCallback(() => {
-    const key = "open-new-chat";
-
-    void createNavigationRegistryRef.current.run(key, async () => {
-      await runListOperation(async () => {
-        router.push("/chat/new");
-      });
-    });
+    router.push("/chat/new");
   }, [router]);
 
   const chatRows = React.useMemo(() => {
@@ -326,6 +312,8 @@ export default function Home() {
             <IconButton
               icon="plus"
               onPress={openNewChat}
+              testID="chat-list-new-chat-button"
+              accessibilityLabel="Start new chat"
               style={{ marginLeft: 6 }}
             />
           ),
@@ -334,6 +322,8 @@ export default function Home() {
             <IconButton
               icon="gear"
               onPress={() => router.push("/settings")}
+              testID="chat-list-settings-button"
+              accessibilityLabel="Open settings"
               style={{ marginLeft: 6 }}
             />
           ),

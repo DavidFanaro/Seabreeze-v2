@@ -189,6 +189,68 @@ describe('useChat', () => {
       expect(result.current.isStreaming).toBe(false);
     });
 
+    it('re-enters streaming state for sequential sends in the same chat', async () => {
+      const secondSendDeferred = createDeferred<{
+        success: boolean;
+        shouldRetryWithFallback: boolean;
+        accumulated: string;
+      }>();
+
+      mockExecuteStreaming
+        .mockImplementationOnce(async (options: any) => {
+          options?.onChunkReceived?.();
+          options?.onDoneSignalReceived?.();
+          options?.onStreamCompleted?.();
+          return {
+            success: true,
+            shouldRetryWithFallback: false,
+            accumulated: 'first response',
+          };
+        })
+        .mockImplementationOnce(async (options: any) => {
+          const result = await secondSendDeferred.promise;
+          options?.onDoneSignalReceived?.();
+          options?.onStreamCompleted?.();
+          return result;
+        });
+
+      const { result } = renderHook(() => useChat({}));
+
+      act(() => {
+        result.current.setText('first send');
+      });
+
+      await act(async () => {
+        await result.current.sendMessage();
+      });
+
+      expect(result.current.streamState).toBe('completed');
+
+      act(() => {
+        result.current.setText('second send');
+      });
+
+      let secondSend = Promise.resolve();
+      act(() => {
+        secondSend = result.current.sendMessage();
+      });
+
+      expect(result.current.streamState).toBe('streaming');
+      expect(result.current.isStreaming).toBe(true);
+
+      await act(async () => {
+        secondSendDeferred.resolve({
+          success: true,
+          shouldRetryWithFallback: false,
+          accumulated: 'second response',
+        });
+        await secondSend;
+      });
+
+      expect(result.current.isStreaming).toBe(false);
+      expect(mockExecuteStreaming).toHaveBeenCalledTimes(2);
+    });
+
     it('should set isThinking while reasoning streams', async () => {
       let resolveStreaming: (() => void) | null = null;
       mockExecuteStreaming.mockImplementation(async (options: any) => {

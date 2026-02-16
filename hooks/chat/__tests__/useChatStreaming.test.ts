@@ -268,7 +268,6 @@ describe('useChatStreaming', () => {
         'chunk',
         'chunk',
         'chunk',
-        'chunk',
         'done',
         'completed',
       ]);
@@ -884,6 +883,77 @@ describe('useChatStreaming', () => {
       expect(mockOnChunk).toHaveBeenCalledTimes(1);
       expect(setMessagesMock).toHaveBeenCalledTimes(1);
       expect(streamingResult.wasCancelled).toBe(true);
+    });
+
+    it('treats finish-step events as stream completion', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      const lifecycleEvents: string[] = [];
+      const mockFullStream = {
+        [Symbol.asyncIterator]: async function* () {
+          yield { type: 'text-delta', text: 'pong' };
+          yield { type: 'finish-step' };
+          yield { type: 'text-delta', text: ' ignored' };
+        },
+      };
+
+      mockStreamText.mockReturnValue({
+        fullStream: mockFullStream,
+      } as any);
+
+      const streamingResult = await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            onChunkReceived: () => lifecycleEvents.push('chunk'),
+            onDoneSignalReceived: () => lifecycleEvents.push('done'),
+            onStreamCompleted: () => lifecycleEvents.push('completed'),
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(streamingResult.success).toBe(true);
+      expect(streamingResult.accumulated).toBe('pong');
+      expect(lifecycleEvents).toEqual(['chunk', 'done', 'completed']);
+      expect(setMessagesMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores empty stream deltas for chunk-received lifecycle', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const lifecycleEvents: string[] = [];
+
+      const mockFullStream = {
+        [Symbol.asyncIterator]: async function* () {
+          yield { type: 'reasoning-delta', text: '' };
+          yield { type: 'text-delta', text: '' };
+          yield { type: 'text-delta', text: 'ok' };
+          yield { type: 'finish' };
+        },
+      };
+
+      mockStreamText.mockReturnValue({
+        fullStream: mockFullStream,
+      } as any);
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            onChunkReceived: () => lifecycleEvents.push('chunk'),
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(lifecycleEvents).toEqual(['chunk']);
+      expect(setMessagesMock).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -338,6 +338,23 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         },
     });
 
+    useEffect(() => {
+        const isTerminalOrIdleState =
+            streamState === "idle"
+            || streamState === "completed"
+            || streamState === "error"
+            || streamState === "cancelled";
+
+        if (!isTerminalOrIdleState) {
+            return;
+        }
+
+        if (isStreaming || isThinking) {
+            setIsStreaming(false);
+            setIsThinking(false);
+        }
+    }, [isStreaming, isThinking, streamState]);
+
         // =============================================================================
     // PROVIDER RESET EFFECT
     // =============================================================================
@@ -662,7 +679,6 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                             operationKey: sendOperationKey,
                             content,
                         };
-                        onError?.(watchdogError);
                     }
 
                     if (!abortSignal.aborted) {

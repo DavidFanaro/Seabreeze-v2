@@ -317,6 +317,18 @@ export function useChatStreaming() {
          * This function processes the text stream and updates the UI in real-time
          */
         const streamOperation = async () => {
+            let hasSignaledCompletion = false;
+
+            const signalCompletion = () => {
+                if (hasSignaledCompletion) {
+                    return;
+                }
+
+                hasSignaledCompletion = true;
+                onDoneSignalReceived?.();
+                onStreamCompleted?.();
+            };
+
             const canModelThink = currentModel.provider === "ollama"
                 || isThinkingCapableModel(
                     currentModel.provider,
@@ -364,12 +376,16 @@ export function useChatStreaming() {
                         return;
                     }
 
-                    if (part.type === "reasoning-delta") {
-                        onChunkReceived?.();
+                    if (part.type === "finish" || part.type === "finish-step") {
+                        signalCompletion();
+                        break;
+                    }
 
+                    if (part.type === "reasoning-delta") {
                         if (!thinkingChunkHandler) {
                             continue;
                         }
+
                         const reasoningDelta = typeof (part as { text?: unknown }).text === "string"
                             ? (part as { text: string }).text
                             : typeof (part as { delta?: unknown }).delta === "string"
@@ -380,6 +396,7 @@ export function useChatStreaming() {
                             continue;
                         }
 
+                        onChunkReceived?.();
                         reasoningAccumulated += reasoningDelta;
                         if (canCommit()) {
                             thinkingChunkHandler?.(reasoningDelta, reasoningAccumulated);
@@ -388,18 +405,23 @@ export function useChatStreaming() {
                     }
 
                     if (part.type === "text-delta") {
+                        const textDelta = typeof part.text === "string" ? part.text : "";
+
+                        if (!textDelta) {
+                            continue;
+                        }
+
                         onChunkReceived?.();
-                        accumulated += part.text;
+                        accumulated += textDelta;
                         updateAssistantMessage(accumulated);
 
                         if (canCommit()) {
-                            onChunk?.(part.text, accumulated);
+                            onChunk?.(textDelta, accumulated);
                         }
                     }
                 }
 
-                onDoneSignalReceived?.();
-                onStreamCompleted?.();
+                signalCompletion();
                 return;
             }
 
@@ -408,6 +430,10 @@ export function useChatStreaming() {
                 // Check for abort signal
                 if (abortSignal?.aborted) {
                     return;
+                }
+
+                if (!chunk) {
+                    continue;
                 }
 
                 onChunkReceived?.();
@@ -420,8 +446,7 @@ export function useChatStreaming() {
                 }
             }
 
-            onDoneSignalReceived?.();
-            onStreamCompleted?.();
+            signalCompletion();
         };
 
         try {

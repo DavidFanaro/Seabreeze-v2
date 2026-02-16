@@ -77,6 +77,10 @@ export interface StreamLifecycleLogEntry {
 export interface StreamLifecycleOptions {
   /** Timeout in milliseconds for fallback completion detection (default: 30000) */
   timeoutMs?: number;
+  /** Upper bound for a stream to remain non-terminal before forcing error (default: 45000) */
+  expectedCompletionWindowMs?: number;
+  /** Grace period after done signal before forcing terminal completion (default: 8000) */
+  completionGraceMs?: number;
   /** Enable debug logging of lifecycle events (default: false) */
   enableLogging?: boolean;
   /** Callback when stream state changes */
@@ -132,6 +136,8 @@ export interface UseStreamLifecycleReturn {
 // =============================================================================
 
 const DEFAULT_TIMEOUT_MS = 30000;
+const DEFAULT_EXPECTED_COMPLETION_WINDOW_MS = 45000;
+const DEFAULT_COMPLETION_GRACE_MS = 8000;
 const MAX_STREAM_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 // =============================================================================
@@ -195,6 +201,8 @@ export function useStreamLifecycle(
 ): UseStreamLifecycleReturn {
   const {
     timeoutMs = DEFAULT_TIMEOUT_MS,
+    expectedCompletionWindowMs = DEFAULT_EXPECTED_COMPLETION_WINDOW_MS,
+    completionGraceMs = DEFAULT_COMPLETION_GRACE_MS,
     enableLogging = false,
     onStateChange,
     onComplete,
@@ -216,11 +224,15 @@ export function useStreamLifecycle(
   // ===========================================================================
 
   const eventLogRef = useRef<StreamLifecycleLogEntry[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expectedCompletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completionGraceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxDurationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastChunkTimeRef = useRef<number>(0);
   const isDoneSignalReceivedRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
+  const streamStateRef = useRef<StreamState>("idle");
 
   // ===========================================================================
   // STATE TRANSITION HELPERS
@@ -233,41 +245,51 @@ export function useStreamLifecycle(
     (newState: StreamState, details?: Record<string, unknown>) => {
       if (!isMountedRef.current) return;
 
-      setStreamState((current) => {
-        // Prevent invalid transitions
-        if (isTerminalState(current) && !isTerminalState(newState)) {
-          logEvent(enableLogging, eventLogRef, "error", {
-            message: "Invalid state transition attempted",
-            from: current,
-            to: newState,
-          });
-          return current;
-        }
+      const current = streamStateRef.current;
 
-        if (current !== newState) {
-          logEvent(enableLogging, eventLogRef, newState as StreamLifecycleEvent, {
-            from: current,
-            ...details,
-          });
+      // Prevent invalid transitions, but allow explicit stream restarts.
+      const isRestartTransition =
+        isTerminalState(current) && newState === "streaming";
 
-          // Call state change callback
-          onStateChange?.(newState);
+      if (
+        isTerminalState(current)
+        && !isTerminalState(newState)
+        && !isRestartTransition
+      ) {
+        logEvent(enableLogging, eventLogRef, "error", {
+          message: "Invalid state transition attempted",
+          from: current,
+          to: newState,
+        });
+        return;
+      }
 
-          // Call terminal state callbacks
-          if (newState === "completed") {
-            onComplete?.();
-          } else if (newState === "error") {
-            const error = details?.error instanceof Error
-              ? details.error
-              : new Error(details?.message as string || "Stream error");
-            onError?.(error);
-          } else if (newState === "cancelled") {
-            onCancel?.();
-          }
-        }
+      if (current === newState) {
+        return;
+      }
 
-        return newState;
+      logEvent(enableLogging, eventLogRef, newState as StreamLifecycleEvent, {
+        from: current,
+        ...details,
       });
+
+      streamStateRef.current = newState;
+      setStreamState(newState);
+
+      // Call state change callback
+      onStateChange?.(newState);
+
+      // Call terminal state callbacks
+      if (newState === "completed") {
+        onComplete?.();
+      } else if (newState === "error") {
+        const error = details?.error instanceof Error
+          ? details.error
+          : new Error(details?.message as string || "Stream error");
+        onError?.(error);
+      } else if (newState === "cancelled") {
+        onCancel?.();
+      }
     },
     [enableLogging, onStateChange, onComplete, onError, onCancel]
   );
@@ -280,6 +302,14 @@ export function useStreamLifecycle(
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    if (expectedCompletionTimeoutRef.current) {
+      clearTimeout(expectedCompletionTimeoutRef.current);
+      expectedCompletionTimeoutRef.current = null;
+    }
+    if (completionGraceTimeoutRef.current) {
+      clearTimeout(completionGraceTimeoutRef.current);
+      completionGraceTimeoutRef.current = null;
+    }
     if (maxDurationTimeoutRef.current) {
       clearTimeout(maxDurationTimeoutRef.current);
       maxDurationTimeoutRef.current = null;
@@ -290,7 +320,10 @@ export function useStreamLifecycle(
    * Start the fallback timeout timer
    */
   const startTimeout = useCallback(() => {
-    clearTimeouts();
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
     logEvent(enableLogging, eventLogRef, "timeout-started", {
       timeoutMs,
@@ -304,6 +337,10 @@ export function useStreamLifecycle(
         isDoneSignalReceived: isDoneSignalReceivedRef.current,
       });
 
+      if (streamStateRef.current !== "streaming") {
+        return;
+      }
+
       // If no chunks received for timeoutMs, fail this stream and abort IO
       if (!isDoneSignalReceivedRef.current) {
         const timeoutError = new Error("Stream timed out while waiting for data");
@@ -314,10 +351,20 @@ export function useStreamLifecycle(
         transitionTo("error", { error: timeoutError, reason: "timeout", timeoutMs });
       }
     }, timeoutMs);
+  }, [enableLogging, timeoutMs, transitionTo]);
 
-    // Also set max duration timeout
+  const startMaxDurationTimeout = useCallback(() => {
+    if (maxDurationTimeoutRef.current) {
+      clearTimeout(maxDurationTimeoutRef.current);
+      maxDurationTimeoutRef.current = null;
+    }
+
     maxDurationTimeoutRef.current = setTimeout(() => {
       if (!isMountedRef.current) return;
+
+      if (streamStateRef.current !== "streaming" && streamStateRef.current !== "completing") {
+        return;
+      }
 
       logEvent(enableLogging, eventLogRef, "timeout-triggered", {
         reason: "max-duration",
@@ -335,7 +382,68 @@ export function useStreamLifecycle(
         maxDurationMs: MAX_STREAM_DURATION_MS,
       });
     }, MAX_STREAM_DURATION_MS);
-  }, [clearTimeouts, enableLogging, timeoutMs, transitionTo]);
+  }, [enableLogging, transitionTo]);
+
+  const startExpectedCompletionTimeout = useCallback(() => {
+    if (expectedCompletionTimeoutRef.current) {
+      clearTimeout(expectedCompletionTimeoutRef.current);
+      expectedCompletionTimeoutRef.current = null;
+    }
+
+    expectedCompletionTimeoutRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
+
+      if (streamStateRef.current !== "streaming" && streamStateRef.current !== "completing") {
+        return;
+      }
+
+      const completionTimeoutError = new Error("Stream exceeded expected completion window");
+      logEvent(enableLogging, eventLogRef, "timeout-triggered", {
+        reason: "expected-completion-window",
+        expectedCompletionWindowMs,
+      });
+
+      setAbortController((current) => {
+        current?.abort();
+        return null;
+      });
+      transitionTo("error", {
+        error: completionTimeoutError,
+        message: completionTimeoutError.message,
+        expectedCompletionWindowMs,
+      });
+    }, expectedCompletionWindowMs);
+  }, [enableLogging, expectedCompletionWindowMs, transitionTo]);
+
+  const startCompletionGraceTimeout = useCallback(() => {
+    if (completionGraceTimeoutRef.current) {
+      clearTimeout(completionGraceTimeoutRef.current);
+      completionGraceTimeoutRef.current = null;
+    }
+
+    completionGraceTimeoutRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
+
+      if (streamStateRef.current !== "completing") {
+        return;
+      }
+
+      logEvent(enableLogging, eventLogRef, "timeout-triggered", {
+        reason: "completion-grace",
+        completionGraceMs,
+      });
+
+      clearTimeouts();
+      transitionTo("completed", {
+        reason: "completion-grace-timeout",
+        completionGraceMs,
+      });
+      setAbortController((current) => {
+        current?.abort();
+        return null;
+      });
+    }, completionGraceMs);
+  }, [clearTimeouts, completionGraceMs, enableLogging, transitionTo]);
 
   // ===========================================================================
   // PUBLIC API
@@ -364,9 +472,19 @@ export function useStreamLifecycle(
     logEvent(enableLogging, eventLogRef, "initialized");
     transitionTo("streaming");
     startTimeout();
+    startMaxDurationTimeout();
+    startExpectedCompletionTimeout();
 
     return newAbortController;
-  }, [abortController, clearTimeouts, enableLogging, startTimeout, transitionTo]);
+  }, [
+    abortController,
+    clearTimeouts,
+    enableLogging,
+    startExpectedCompletionTimeout,
+    startMaxDurationTimeout,
+    startTimeout,
+    transitionTo,
+  ]);
 
   /**
    * Mark that a chunk was received
@@ -381,10 +499,10 @@ export function useStreamLifecycle(
     });
 
     // Reset timeout on each chunk
-    if (streamState === "streaming") {
+    if (streamStateRef.current === "streaming") {
       startTimeout();
     }
-  }, [enableLogging, startTimeout, streamState]);
+  }, [enableLogging, startTimeout]);
 
   /**
    * Mark that the done signal was received from the provider
@@ -395,14 +513,16 @@ export function useStreamLifecycle(
     isDoneSignalReceivedRef.current = true;
     logEvent(enableLogging, eventLogRef, "done-signal-received");
     transitionTo("completing", { reason: "done-signal" });
-  }, [enableLogging, transitionTo]);
+    startCompletionGraceTimeout();
+  }, [enableLogging, startCompletionGraceTimeout, transitionTo]);
 
   /**
    * Mark that stream is completing (post-processing)
    */
   const markCompleting = useCallback(() => {
     transitionTo("completing");
-  }, [transitionTo]);
+    startCompletionGraceTimeout();
+  }, [startCompletionGraceTimeout, transitionTo]);
 
   /**
    * Mark that stream completed successfully
@@ -439,13 +559,13 @@ export function useStreamLifecycle(
    * Cancel the current stream
    */
   const cancelStream = useCallback(() => {
-    if (isTerminalState(streamState)) {
+    if (isTerminalState(streamStateRef.current)) {
       // Already in terminal state, nothing to cancel
       return;
     }
 
     logEvent(enableLogging, eventLogRef, "cancelled", {
-      previousState: streamState,
+      previousState: streamStateRef.current,
     });
 
     clearTimeouts();
@@ -457,7 +577,7 @@ export function useStreamLifecycle(
 
     transitionTo("cancelled");
     setAbortController(null);
-  }, [abortController, clearTimeouts, enableLogging, streamState, transitionTo]);
+  }, [abortController, clearTimeouts, enableLogging, transitionTo]);
 
   /**
    * Clear the event log
@@ -465,6 +585,10 @@ export function useStreamLifecycle(
   const clearEventLog = useCallback(() => {
     eventLogRef.current = [];
   }, []);
+
+  useEffect(() => {
+    abortControllerRef.current = abortController;
+  }, [abortController]);
 
   // ===========================================================================
   // DERIVED STATE (must be defined before effects that use them)
@@ -511,18 +635,20 @@ export function useStreamLifecycle(
   // ===========================================================================
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     return () => {
       isMountedRef.current = false;
       clearTimeouts();
 
-      if (abortController) {
+      if (abortControllerRef.current) {
         logEvent(enableLogging, eventLogRef, "cleanup", {
           reason: "component-unmount",
         });
-        abortController.abort();
+        abortControllerRef.current.abort();
       }
     };
-  }, [abortController, clearTimeouts, enableLogging]);
+  }, [clearTimeouts, enableLogging]);
 
   // ===========================================================================
   // RETURN VALUE

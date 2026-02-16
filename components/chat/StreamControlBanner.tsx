@@ -104,6 +104,9 @@ export function StreamControlBanner({
         <TouchableOpacity
           testID="stream-cancel-button"
           onPress={onCancel}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel streaming"
+          accessibilityHint="Stops the current response generation"
           className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full"
           style={{ backgroundColor: theme.colors.error + "20" }}
           activeOpacity={0.7}

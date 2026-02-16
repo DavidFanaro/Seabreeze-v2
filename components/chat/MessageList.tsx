@@ -18,6 +18,7 @@ import {
 import { ModelMessage } from "ai";
 import { MessageBubble } from "./MessageBubble";
 import { useTheme } from "@/components/ui/ThemeProvider";
+import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
 
 /**
  * Props for the MessageList component
@@ -66,7 +67,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     const isNearBottomRef = useRef(true);
     const lastAutoScrollAtRef = useRef(0);
     const previousMessageCountRef = useRef(messages.length);
-    const previousLastMessageContentRef = useRef<string>((messages[messages.length - 1]?.content as string) ?? "");
+    const previousLastMessageContentRef = useRef<string>(
+        normalizeMessageContentForRender(messages[messages.length - 1]?.content)
+    );
     const previousWasStreamingRef = useRef(isStreaming);
     const terminalSettleUntilRef = useRef(0);
     const terminalSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,9 +98,11 @@ export const MessageList: React.FC<MessageListProps> = ({
         const isStreamingThisMessage = isLastMessage && item.role === "assistant" && isStreaming;
         const messageThinkingOutput = thinkingOutput[index] ?? "";
 
+        const normalizedContent = normalizeMessageContentForRender(item.content);
+
         return (
             <MessageBubble
-                content={item.content as string}
+                content={normalizedContent}
                 isUser={item.role === "user"}
                 isStreaming={isStreamingThisMessage}
                 thinkingOutput={messageThinkingOutput}
@@ -160,7 +165,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1];
-        const lastMessageContent = (lastMessage?.content as string) ?? "";
+        const lastMessageContent = normalizeMessageContentForRender(lastMessage?.content);
         const previousMessageCount = previousMessageCountRef.current;
         const previousLastMessageContent = previousLastMessageContentRef.current;
         const previousWasStreaming = previousWasStreamingRef.current;

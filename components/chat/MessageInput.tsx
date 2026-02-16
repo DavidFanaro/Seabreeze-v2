@@ -1,5 +1,12 @@
 import React from "react";
-import { View, TextInput, TouchableOpacity, ViewStyle } from "react-native";
+import {
+    View,
+    TextInput,
+    TouchableOpacity,
+    ViewStyle,
+    type NativeSyntheticEvent,
+    type TextInputSubmitEditingEventData,
+} from "react-native";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { SymbolView } from "expo-symbols";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
@@ -20,7 +27,7 @@ import useHapticFeedback from "@/hooks/useHapticFeedback";
 interface MessageInputProps {
     value: string;
     onChangeText: (text: string) => void;
-    onSend: () => void;
+    onSend: (textOverride?: string) => void;
     placeholder?: string;
     disabled?: boolean;
     style?: ViewStyle;
@@ -76,6 +83,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         }
     };
 
+    const handleSubmitEditing = (
+        event: NativeSyntheticEvent<TextInputSubmitEditingEventData>
+    ) => {
+        const submittedText = event.nativeEvent.text;
+        if (submittedText.trim().length === 0 || disabled) {
+            return;
+        }
+
+        triggerPress("light");
+        onSend(submittedText);
+    };
+
     return (
         // ====================================================================
         // SECTION: Layout Wrapper
@@ -96,6 +115,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 style={[{ backgroundColor: theme.colors.surface }, style]}
             >
                 <TextInput
+                    testID="message-input-text-input"
                     className="py-2 max-h-[120px] text-base"
                     style={{ color: theme.colors.text }}
                     onChangeText={onChangeText}
@@ -103,6 +123,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                     placeholder={placeholder}
                     placeholderTextColor={theme.colors.textSecondary}
                     editable={!disabled}
+                    returnKeyType="send"
+                    enablesReturnKeyAutomatically
+                    onSubmitEditing={handleSubmitEditing}
                     multiline
                 />
             </View>
@@ -127,7 +150,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 onPress={handleSend}
                 disabled={!canSend}
                 activeOpacity={0.7}
-                className="w-9 h-9 rounded-full justify-center items-center ml-2"
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Send message"
+                accessibilityHint="Sends the current message"
+                accessibilityState={{ disabled: !canSend }}
+                className="w-11 h-11 rounded-full justify-center items-center ml-2"
                 style={{ backgroundColor: canSend ? theme.colors.accent : theme.colors.surface }}
             >
                 <SymbolView

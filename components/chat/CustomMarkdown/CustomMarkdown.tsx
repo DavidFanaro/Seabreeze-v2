@@ -6,6 +6,7 @@
 import React, { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, ViewStyle } from "react-native";
 import { useTheme } from "@/components/ui/ThemeProvider";
+import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
 import { createMarkdownStyles } from "./styles";
 import {
     parseMarkdown,
@@ -24,7 +25,7 @@ import {
 } from "./components";
 
 interface CustomMarkdownProps {
-    content: string;
+    content: unknown;
     isStreaming?: boolean;
     showCopyAll?: boolean;
     showLineNumbers?: boolean;
@@ -82,18 +83,19 @@ class MarkdownErrorBoundary extends React.Component<
 /**
  * Raw text fallback component shown when markdown rendering fails
  */
-const MarkdownErrorFallback: React.FC<{ content: string; style?: ViewStyle; isUser?: boolean }> = ({
+const MarkdownErrorFallback: React.FC<{ content: unknown; style?: ViewStyle; isUser?: boolean }> = ({
     content,
     style,
     isUser = false,
 }) => {
     const { theme } = useTheme();
     const styles = useMemo(() => createMarkdownStyles(theme), [theme]);
+    const normalizedContent = normalizeMessageContentForRender(content);
 
     return (
         <View style={[styles.container, style]}>
             <Text style={[styles.text, { fontFamily: "monospace" }]}>
-                {content}
+                {normalizedContent}
             </Text>
             {!isUser && (
                 <View
@@ -128,16 +130,20 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
 }) => {
     const { theme } = useTheme();
     const styles = useMemo(() => createMarkdownStyles(theme), [theme]);
+    const normalizedContent = useMemo(
+        () => normalizeMessageContentForRender(content),
+        [content]
+    );
 
     // Streaming buffer
     const bufferRef = useRef(createStreamingBuffer({ bufferSize: 50 }));
     const ingestedLengthRef = useRef(0);
     const prevStreamingRef = useRef(isStreaming);
-    const prevContentRef = useRef(content);
+    const prevContentRef = useRef(normalizedContent);
     const pendingRenderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingRenderContentRef = useRef<string | null>(null);
     const lastRenderUpdateAtRef = useRef(0);
-    const [renderedContent, setRenderedContent] = useState(content);
+    const [renderedContent, setRenderedContent] = useState(normalizedContent);
     const setRenderedContentIfChanged = useCallback((nextContent: string) => {
         setRenderedContent((prevContent) => {
             if (prevContent === nextContent) {
@@ -163,20 +169,20 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
 
             const currentIngestedLength = ingestedLengthRef.current;
             const previousContent = prevContentRef.current;
-            const hasRegression = content.length < currentIngestedLength;
+            const hasRegression = normalizedContent.length < currentIngestedLength;
             const hasPrefixMismatch =
                 currentIngestedLength > 0 &&
-                !content.startsWith(previousContent.slice(0, currentIngestedLength));
+                !normalizedContent.startsWith(previousContent.slice(0, currentIngestedLength));
 
             if (hasRegression || hasPrefixMismatch) {
                 buffer.reset();
                 ingestedLengthRef.current = 0;
             }
 
-            if (content.length > ingestedLengthRef.current) {
-                const delta = content.slice(ingestedLengthRef.current);
+            if (normalizedContent.length > ingestedLengthRef.current) {
+                const delta = normalizedContent.slice(ingestedLengthRef.current);
                 const result = buffer.push(delta);
-                ingestedLengthRef.current = content.length;
+                ingestedLengthRef.current = normalizedContent.length;
 
                 if (result.shouldUpdate) {
                     const now = Date.now();
@@ -209,7 +215,7 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
             }
 
             prevStreamingRef.current = isStreaming;
-            prevContentRef.current = content;
+            prevContentRef.current = normalizedContent;
             return;
         }
 
@@ -219,7 +225,7 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
                 pendingRenderTimeoutRef.current = null;
             }
             pendingRenderContentRef.current = null;
-            const finalContent = buffer.complete() || content;
+            const finalContent = buffer.complete() || normalizedContent;
             lastRenderUpdateAtRef.current = Date.now();
             setRenderedContentIfChanged(finalContent);
             buffer.reset();
@@ -233,12 +239,12 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
             buffer.reset();
             ingestedLengthRef.current = 0;
             lastRenderUpdateAtRef.current = Date.now();
-            setRenderedContentIfChanged(content);
+            setRenderedContentIfChanged(normalizedContent);
         }
 
         prevStreamingRef.current = isStreaming;
-        prevContentRef.current = content;
-    }, [content, isStreaming, setRenderedContentIfChanged]);
+        prevContentRef.current = normalizedContent;
+    }, [normalizedContent, isStreaming, setRenderedContentIfChanged]);
 
     useEffect(() => {
         return () => {
@@ -257,8 +263,8 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
 
     // Get plain text for copy all
     const copyAllContent = useMemo(
-        () => formatMarkdownForCopy(content),
-        [content]
+        () => formatMarkdownForCopy(normalizedContent),
+        [normalizedContent]
     );
 
     // Render a single block
@@ -388,7 +394,7 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
                     );
             }
         },
-        [styles, showLineNumbers, theme.colors.surface]
+        [isStreaming, styles, showLineNumbers, theme.colors.surface]
     );
 
     return (
@@ -397,7 +403,7 @@ const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
             {parsed.blocks.map(renderBlock)}
 
             {/* Copy all button - only show after streaming is complete */}
-            {showCopyAll && !isStreaming && content.length > 0 && (
+            {showCopyAll && !isStreaming && normalizedContent.length > 0 && (
                 <View
                     style={{
                         alignItems: "flex-end",

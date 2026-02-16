@@ -8,6 +8,7 @@ import React, { memo, useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View, ViewStyle } from "react-native";
 import { CustomMarkdown } from "./CustomMarkdown";
 import { useTheme } from "@/components/ui/ThemeProvider";
+import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
 /**
@@ -52,9 +53,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
 
     const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
     const [hasAutoExpandedThinking, setHasAutoExpandedThinking] = useState(false);
+    const normalizedContent = normalizeMessageContentForRender(content);
     const normalizedThinkingOutput = thinkingOutput?.trim() ?? "";
     const hasThinkingOutput = !isUser && normalizedThinkingOutput.length > 0;
-    const shouldDeferThinkingMarkdown = isStreaming && content.includes("```");
+    const shouldDeferThinkingMarkdown = isStreaming && normalizedContent.includes("```");
 
     const toggleThinkingOutput = useCallback(() => {
       setIsThinkingExpanded((prev) => !prev);
@@ -169,7 +171,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
           {/* ========== Content Rendering Section ========== */}
           {/* CustomMarkdown component handles rendering markdown content with syntax highlighting */}
           <CustomMarkdown
-            content={content}
+            content={normalizedContent}
             isStreaming={isStreaming}
             showLineNumbers={showCodeLineNumbers}
             showCopyAll={!isStreaming && !isUser}

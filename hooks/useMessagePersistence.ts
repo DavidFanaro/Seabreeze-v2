@@ -127,6 +127,9 @@ const SAVE_RETRY_CONFIG = {
   retryableCategories: ["network", "server_error", "timeout", "unknown"] as ErrorCategory[],
 };
 
+const LONG_RUNNING_STREAM_CHECKPOINT_INITIAL_DELAY_MS = 15000;
+const LONG_RUNNING_STREAM_CHECKPOINT_INTERVAL_MS = 10000;
+
 function hasMeaningfulAssistantContent(messages: ModelMessage[]): boolean {
   const lastAssistantMessage = [...messages]
     .reverse()
@@ -138,6 +141,17 @@ function hasMeaningfulAssistantContent(messages: ModelMessage[]): boolean {
 
   const trimmedContent = lastAssistantMessage.content.trim();
   return trimmedContent.length > 0 && trimmedContent !== "...";
+}
+
+function hasPendingAssistantReply(messages: ModelMessage[]): boolean {
+  const lastMessage = messages[messages.length - 1];
+
+  if (!lastMessage || lastMessage.role !== "assistant" || typeof lastMessage.content !== "string") {
+    return false;
+  }
+
+  const trimmedContent = lastMessage.content.trim();
+  return trimmedContent.length === 0 || trimmedContent === "...";
 }
 
 // =============================================================================
@@ -164,6 +178,26 @@ interface SaveSnapshot {
   title: string | null;
   providerId: ProviderId;
   modelId: string;
+}
+
+interface SnapshotSource {
+  chatScope: string;
+  messages: ModelMessage[];
+  thinkingOutput: string[];
+  title: string;
+  providerId: ProviderId;
+  modelId: string;
+}
+
+interface LatestPersistenceState {
+  chatScope: string;
+  messages: ModelMessage[];
+  thinkingOutput: string[];
+  title: string;
+  providerId: ProviderId;
+  modelId: string;
+  streamState: StreamState;
+  enabled: boolean;
 }
 
 // =============================================================================
@@ -218,6 +252,16 @@ export function useMessagePersistence(
   const activeChatScopeRef = useRef(chatIdParam);
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const saveRegistryRef = useRef(createIdempotencyRegistry<void>());
+  const latestPersistenceStateRef = useRef<LatestPersistenceState>({
+    chatScope: chatIdParam,
+    messages,
+    thinkingOutput,
+    title,
+    providerId,
+    modelId,
+    streamState,
+    enabled,
+  });
 
   // ===========================================================================
   // DATABASE ACCESS
@@ -232,33 +276,56 @@ export function useMessagePersistence(
   /**
    * Execute the actual database save operation
    */
-  const createSnapshot = useCallback((): SaveSnapshot => {
-    const titleForPersistence = normalizeTitleForPersistence(title);
-    const thinkingJson = JSON.stringify(thinkingOutput);
-    const messagesJson = JSON.stringify(messages);
+  const createSnapshotFromSource = useCallback((source: SnapshotSource): SaveSnapshot => {
+    const titleForPersistence = normalizeTitleForPersistence(source.title);
+    const thinkingJson = JSON.stringify(source.thinkingOutput);
+    const messagesJson = JSON.stringify(source.messages);
     const chatIdentity = activeChatIdRef.current ?? chatIdParam;
     const queueScope = activeChatIdRef.current !== null
       ? String(activeChatIdRef.current)
-      : chatIdParam;
+      : source.chatScope;
 
     return {
       key: createIdempotencyKey("chat-persistence", [
         chatIdentity,
         titleForPersistence ?? "",
-        providerId,
-        modelId,
+        source.providerId,
+        source.modelId,
         messagesJson,
         thinkingJson,
       ]),
-      chatScope: chatIdParam,
+      chatScope: source.chatScope,
       queueScope,
+      messages: source.messages,
+      thinkingOutput: source.thinkingOutput,
+      title: titleForPersistence,
+      providerId: source.providerId,
+      modelId: source.modelId,
+    };
+  }, [chatIdParam]);
+
+  const createSnapshot = useCallback((): SaveSnapshot => {
+    return createSnapshotFromSource({
+      chatScope: chatIdParam,
       messages,
       thinkingOutput,
-      title: titleForPersistence,
+      title,
       providerId,
       modelId,
-    };
-  }, [chatIdParam, messages, modelId, providerId, thinkingOutput, title]);
+    });
+  }, [chatIdParam, createSnapshotFromSource, messages, modelId, providerId, thinkingOutput, title]);
+
+  const createSnapshotFromLatest = useCallback((): SaveSnapshot => {
+    const latestState = latestPersistenceStateRef.current;
+    return createSnapshotFromSource({
+      chatScope: latestState.chatScope,
+      messages: latestState.messages,
+      thinkingOutput: latestState.thinkingOutput,
+      title: latestState.title,
+      providerId: latestState.providerId,
+      modelId: latestState.modelId,
+    });
+  }, [createSnapshotFromSource]);
 
   const executeSave = useCallback(async (snapshot: SaveSnapshot): Promise<SaveResult> => {
     const now = new Date();
@@ -281,17 +348,19 @@ export function useMessagePersistence(
           createdAt: now,
           updatedAt: now,
         })
-        .returning({ id: chat.id });
+        .run();
 
-      if (!result[0]) {
-        throw new Error("Failed to insert new chat - no ID returned");
+      const insertedChatId = Number(result.lastInsertRowId);
+
+      if (!Number.isFinite(insertedChatId) || insertedChatId <= 0) {
+        throw new Error("Failed to insert new chat - invalid insert ID");
       }
 
-      activeChatIdRef.current = result[0].id;
+      activeChatIdRef.current = insertedChatId;
 
       return {
         success: true,
-        chatId: result[0].id,
+        chatId: insertedChatId,
         attempts: 1,
       };
     } else {
@@ -456,6 +525,19 @@ export function useMessagePersistence(
     [saveWithRetry]
   );
 
+  useEffect(() => {
+    latestPersistenceStateRef.current = {
+      chatScope: chatIdParam,
+      messages,
+      thinkingOutput,
+      title,
+      providerId,
+      modelId,
+      streamState,
+      enabled,
+    };
+  }, [chatIdParam, enabled, messages, modelId, providerId, streamState, thinkingOutput, title]);
+
   /**
    * Trigger a manual save
    */
@@ -490,9 +572,10 @@ export function useMessagePersistence(
       streamState === "completed"
       || streamState === "error"
       || streamState === "cancelled";
+    const hasPendingReply = hasPendingAssistantReply(messages);
 
     const shouldPersistTerminalState =
-      streamState === "completed"
+      (streamState === "completed" && !hasPendingReply)
       || hasMeaningfulAssistantContent(messages);
 
     // Queue save when stream reaches terminal state.
@@ -511,6 +594,55 @@ export function useMessagePersistence(
     }
   }, [messages, streamState, enabled, createSnapshot, runSerializedSave]);
 
+  const isStreamInProgress = streamState === "streaming" || streamState === "completing";
+
+  useEffect(() => {
+    if (!enabled || !isStreamInProgress) {
+      return;
+    }
+
+    let checkpointInterval: ReturnType<typeof setInterval> | null = null;
+
+    const checkpointSave = (): void => {
+      if (!isMountedRef.current) return;
+
+      const latest = latestPersistenceStateRef.current;
+      if (!latest.enabled) return;
+
+      const latestInProgress = latest.streamState === "streaming" || latest.streamState === "completing";
+      if (!latestInProgress) return;
+      if (latest.messages.length === 0) return;
+      if (hasPendingAssistantReply(latest.messages)) return;
+      if (!hasMeaningfulAssistantContent(latest.messages)) return;
+
+      const checkpointSnapshot = createSnapshotFromLatest();
+      if (checkpointSnapshot.key === lastPersistedSnapshotKeyRef.current) {
+        return;
+      }
+
+      setSaveStatus((currentStatus) => {
+        if (currentStatus === "saving" || currentStatus === "retrying") {
+          return currentStatus;
+        }
+
+        return "queued";
+      });
+      pendingSaveRef.current = runSerializedSave(checkpointSnapshot);
+    };
+
+    const initialCheckpointTimeout = setTimeout(() => {
+      checkpointSave();
+      checkpointInterval = setInterval(checkpointSave, LONG_RUNNING_STREAM_CHECKPOINT_INTERVAL_MS);
+    }, LONG_RUNNING_STREAM_CHECKPOINT_INITIAL_DELAY_MS);
+
+    return () => {
+      clearTimeout(initialCheckpointTimeout);
+      if (checkpointInterval) {
+        clearInterval(checkpointInterval);
+      }
+    };
+  }, [enabled, isStreamInProgress, createSnapshotFromLatest, runSerializedSave]);
+
   // ===========================================================================
   // MESSAGES CHANGE MONITORING
   // ===========================================================================
@@ -528,6 +660,7 @@ export function useMessagePersistence(
 
     if (!canSaveForCurrentState) return;
     if (messages.length === 0) return;
+    if (hasPendingAssistantReply(messages)) return;
 
     const nextSnapshot = createSnapshot();
     if (nextSnapshot.key === lastPersistedSnapshotKeyRef.current) {

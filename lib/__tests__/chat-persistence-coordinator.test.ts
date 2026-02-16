@@ -5,6 +5,13 @@ import {
   runListOperation,
 } from "../chat-persistence-coordinator";
 
+const mockReportSoftlockSignatureEvent = jest.fn();
+
+jest.mock("@/lib/persistence-telemetry", () => ({
+  reportSoftlockSignatureEvent: (...args: unknown[]) =>
+    mockReportSoftlockSignatureEvent(...args),
+}));
+
 interface Deferred {
   promise: Promise<void>;
   resolve: () => void;
@@ -20,6 +27,11 @@ function createDeferred(): Deferred {
 }
 
 describe("chat-persistence-coordinator", () => {
+  beforeEach(() => {
+    jest.useRealTimers();
+    mockReportSoftlockSignatureEvent.mockReset();
+  });
+
   it("serializes list operations in submission order", async () => {
     const first = createDeferred();
     const executionOrder: string[] = [];
@@ -86,5 +98,30 @@ describe("chat-persistence-coordinator", () => {
 
     release();
     expect(isChatDeleteLocked(7)).toBe(false);
+  });
+
+  it("reports softlock telemetry when list operations stall", async () => {
+    jest.useFakeTimers();
+    const deferred = createDeferred();
+
+    const operation = runListOperation(async () => {
+      await deferred.promise;
+    });
+
+    await Promise.resolve();
+
+    jest.advanceTimersByTime(8000);
+
+    expect(mockReportSoftlockSignatureEvent).toHaveBeenCalledWith(
+      "list-queue-softlock",
+      "list",
+      expect.objectContaining({
+        queueType: "list",
+        watchdogTimeoutMs: 8000,
+      })
+    );
+
+    deferred.resolve();
+    await operation;
   });
 });

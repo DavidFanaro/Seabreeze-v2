@@ -24,6 +24,10 @@ interface IconButtonProps {
     disabled?: boolean;
     /** Additional styling properties to apply to the button container */
     style?: any;
+    /** Test identifier for UI automation */
+    testID?: string;
+    /** Accessibility label for assistive technologies */
+    accessibilityLabel?: string;
 }
 
 /**
@@ -46,6 +50,8 @@ export const IconButton: React.FC<IconButtonProps> = ({
     onPress,
     disabled = false,
     style,
+    testID,
+    accessibilityLabel,
 }) => {
     // Access current theme for consistent color scheme across the app
     const { theme } = useTheme();
@@ -56,6 +62,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
     // Render the button with icon content
     return (
         <HeroUIButton
+            testID={testID}
             // Ghost variant for subtle background appearance
             variant="ghost"
             // Medium size for balanced touch targets
@@ -64,6 +71,8 @@ export const IconButton: React.FC<IconButtonProps> = ({
             onPress={onPress}
             // Disabled state prevents interaction and updates styling
             isDisabled={disabled}
+            // Accessibility label for screen readers
+            accessibilityLabel={accessibilityLabel}
             // Icon-only flag for proper accessibility and layout
             isIconOnly
             // Custom styles override for specific positioning or layout needs

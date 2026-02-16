@@ -55,8 +55,8 @@ function createDeferred<T>(): Deferred<T> {
 }
 
 describe("useMessagePersistence", () => {
-  const insertReturningMock = jest.fn();
-  const insertValuesMock = jest.fn(() => ({ returning: insertReturningMock }));
+  const insertRunMock = jest.fn();
+  const insertValuesMock = jest.fn(() => ({ run: insertRunMock }));
   const insertMock = jest.fn(() => ({ values: insertValuesMock }));
 
   const updateWhereMock = jest.fn(async () => undefined);
@@ -67,7 +67,7 @@ describe("useMessagePersistence", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    insertReturningMock.mockResolvedValue([{ id: 101 }]);
+    insertRunMock.mockResolvedValue({ lastInsertRowId: 101 });
 
     (useDatabase as jest.Mock).mockReturnValue({
       insert: insertMock,
@@ -100,8 +100,8 @@ describe("useMessagePersistence", () => {
   });
 
   it("deduplicates concurrent identical saves at the persistence boundary", async () => {
-    const deferredInsert = createDeferred<{ id: number }[]>();
-    insertReturningMock.mockReturnValue(deferredInsert.promise);
+    const deferredInsert = createDeferred<{ lastInsertRowId: number }>();
+    insertRunMock.mockReturnValue(deferredInsert.promise);
 
     const { result } = renderHook(() =>
       useMessagePersistence({
@@ -128,7 +128,7 @@ describe("useMessagePersistence", () => {
       expect(insertMock).toHaveBeenCalledTimes(1);
     });
 
-    deferredInsert.resolve([{ id: 777 }]);
+    deferredInsert.resolve({ lastInsertRowId: 777 });
 
     await act(async () => {
       await Promise.all([firstSave, secondSave]);
@@ -140,8 +140,8 @@ describe("useMessagePersistence", () => {
   });
 
   it("serializes superseding writes and upgrades follow-up save to update", async () => {
-    const deferredInsert = createDeferred<{ id: number }[]>();
-    insertReturningMock.mockReturnValue(deferredInsert.promise);
+    const deferredInsert = createDeferred<{ lastInsertRowId: number }>();
+    insertRunMock.mockReturnValue(deferredInsert.promise);
 
     const baseProps = {
       streamState: "idle" as const,
@@ -181,7 +181,7 @@ describe("useMessagePersistence", () => {
       expect(updateMock).toHaveBeenCalledTimes(0);
     });
 
-    deferredInsert.resolve([{ id: 314 }]);
+    deferredInsert.resolve({ lastInsertRowId: 314 });
 
     await act(async () => {
       await Promise.all([firstSave, secondSave]);
@@ -229,6 +229,46 @@ describe("useMessagePersistence", () => {
     await waitFor(() => {
       expect(insertMock).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("checkpoints meaningful assistant output during long-running streaming", async () => {
+    jest.useFakeTimers();
+
+    try {
+      const { result } = renderHook(() =>
+        useMessagePersistence({
+          streamState: "streaming",
+          chatIdParam: "42",
+          messages: [
+            { role: "user", content: "start" },
+            { role: "assistant", content: "partial response" },
+          ],
+          thinkingOutput: ["", ""],
+          providerId: "apple",
+          modelId: "apple.on.device",
+          title: "Chat",
+          enabled: true,
+        })
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(14999);
+      });
+
+      expect(updateMock).toHaveBeenCalledTimes(0);
+
+      await act(async () => {
+        jest.advanceTimersByTime(2);
+      });
+
+      await waitFor(() => {
+        expect(updateMock).toHaveBeenCalledTimes(1);
+      });
+
+      expect(result.current.saveStatus).toBe("saved");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("persists meaningful partial assistant output when stream errors", async () => {
@@ -302,9 +342,43 @@ describe("useMessagePersistence", () => {
     expect(updateMock).toHaveBeenCalledTimes(0);
   });
 
+  it("does not persist completed snapshots while assistant placeholder is still pending", async () => {
+    const baseProps = {
+      chatIdParam: "new",
+      thinkingOutput: [] as string[],
+      providerId: "apple" as const,
+      modelId: "apple.on.device",
+      title: "Chat",
+      enabled: true,
+    };
+
+    const messages = [
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "..." },
+    ] as ModelMessage[];
+
+    let streamState: "streaming" | "completed" = "streaming";
+
+    const { rerender } = renderHook(() =>
+      useMessagePersistence({
+        ...baseProps,
+        messages,
+        streamState,
+      })
+    );
+
+    streamState = "completed";
+    rerender(undefined);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(insertMock).toHaveBeenCalledTimes(0);
+    expect(updateMock).toHaveBeenCalledTimes(0);
+  });
+
   it("ignores stale save completion after chat scope changes", async () => {
-    const deferredInsert = createDeferred<{ id: number }[]>();
-    insertReturningMock.mockReturnValue(deferredInsert.promise);
+    const deferredInsert = createDeferred<{ lastInsertRowId: number }>();
+    insertRunMock.mockReturnValue(deferredInsert.promise);
 
     const baseProps = {
       streamState: "idle" as const,
@@ -339,7 +413,7 @@ describe("useMessagePersistence", () => {
     messages = [{ role: "user", content: "loaded chat" }];
     rerender(undefined);
 
-    deferredInsert.resolve([{ id: 777 }]);
+    deferredInsert.resolve({ lastInsertRowId: 777 });
 
     await act(async () => {
       await oldSave;
