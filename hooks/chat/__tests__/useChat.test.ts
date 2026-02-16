@@ -545,24 +545,49 @@ describe('useChat', () => {
       expect(onError).toHaveBeenCalledTimes(0);
     });
 
-    it('fails stalled streams with watchdog timeout and enables retry', async () => {
+    it('fails stalled streams via lifecycle inactivity timeout and enables retry', async () => {
       jest.useFakeTimers();
 
       try {
-        mockExecuteStreaming.mockImplementationOnce(
-          async () => new Promise(() => undefined)
-        );
+        // Mock executeStreaming to wait for abort signal (simulating a
+        // stalled stream that produces no chunks).  When the lifecycle
+        // inactivity timeout fires it aborts the signal, allowing the
+        // mock to resolve.
+        mockExecuteStreaming.mockImplementationOnce(async (options: any) => {
+          await new Promise<void>((resolve) => {
+            if (options.abortSignal?.aborted) {
+              resolve();
+              return;
+            }
+            options.abortSignal?.addEventListener('abort', () => resolve());
+          });
+          return {
+            success: true,
+            shouldRetryWithFallback: false,
+            accumulated: '',
+            wasCancelled: true,
+          };
+        });
 
         const onError = jest.fn();
         const { result } = renderHook(() => useChat({ onError }));
 
-        let sendPromise = Promise.resolve();
+        // Fire-and-forget: start sendMessage without awaiting it.
+        // It will block on executeStreaming until the abort signal fires.
+        let sendPromise: Promise<void> = Promise.resolve();
         act(() => {
-          sendPromise = result.current.sendMessage('watchdog timeout');
+          sendPromise = result.current.sendMessage('lifecycle timeout');
         });
 
+        // Advance past the default inactivity timeout (30 000 ms).
+        // This fires the lifecycle timeout which aborts the signal and
+        // sets error UI state via the lifecycle onError callback.
+        act(() => {
+          jest.advanceTimersByTime(31000);
+        });
+
+        // Let sendMessage finish and flush all pending state updates.
         await act(async () => {
-          jest.advanceTimersByTime(46000);
           await sendPromise;
         });
 
@@ -573,7 +598,7 @@ describe('useChat', () => {
       } finally {
         jest.useRealTimers();
       }
-    });
+    }, 15000);
 
     it('deduplicates quick retry taps for the same failed operation', async () => {
       mockExecuteStreaming.mockImplementationOnce(async (options: any) => {

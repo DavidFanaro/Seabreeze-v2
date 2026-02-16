@@ -136,4 +136,10 @@ import type { ProviderId } from "@/types/provider.types";
 - Docs lookup: use Context7 tools when needed.
 - Web info: use SearXNG tools.
 - GitHub search: use `gh_grep` tools.
-- iOS simulator: use `ios-simulator` tools.
+- iOS simulator: use `agent-device` skill.
+
+## AWAYS TEST YOUR CHANGES IN THE SIMULATOR
+- Use the `agent-device` skill to control the simulator
+- Aways use the `expo start --clear` command to start the dev server
+- Use the r - reload app command in the expo dev server to reload the app
+- DO NOT USE npm run ios!!!!!!!!!!

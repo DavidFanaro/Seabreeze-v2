@@ -362,91 +362,106 @@ export function useChatStreaming() {
                     },
                 };
             }
-            // Initialize the streaming text generation
+            // Initialize the streaming text generation.
+            // Forward the abort signal so lifecycle timeouts and user
+            // cancellations terminate provider I/O immediately.
             const result = streamText({
                 model: currentModel.model!,
                 messages: messages,
                 providerOptions,
+                abortSignal,
             });
 
-            if (result.fullStream) {
-                for await (const part of result.fullStream) {
+            try {
+                if (result.fullStream) {
+                    for await (const part of result.fullStream) {
+                        // Check for abort signal
+                        if (abortSignal?.aborted) {
+                            return;
+                        }
+
+                        if (part.type === "finish" || part.type === "finish-step") {
+                            signalCompletion();
+                            break;
+                        }
+
+                        if (part.type === "reasoning-delta") {
+                            if (!thinkingChunkHandler) {
+                                continue;
+                            }
+
+                            const reasoningDelta = typeof (part as { text?: unknown }).text === "string"
+                                ? (part as { text: string }).text
+                                : typeof (part as { delta?: unknown }).delta === "string"
+                                    ? (part as { delta?: string }).delta ?? ""
+                                    : "";
+
+                            if (!reasoningDelta) {
+                                continue;
+                            }
+
+                            onChunkReceived?.();
+                            reasoningAccumulated += reasoningDelta;
+                            if (canCommit()) {
+                                thinkingChunkHandler?.(reasoningDelta, reasoningAccumulated);
+                            }
+                            continue;
+                        }
+
+                        if (part.type === "text-delta") {
+                            const textDelta = typeof part.text === "string" ? part.text : "";
+
+                            if (!textDelta) {
+                                continue;
+                            }
+
+                            onChunkReceived?.();
+                            accumulated += textDelta;
+                            updateAssistantMessage(accumulated);
+
+                            if (canCommit()) {
+                                onChunk?.(textDelta, accumulated);
+                            }
+                        }
+                    }
+
+                    signalCompletion();
+                    return;
+                }
+
+                // Fallback for older SDKs without fullStream
+                for await (const chunk of result.textStream) {
                     // Check for abort signal
                     if (abortSignal?.aborted) {
                         return;
                     }
 
-                    if (part.type === "finish" || part.type === "finish-step") {
-                        signalCompletion();
-                        break;
-                    }
-
-                    if (part.type === "reasoning-delta") {
-                        if (!thinkingChunkHandler) {
-                            continue;
-                        }
-
-                        const reasoningDelta = typeof (part as { text?: unknown }).text === "string"
-                            ? (part as { text: string }).text
-                            : typeof (part as { delta?: unknown }).delta === "string"
-                                ? (part as { delta?: string }).delta ?? ""
-                                : "";
-
-                        if (!reasoningDelta) {
-                            continue;
-                        }
-
-                        onChunkReceived?.();
-                        reasoningAccumulated += reasoningDelta;
-                        if (canCommit()) {
-                            thinkingChunkHandler?.(reasoningDelta, reasoningAccumulated);
-                        }
+                    if (!chunk) {
                         continue;
                     }
 
-                    if (part.type === "text-delta") {
-                        const textDelta = typeof part.text === "string" ? part.text : "";
+                    onChunkReceived?.();
 
-                        if (!textDelta) {
-                            continue;
-                        }
+                    accumulated += chunk;
+                    updateAssistantMessage(accumulated);
 
-                        onChunkReceived?.();
-                        accumulated += textDelta;
-                        updateAssistantMessage(accumulated);
-
-                        if (canCommit()) {
-                            onChunk?.(textDelta, accumulated);
-                        }
+                    if (canCommit()) {
+                        onChunk?.(chunk, accumulated);
                     }
                 }
 
                 signalCompletion();
-                return;
-            }
-
-            // Fallback for older SDKs without fullStream
-            for await (const chunk of result.textStream) {
-                // Check for abort signal
+            } catch (streamError: unknown) {
+                // When the abort signal fires (lifecycle timeout or user cancel),
+                // the SDK throws an AbortError.  Treat this as a clean exit so
+                // the error doesn't cascade into retry/fallback logic.
                 if (abortSignal?.aborted) {
                     return;
                 }
 
-                if (!chunk) {
-                    continue;
-                }
-
-                onChunkReceived?.();
-
-                accumulated += chunk;
-                updateAssistantMessage(accumulated);
-
-                if (canCommit()) {
-                    onChunk?.(chunk, accumulated);
-                }
+                // Non-abort errors should propagate for retry/fallback handling.
+                throw streamError;
             }
-
-            signalCompletion();
         };
 
         try {

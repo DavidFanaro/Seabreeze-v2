@@ -19,7 +19,6 @@ import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated
 import { ModelMessage } from "ai";
 import { MessageList, MessageInput, useTheme, ChatContextMenu, RetrievalRecoveryView, RetryBanner } from "@/components";
 import { SaveErrorBanner } from "@/components/chat/SaveErrorBanner";
-import { StreamControlBanner } from "@/components/chat/StreamControlBanner";
 import { createIdempotencyKey, createSequenceGuard } from "@/lib/concurrency";
 import { DEFAULT_CHAT_TITLE, getChatTitleForDisplay } from "@/lib/chat-title";
 import { ProviderId } from "@/types/provider.types";
@@ -507,16 +506,6 @@ export default function Chat() {
                        />
 
                      {/* ================================================================== */}
-                     {/* STREAM CONTROL BANNER SECTION */}
-                     {/* Shows cancel button during streaming and 'Stopped' when cancelled */}
-                     {/* ================================================================== */}
-                     <StreamControlBanner 
-                         isStreaming={isInputLocked}
-                         streamState={streamState}
-                         onCancel={cancel}
-                     />
-
-                     {/* ================================================================== */}
                      {/* SAVE ERROR BANNER SECTION */}
                      {/* Shows error when message persistence fails with retry option */}
                      {/* ================================================================== */}
@@ -539,7 +528,9 @@ export default function Chat() {
                                 value={text}
                                 onChangeText={setText}
                                 onSend={sendChatMessages}
-                                disabled={isInputLocked}
+                                disabled={isStreaming}
+                                isStreaming={isStreaming}
+                                onCancel={cancel}
                             />
                         </Animated.View>
                     </KeyboardStickyView>
@@ -549,7 +540,9 @@ export default function Chat() {
                             value={text}
                             onChangeText={setText}
                             onSend={sendChatMessages}
-                            disabled={isInputLocked}
+                            disabled={isStreaming}
+                            isStreaming={isStreaming}
+                            onCancel={cancel}
                         />
                     </Animated.View>
                 )}

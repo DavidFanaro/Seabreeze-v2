@@ -64,7 +64,6 @@ interface RetryableOperation {
 }
 
 const DEFAULT_PLACEHOLDER_TEXT = "...";
-const STREAM_EXECUTION_WATCHDOG_MS = 45000;
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -329,11 +328,27 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         markError,
         cancelStream,
     } = useStreamLifecycle({
-        timeoutMs: 30000, // 30 second fallback timeout
+        timeoutMs: 30000, // 30 second inactivity timeout
         backgroundBehavior: "cancel",
         enableLogging: __DEV__,
         onError: (error) => {
             console.error("[StreamLifecycle] Error:", error.message);
+
+            // Propagate lifecycle errors (inactivity timeout, max duration) to
+            // UI state so the retry button is shown.
+            // No isStreaming guard needed: initializeStream() clears old timers
+            // before each send, so lifecycle errors only fire for the current
+            // active stream.  Using isStreaming here would be stale-closure-prone
+            // because the callback is captured before the React state flush.
+            setErrorMessage(error.message);
+            setCanRetry(true);
+            if (lastUserMessageRef.current) {
+                lastRetryableOperationRef.current = {
+                    operationKey: createIdempotencyKey("lifecycle-error", [chatId ?? "default"]),
+                    content: lastUserMessageRef.current,
+                };
+            }
+
             onError?.(error);
         },
     });
@@ -638,59 +653,18 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                     },
                 };
 
-                let result: StreamingResult;
-
-                let watchdogTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-                try {
-                    result = await Promise.race<StreamingResult>([
-                        executeStreaming(
-                            streamingOptions,
-                            updatedMessages,
-                            setMessages,
-                            assistantIndex,
-                            failedProvidersRef
-                        ),
-                        new Promise<StreamingResult>((_, reject) => {
-                            watchdogTimeoutId = setTimeout(() => {
-                                reject(new Error("Streaming timed out waiting for provider completion"));
-                            }, STREAM_EXECUTION_WATCHDOG_MS);
-                        }),
-                    ]);
-
-                } catch (error: unknown) {
-                    if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
-                        return;
-                    }
-
-                    const watchdogError = error instanceof Error
-                        ? error
-                        : new Error(String(error));
-
-                    const canFinalizeWatchdogError =
-                        sendSequenceGuardRef.current.isCurrent(sendToken)
-                        && !canceledRef.current;
-
-                    if (canFinalizeWatchdogError) {
-                        markError(watchdogError);
-                        setErrorMessage(watchdogError.message);
-                        setCanRetry(true);
-                        lastRetryableOperationRef.current = {
-                            operationKey: sendOperationKey,
-                            content,
-                        };
-                    }
-
-                    if (!abortSignal.aborted) {
-                        streamController.abort();
-                    }
-
-                    break;
-                } finally {
-                    if (watchdogTimeoutId) {
-                        clearTimeout(watchdogTimeoutId);
-                    }
-                }
+                // Timeout / stall detection is handled entirely by the
+                // stream lifecycle hook (inactivity timeout + max duration).
+                // When the lifecycle fires, it aborts the signal and
+                // transitions to "error", which propagates to the UI via the
+                // lifecycle onError callback above.
+                const result: StreamingResult = await executeStreaming(
+                    streamingOptions,
+                    updatedMessages,
+                    setMessages,
+                    assistantIndex,
+                    failedProvidersRef
+                );
 
                 if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
                     return;

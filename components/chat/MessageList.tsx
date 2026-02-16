@@ -267,6 +267,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         <FlashList
             ref={flashListRef}
             data={messages}
+            extraData={isStreaming}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             ListEmptyComponent={listEmptyComponent}

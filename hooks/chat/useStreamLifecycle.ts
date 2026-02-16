@@ -9,7 +9,9 @@
  *
  * Features:
  * - Stream state tracking: idle → streaming → completing → completed | error
- * - Dual detection: done signal + fallback timeout (30s)
+ * - Inactivity timeout: errors if no chunks arrive within window (default 30s)
+ * - Max duration cap: hard safety limit for runaway streams (5 min)
+ * - Completion grace: forces terminal state after done signal + grace period
  * - App state handling: background/foreground transitions
  * - Graceful cancellation with resource cleanup
  * - Lifecycle event logging for debugging
@@ -75,10 +77,8 @@ export interface StreamLifecycleLogEntry {
  * Stream lifecycle configuration options
  */
 export interface StreamLifecycleOptions {
-  /** Timeout in milliseconds for fallback completion detection (default: 30000) */
+  /** Inactivity timeout in milliseconds — stream errors if no chunks arrive within this window (default: 30000) */
   timeoutMs?: number;
-  /** Upper bound for a stream to remain non-terminal before forcing error (default: 45000) */
-  expectedCompletionWindowMs?: number;
   /** Grace period after done signal before forcing terminal completion (default: 8000) */
   completionGraceMs?: number;
   /** Enable debug logging of lifecycle events (default: false) */
@@ -136,7 +136,6 @@ export interface UseStreamLifecycleReturn {
 // =============================================================================
 
 const DEFAULT_TIMEOUT_MS = 30000;
-const DEFAULT_EXPECTED_COMPLETION_WINDOW_MS = 45000;
 const DEFAULT_COMPLETION_GRACE_MS = 8000;
 const MAX_STREAM_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -201,7 +200,6 @@ export function useStreamLifecycle(
 ): UseStreamLifecycleReturn {
   const {
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    expectedCompletionWindowMs = DEFAULT_EXPECTED_COMPLETION_WINDOW_MS,
     completionGraceMs = DEFAULT_COMPLETION_GRACE_MS,
     enableLogging = false,
     onStateChange,
@@ -226,7 +224,6 @@ export function useStreamLifecycle(
   const eventLogRef = useRef<StreamLifecycleLogEntry[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expectedCompletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completionGraceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxDurationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastChunkTimeRef = useRef<number>(0);
@@ -301,10 +298,6 @@ export function useStreamLifecycle(
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
-    }
-    if (expectedCompletionTimeoutRef.current) {
-      clearTimeout(expectedCompletionTimeoutRef.current);
-      expectedCompletionTimeoutRef.current = null;
     }
     if (completionGraceTimeoutRef.current) {
       clearTimeout(completionGraceTimeoutRef.current);
@@ -384,37 +377,6 @@ export function useStreamLifecycle(
     }, MAX_STREAM_DURATION_MS);
   }, [enableLogging, transitionTo]);
 
-  const startExpectedCompletionTimeout = useCallback(() => {
-    if (expectedCompletionTimeoutRef.current) {
-      clearTimeout(expectedCompletionTimeoutRef.current);
-      expectedCompletionTimeoutRef.current = null;
-    }
-
-    expectedCompletionTimeoutRef.current = setTimeout(() => {
-      if (!isMountedRef.current) return;
-
-      if (streamStateRef.current !== "streaming" && streamStateRef.current !== "completing") {
-        return;
-      }
-
-      const completionTimeoutError = new Error("Stream exceeded expected completion window");
-      logEvent(enableLogging, eventLogRef, "timeout-triggered", {
-        reason: "expected-completion-window",
-        expectedCompletionWindowMs,
-      });
-
-      setAbortController((current) => {
-        current?.abort();
-        return null;
-      });
-      transitionTo("error", {
-        error: completionTimeoutError,
-        message: completionTimeoutError.message,
-        expectedCompletionWindowMs,
-      });
-    }, expectedCompletionWindowMs);
-  }, [enableLogging, expectedCompletionWindowMs, transitionTo]);
-
   const startCompletionGraceTimeout = useCallback(() => {
     if (completionGraceTimeoutRef.current) {
       clearTimeout(completionGraceTimeoutRef.current);
@@ -473,14 +435,12 @@ export function useStreamLifecycle(
     transitionTo("streaming");
     startTimeout();
     startMaxDurationTimeout();
-    startExpectedCompletionTimeout();
 
     return newAbortController;
   }, [
     abortController,
     clearTimeouts,
     enableLogging,
-    startExpectedCompletionTimeout,
     startMaxDurationTimeout,
     startTimeout,
     transitionTo,

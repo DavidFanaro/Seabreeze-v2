@@ -1016,5 +1016,80 @@ describe('useChatStreaming', () => {
       expect(mockOnProviderChange).toHaveBeenCalledWith('apple', 'gpt-4', true);
       expect(failedProvidersRef.current).toContain('openai');
     });
+
+    it('forwards abortSignal to streamText', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      const controller = new AbortController();
+
+      const options = {
+        model: mockModel,
+        enableRetry: false,
+        retryConfig: {},
+        enableFallback: false,
+        activeProvider: 'openai' as ProviderId,
+        effectiveProviderId: 'openai' as ProviderId,
+        abortSignal: controller.signal,
+      };
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          options,
+          mockMessages,
+          setMessagesMock,
+          0,
+          { current: [] }
+        );
+      });
+
+      expect(mockStreamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          abortSignal: controller.signal,
+        })
+      );
+    });
+
+    it('handles abort errors from streamText gracefully without triggering fallback', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      const controller = new AbortController();
+
+      mockStreamText.mockReturnValue({
+        fullStream: (async function* () {
+          yield { type: 'text-delta', text: 'partial' };
+          // Simulate abort mid-stream: the SDK throws when aborted
+          controller.abort();
+          const abortError = new DOMException('The operation was aborted.', 'AbortError');
+          throw abortError;
+        })(),
+      } as any);
+
+      const mockOnError = jest.fn();
+
+      const options = {
+        model: mockModel,
+        enableRetry: false,
+        retryConfig: {},
+        enableFallback: false,
+        activeProvider: 'openai' as ProviderId,
+        effectiveProviderId: 'openai' as ProviderId,
+        abortSignal: controller.signal,
+        onError: mockOnError,
+      };
+
+      const streamingResult = await act(async () => {
+        return await result.current.executeStreaming(
+          options,
+          mockMessages,
+          setMessagesMock,
+          0,
+          { current: [] }
+        );
+      });
+
+      // Abort should be treated as clean cancellation, not an error.
+      expect(streamingResult.wasCancelled).toBe(true);
+      expect(mockOnError).not.toHaveBeenCalled();
+    });
   });
 });

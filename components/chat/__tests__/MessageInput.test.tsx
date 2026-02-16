@@ -452,6 +452,103 @@ describe("MessageInput Component", () => {
     expect(input.props.value).toBe("Hello World");
   });
 
+  // ==========================================================================
+  // SECTION: Streaming / Stop Button Tests
+  // ==========================================================================
+
+  /**
+   * Test: Stop button renders instead of send button when streaming
+   */
+  it("renders stop button when isStreaming is true", () => {
+    const mockOnCancel = jest.fn();
+    const { getByTestId, queryByTestId } = render(
+      <MessageInput
+        value=""
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        isStreaming={true}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    expect(getByTestId("message-input-stop")).toBeTruthy();
+    expect(queryByTestId("message-input-send")).toBeNull();
+  });
+
+  /**
+   * Test: Stop button calls onCancel when pressed
+   */
+  it("calls onCancel when stop button is pressed during streaming", () => {
+    const mockOnCancel = jest.fn();
+    const { getByTestId } = render(
+      <MessageInput
+        value=""
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        isStreaming={true}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    fireEvent.press(getByTestId("message-input-stop"));
+    expect(mockOnCancel).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Test: Send button returns when streaming stops
+   */
+  it("shows send button again after streaming ends", () => {
+    const mockOnCancel = jest.fn();
+    const { rerender, getByTestId, queryByTestId } = render(
+      <MessageInput
+        value="Hello"
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        isStreaming={true}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    expect(getByTestId("message-input-stop")).toBeTruthy();
+    expect(queryByTestId("message-input-send")).toBeNull();
+
+    rerender(
+      <MessageInput
+        value="Hello"
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        isStreaming={false}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    expect(getByTestId("message-input-send")).toBeTruthy();
+    expect(queryByTestId("message-input-stop")).toBeNull();
+  });
+
+  /**
+   * Test: Stop button works regardless of input text content
+   */
+  it("stop button is tappable even when input is empty", () => {
+    const mockOnCancel = jest.fn();
+    const { getByTestId } = render(
+      <MessageInput
+        value=""
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        isStreaming={true}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    fireEvent.press(getByTestId("message-input-stop"));
+    expect(mockOnCancel).toHaveBeenCalled();
+  });
+
+  // ==========================================================================
+  // SECTION: Whitespace Handling Tests
+  // ==========================================================================
+
   /**
    * Test: Empty input is not sent with just spaces
    */

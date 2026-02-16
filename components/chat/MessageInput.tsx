@@ -22,6 +22,8 @@ import useHapticFeedback from "@/hooks/useHapticFeedback";
  * @property {function} onSend - Callback fired when the send button is pressed
  * @property {string} [placeholder] - Placeholder text displayed when input is empty
  * @property {boolean} [disabled] - Whether the input field and send button are disabled
+ * @property {boolean} [isStreaming] - Whether a response is currently streaming
+ * @property {function} [onCancel] - Callback fired when the stop button is pressed during streaming
  * @property {ViewStyle} [style] - Optional custom styles to merge with the input container
  */
 interface MessageInputProps {
@@ -30,6 +32,8 @@ interface MessageInputProps {
     onSend: (textOverride?: string) => void;
     placeholder?: string;
     disabled?: boolean;
+    isStreaming?: boolean;
+    onCancel?: () => void;
     style?: ViewStyle;
 }
 
@@ -52,6 +56,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     onSend,
     placeholder = "Message...",
     disabled = false,
+    isStreaming = false,
+    onCancel,
     style,
 }) => {
     // ============================================================================
@@ -81,6 +87,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             triggerPress("light");
             onSend();
         }
+    };
+
+    /**
+     * Handler for the stop button press during streaming.
+     * Triggers haptic feedback and invokes the cancel callback.
+     */
+    const handleCancel = () => {
+        triggerPress("light");
+        onCancel?.();
     };
 
     const handleSubmitEditing = (
@@ -131,39 +146,51 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             </View>
 
             {/* ================================================================
-                SECTION: Send Button
+                SECTION: Send / Stop Button
                 ================================================================
-                Circular button that triggers the onSend callback when pressed.
-                - Size: 9x9 (36x36 pixels)
-                - Shape: rounded-full (circular appearance)
-                - Styling:
-                  * Background: accent color when enabled, surface color when disabled
-                  * Icon: arrow.up symbol, color matches button state
-                  * Opacity: 0.7 when pressed for visual feedback
-                - State:
-                  * Disabled: when input is empty or component is disabled
-                  * Active: full opacity, accent background color
-                - Spacing: left margin of 2 units, vertically centered
+                Dual-purpose circular button:
+                - During streaming: stop icon that cancels the response
+                - Otherwise: send arrow that dispatches the message
             */}
-            <TouchableOpacity
-                testID="message-input-send"
-                onPress={handleSend}
-                disabled={!canSend}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel="Send message"
-                accessibilityHint="Sends the current message"
-                accessibilityState={{ disabled: !canSend }}
-                className="w-11 h-11 rounded-full justify-center items-center ml-2"
-                style={{ backgroundColor: canSend ? theme.colors.accent : theme.colors.surface }}
-            >
-                <SymbolView
-                  name="arrow.up"
-                  size={18}
-                  tintColor={canSend ? theme.colors.surface : theme.colors.textSecondary}
-                />
-            </TouchableOpacity>
+            {isStreaming ? (
+                <TouchableOpacity
+                    testID="message-input-stop"
+                    onPress={handleCancel}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Stop streaming"
+                    accessibilityHint="Stops the current response generation"
+                    className="w-11 h-11 rounded-full justify-center items-center ml-2"
+                    style={{ backgroundColor: theme.colors.surface }}
+                >
+                    <SymbolView
+                      name="stop"
+                      size={16}
+                      tintColor={theme.colors.text}
+                    />
+                </TouchableOpacity>
+            ) : (
+                <TouchableOpacity
+                    testID="message-input-send"
+                    onPress={handleSend}
+                    disabled={!canSend}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send message"
+                    accessibilityHint="Sends the current message"
+                    accessibilityState={{ disabled: !canSend }}
+                    className="w-11 h-11 rounded-full justify-center items-center ml-2"
+                    style={{ backgroundColor: canSend ? theme.colors.accent : theme.colors.surface }}
+                >
+                    <SymbolView
+                      name="arrow.up"
+                      size={18}
+                      tintColor={canSend ? theme.colors.surface : theme.colors.textSecondary}
+                    />
+                </TouchableOpacity>
+            )}
         </View>
     );
 };
