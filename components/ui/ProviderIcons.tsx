@@ -5,7 +5,8 @@
  */
 
 import React from "react";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Image } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ProviderId } from "@/types/provider.types";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { useTheme } from "./ThemeProvider";
@@ -29,29 +30,38 @@ export interface ProviderIconProps {
 // ============================================================================
 
 /**
- * Registry of icon components for each AI provider
- * Maps ProviderId to corresponding React component with appropriate icons
- * Uses MaterialCommunityIcons, AntDesign, and Ionicons for variety
+ * Registry of icon components for each AI provider.
+ * Apple and OpenAI use vector icons; OpenRouter and Ollama use PNG brand assets.
  */
 export const PROVIDER_ICONS: Record<ProviderId, React.FC<ProviderIconProps>> = {
   // Apple Intelligence: Uses apple icon from MaterialCommunityIcons
   apple: ({ size = 24, color }) => (
     <MaterialCommunityIcons name="apple" size={size} color={color} />
   ),
-  
+
   // OpenAI: Uses open-a-i icon from AntDesign (specifically designed for OpenAI)
   openai: ({ size = 24, color }) => (
     <AntDesign name="open-a-i" size={size} color={color} />
   ),
-  
-  // OpenRouter: Uses web icon representing multi-provider routing
+
+  // OpenRouter: Brand PNG asset tinted with theme color for consistency
   openrouter: ({ size = 24, color }) => (
-    <MaterialCommunityIcons name="web" size={size} color={color} />
+    <Image
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      source={require("../../assets/provider logos/openrouter.png")}
+      style={{ width: size, height: size, tintColor: color }}
+      resizeMode="contain"
+    />
   ),
-  
-  // Ollama: Uses server outline icon representing local AI server
+
+  // Ollama: Brand PNG asset tinted with theme color for consistency
   ollama: ({ size = 24, color }) => (
-    <Ionicons name="server-outline" size={size} color={color} />
+    <Image
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      source={require("../../assets/provider logos/ollama.png")}
+      style={{ width: size, height: size, tintColor: color }}
+      resizeMode="contain"
+    />
   ),
 };
 
@@ -60,12 +70,12 @@ export const PROVIDER_ICONS: Record<ProviderId, React.FC<ProviderIconProps>> = {
 // ============================================================================
 
 /**
- * Main ProviderIcon component for rendering provider-specific icons
- * Handles theme integration and provides consistent styling across the app
- * 
+ * Main ProviderIcon component for rendering provider-specific icons.
+ * Handles theme integration and provides consistent styling across the app.
+ *
  * @param providerId - The AI provider identifier (apple, openai, openrouter, ollama)
  * @param size - Icon size in pixels (default: 24)
- * @param color - Optional custom color, falls back to theme text color
+ * @param color - Optional custom color (used for vector icons; ignored by PNG icons)
  * @returns Themed icon component for the specified provider
  */
 export function ProviderIcon({
@@ -75,13 +85,13 @@ export function ProviderIcon({
 }: ProviderIconProps & { providerId: ProviderId }) {
   // Get current theme for consistent color theming
   const { theme } = useTheme();
-  
+
   // Use provided color or fallback to theme's text color
   const defaultColor = color ?? theme.colors.text;
-  
+
   // Get the appropriate icon component from the registry
   const IconComponent = PROVIDER_ICONS[providerId];
-  
+
   // Render the icon with computed styling
   return <IconComponent size={size} color={defaultColor} />;
 }

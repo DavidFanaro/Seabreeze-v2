@@ -1,9 +1,9 @@
 import { router, Stack } from "expo-router";
-import { View, Text, SafeAreaView, Pressable, ScrollView } from "react-native";
+import { View, Text, SafeAreaView, Pressable, ScrollView, StyleSheet } from "react-native";
 import { Suspense } from "react";
 import { IconButton, useTheme } from "@/components";
 import { ProviderIcon } from "@/components/ui/ProviderIcons";
-import { isProviderConfigured } from "@/stores";
+import { isProviderConfigured, useProviderStore } from "@/stores";
 import { SymbolView } from "expo-symbols";
 import type { ProviderId } from "@/types/provider.types";
 
@@ -12,137 +12,92 @@ interface ProviderListItemProps {
   name: string;
   description: string;
   isConfigured: boolean;
+  isLast?: boolean;
   selectedModel?: string;
   onPress: () => void;
 }
 
-// Provider list item component - displays a single AI provider with configuration status
+// Provider list item component — displays a single AI provider with configuration status
 const ProviderListItem: React.FC<ProviderListItemProps> = ({
   providerId,
   name,
   description,
   isConfigured,
+  isLast,
   selectedModel,
   onPress,
 }) => {
   const { theme } = useTheme();
 
-  // Determine icon color based on provider configuration status
-  // Unconfigured providers show secondary text color, configured providers show accent color
-  const getStatusColor = () => {
-    if (!isConfigured) return theme.colors.textSecondary;
-    return theme.colors.accent;
-  };
+  // Accent when configured, muted when not (except PNG icons which are always full-color)
+  const iconColor = isConfigured ? theme.colors.accent : theme.colors.textSecondary;
 
   return (
-    // Pressable container for the entire provider list item
-    // Provides press feedback and navigation to provider settings
     <Pressable
       onPress={onPress}
-      className="flex-row items-center justify-between py-3.5 px-4 border-b"
+      className="flex-row items-center justify-between py-3.5 px-4"
       style={({ pressed }) => ({
-        backgroundColor: pressed
-          ? theme.colors.surface
-          : theme.colors.background,
-        borderColor: theme.colors.border,
+        backgroundColor: pressed ? theme.colors.border : theme.colors.surface,
+        borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.border,
       })}
     >
-      {/* Left content section: icon + provider information */}
+      {/* Icon + text */}
       <View className="flex-row items-center flex-1">
-        {/* Provider icon container with rounded background */}
+        {/* Provider icon — slightly larger rounded container for iOS-icon feel */}
         <View
-          className="w-[40px] h-[40px] rounded-lg justify-center items-center mr-3"
-          style={{ backgroundColor: theme.colors.surface }}
+          className="w-[40px] h-[40px] rounded-xl justify-center items-center mr-3"
+          style={{ backgroundColor: theme.colors.background }}
         >
-          <ProviderIcon
-            providerId={providerId}
-            size={24}
-            color={getStatusColor()}
-          />
+          <ProviderIcon providerId={providerId} size={24} color={iconColor} />
         </View>
-        
-        {/* Provider information section containing name, description, and optional selected model */}
+
+        {/* Name, description, active model */}
         <View className="flex-1">
-          {/* Provider name label displayed in bold */}
           <Text className="text-[16px] font-semibold mb-0.5" style={{ color: theme.colors.text }}>
             {name}
           </Text>
-          
-          {/* Provider description label (e.g., "ChatGPT and other OpenAI models") */}
-          <Text
-            className="text-[13px]"
-            style={{ color: theme.colors.textSecondary }}
-          >
+          <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
             {description}
           </Text>
-          
-          {/* Selected model indicator displayed when a model is configured for this provider */}
           {selectedModel && (
-            <Text
-              className="text-[12px] mt-1"
-              style={{ color: theme.colors.accent }}
-            >
+            <Text className="text-[12px] mt-0.5" style={{ color: theme.colors.accent }}>
               {selectedModel}
             </Text>
           )}
         </View>
       </View>
-      
-      {/* Right section: navigation chevron icon indicating this is tappable */}
+
+      {/* Chevron */}
       <View className="ml-2">
-        <SymbolView
-          name="chevron.right"
-          size={18}
-          tintColor={theme.colors.textSecondary}
-        />
+        <SymbolView name="chevron.right" size={18} tintColor={theme.colors.textSecondary} />
       </View>
     </Pressable>
   );
 };
 
-// Main settings screen displaying all configuration options
+// Main settings screen
 export default function SettingsIndex() {
   const { theme } = useTheme();
+  const { selectedProvider, selectedModel } = useProviderStore();
 
-  // Navigate to a specific provider's settings page
   const navigateToProvider = (providerId: string) => {
     router.push(`/settings/${providerId}` as any);
   };
 
-  // Navigate to appearance/theme settings page
   const navigateToAppearance = () => {
     router.push("/settings/appearance" as any);
   };
 
-  // Array of available AI providers with their names and descriptions
-  // Used to dynamically render the providers list
-  const providers = [
-    {
-      id: "apple",
-      name: "Apple Intelligence",
-      description: "On-device AI powered by Apple Silicon",
-    },
-    {
-      id: "openai",
-      name: "OpenAI",
-      description: "ChatGPT and other OpenAI models",
-    },
-    {
-      id: "openrouter",
-      name: "OpenRouter",
-      description: "Access to multiple AI providers",
-    },
-    {
-      id: "ollama",
-      name: "Ollama",
-      description: "Local AI models via Ollama",
-    },
+  const providers: { id: ProviderId; name: string; description: string }[] = [
+    { id: "apple", name: "Apple Intelligence", description: "On-device AI powered by Apple Silicon" },
+    { id: "openai", name: "OpenAI", description: "ChatGPT and other OpenAI models" },
+    { id: "openrouter", name: "OpenRouter", description: "Access to multiple AI providers" },
+    { id: "ollama", name: "Ollama", description: "Local AI models via Ollama" },
   ];
 
   return (
-    // Root container for the settings screen
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      {/* Header configuration: title and close button */}
       <Stack.Screen
         options={{
           headerTitle: "Settings",
@@ -158,118 +113,104 @@ export default function SettingsIndex() {
           ),
         }}
       />
-      
+
       <SafeAreaView className="flex-1">
         <Suspense fallback={<Text>Loading</Text>}>
-          {/* Scrollable content container for settings sections */}
-          <ScrollView
-            className="flex-1"
-            contentContainerClassName="flex-grow pt-5 px-4"
-          >
-            {/* APPEARANCE SECTION - Theme and display settings */}
-            <Pressable
-              onPress={navigateToAppearance}
-              className="flex-row items-center justify-between py-3.5 px-4 rounded-lg mb-6"
-              style={({ pressed }) => ({
-                backgroundColor: pressed
-                  ? theme.colors.border
-                  : theme.colors.surface,
-              })}
-            >
-              {/* Appearance section content: icon + labels */}
-              <View className="flex-row items-center flex-1">
-                {/* Paintbrush icon for appearance settings */}
-                <View
-                  className="w-[40px] h-[40px] rounded-lg justify-center items-center mr-3"
-                  style={{ backgroundColor: theme.colors.background }}
-                >
-                  <SymbolView
-                    name="paintbrush"
-                    size={24}
-                    tintColor={theme.colors.accent}
-                  />
-                </View>
-                
-                {/* Appearance section text content */}
-                <View className="flex-1">
-                  {/* Section title label */}
-                  <Text className="text-[16px] font-semibold mb-0.5" style={{ color: theme.colors.text }}>
-                    Appearance
-                  </Text>
-                  
-                  {/* Section description label */}
-                  <Text
-                    className="text-[13px]"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    Theme and display settings
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Navigation chevron icon */}
-              <View className="ml-2">
-                <SymbolView
-                  name="chevron.right"
-                  size={18}
-                  tintColor={theme.colors.textSecondary}
-                />
-              </View>
-            </Pressable>
+          <ScrollView className="flex-1" contentContainerClassName="flex-grow pt-5 px-4">
 
-            {/* PROVIDERS SECTION HEADER - Uppercase label for the providers list */}
+            {/* ── APPEARANCE ──────────────────────────────────── */}
             <Text
-              className="text-[13px] font-bold uppercase tracking-wide px-4 mb-2 mt-6"
+              className="text-[11px] font-semibold uppercase tracking-widest px-1 mb-2"
               style={{ color: theme.colors.textSecondary }}
             >
-              PROVIDERS
+              General
             </Text>
-            
-            {/* PROVIDERS SECTION - Container for all available AI providers */}
+
             <View
-              className="rounded-lg overflow-hidden"
+              className="rounded-xl overflow-hidden mb-6"
               style={{ backgroundColor: theme.colors.surface }}
             >
-              {/* Dynamically render provider list items for each available provider */}
-              {providers.map((provider) => (
+              <Pressable
+                onPress={navigateToAppearance}
+                className="flex-row items-center justify-between py-3.5 px-4"
+                style={({ pressed }) => ({
+                  backgroundColor: pressed ? theme.colors.border : theme.colors.surface,
+                })}
+              >
+                <View className="flex-row items-center flex-1">
+                  <View
+                    className="w-[40px] h-[40px] rounded-xl justify-center items-center mr-3"
+                    style={{ backgroundColor: theme.colors.background }}
+                  >
+                    <SymbolView name="paintbrush" size={22} tintColor={theme.colors.accent} />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className="text-[16px] font-semibold mb-0.5"
+                      style={{ color: theme.colors.text }}
+                    >
+                      Appearance
+                    </Text>
+                    <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
+                      Theme and display settings
+                    </Text>
+                  </View>
+                </View>
+                <View className="ml-2">
+                  <SymbolView name="chevron.right" size={18} tintColor={theme.colors.textSecondary} />
+                </View>
+              </Pressable>
+            </View>
+
+            {/* ── PROVIDERS ───────────────────────────────────── */}
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-widest px-1 mb-2"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              Providers
+            </Text>
+
+            <View
+              className="rounded-xl overflow-hidden mb-6"
+              style={{ backgroundColor: theme.colors.surface }}
+            >
+              {providers.map((provider, index) => (
                 <ProviderListItem
                   key={provider.id}
-                  providerId={provider.id as ProviderId}
+                  providerId={provider.id}
                   name={provider.name}
                   description={provider.description}
-                  isConfigured={isProviderConfigured(provider.id as ProviderId)}
+                  isConfigured={isProviderConfigured(provider.id)}
+                  isLast={index === providers.length - 1}
+                  selectedModel={
+                    provider.id === selectedProvider ? selectedModel ?? undefined : undefined
+                  }
                   onPress={() => navigateToProvider(provider.id)}
                 />
               ))}
             </View>
 
-            {/* ABOUT SECTION - Application information and version */}
+            {/* ── ABOUT ───────────────────────────────────────── */}
             <View
-              className="p-4 rounded-lg mt-6"
+              className="p-4 rounded-xl"
               style={{ backgroundColor: theme.colors.surface }}
             >
-              {/* About section title label */}
               <Text
-                className="text-[16px] font-semibold mb-2"
+                className="text-[15px] font-semibold mb-1.5"
                 style={{ color: theme.colors.text }}
               >
                 About
               </Text>
-              
-              {/* About section content: version and description */}
               <Text
-                className="text-[14px] leading-[20px]"
+                className="text-[13px] leading-[19px]"
                 style={{ color: theme.colors.textSecondary }}
               >
-                Seabreeze v1.0.0
-                {"\n"}
-                A modern AI chat interface powered by React Native and Expo.
-                {"\n\n"}
+                Seabreeze v1.0.0{"\n"}
+                A modern AI chat interface powered by React Native and Expo.{"\n\n"}
                 Built with ❤️ for iOS, Android, and Web.
               </Text>
             </View>
-            
-            {/* Bottom spacer for scroll padding */}
+
             <View className="h-4" />
           </ScrollView>
         </Suspense>

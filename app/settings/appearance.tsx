@@ -12,6 +12,7 @@ import {
   SafeAreaView,
   ScrollView,
   Switch,
+  StyleSheet,
 } from "react-native";
 import { Suspense } from "react";
 import { SymbolView } from "expo-symbols";
@@ -19,96 +20,58 @@ import { IconButton, useTheme } from "@/components";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { ThemeMode } from "@/components/ui/ThemeProvider";
 
-/**
- * Converts a hexadecimal color code to RGBA format with custom alpha value.
- * Supports both 3-digit (#ABC) and 6-digit (#AABBCC) hex color formats.
- * Used for theme color calculations when rendering interactive elements.
- *
- * @param hex - Hex color string (e.g., "#FF5733")
- * @param alpha - Alpha/opacity value between 0 and 1
- * @returns RGBA color string (e.g., "rgba(255, 87, 51, 0.14)")
- */
-const hexToRgba = (hex: string, alpha: number): string => {
-  const sanitized = hex.replace("#", "");
-  const normalized =
-    sanitized.length === 3
-      ? sanitized
-          .split("")
-          .map((value) => value + value)
-          .join("")
-      : sanitized;
-  const red = Number.parseInt(normalized.slice(0, 2), 16);
-  const green = Number.parseInt(normalized.slice(2, 4), 16);
-  const blue = Number.parseInt(normalized.slice(4, 6), 16);
-
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+// ── Static palette previews ─────────────────────────────────────────────────
+// Three representative colors per theme (background → surface → accent).
+// Displayed as small dot swatches beside each theme name.
+const THEME_PALETTE: Record<ThemeMode, readonly [string, string, string]> = {
+  light:                  ["#f2f2f7", "#ffffff",  "#007AFF"],
+  dark:                   ["#000000", "#1a1a1a",  "#0567d1"],
+  nord:                   ["#2E3440", "#3B4252",  "#88C0D0"],
+  catppuccin:             ["#1E1E2E", "#313244",  "#89B4FA"],
+  "tokyo-night":          ["#1a1b26", "#24283b",  "#7aa2f7"],
+  "tokyo-night-storm":    ["#24283b", "#414868",  "#7aa2f7"],
+  "tokyo-night-moon":     ["#222436", "#2f334d",  "#82aaff"],
+  "one-dark":             ["#282c34", "#2c313a",  "#61afef"],
+  "gruvbox-dark-hard":    ["#1d2021", "#282828",  "#83a598"],
+  "gruvbox-dark-medium":  ["#282828", "#3c3836",  "#83a598"],
+  "gruvbox-dark-soft":    ["#32302f", "#3c3836",  "#83a598"],
+  darcula:                ["#2b2b2b", "#323232",  "#6897bb"],
+  system:                 ["#000000", "#1a1a1a",  "#007AFF"],
 };
 
-/**
- * AppearanceSettings Component
- *
- * Displays all appearance-related settings for the application.
- * Users can modify theme selection and chat display options from this screen.
- * Settings are persisted to the theme context and settings store.
- */
 export default function AppearanceSettings() {
-  // Retrieve current theme configuration and setter from theme context
   const { theme, themeMode, setTheme } = useTheme();
 
-  // Retrieve code line numbers display setting from persistent store
   const showCodeLineNumbers = useSettingsStore(
     (state) => state.showCodeLineNumbers,
   );
-
-  // Retrieve setter for code line numbers setting
   const setShowCodeLineNumbers = useSettingsStore(
     (state) => state.setShowCodeLineNumbers,
   );
 
-  /**
-   * Array of available theme options with unique identifiers and display names.
-   * Includes light, dark, and various color scheme themes (Nord, Catppuccin, Tokyo Night, etc.)
-   * and a "System" option that respects device settings.
-   */
   const themeOptions: { id: ThemeMode; name: string }[] = [
-    { id: "light", name: "Light" },
-    { id: "dark", name: "Dark" },
-    { id: "nord", name: "Nord" },
-    { id: "catppuccin", name: "Catppuccin" },
-    { id: "tokyo-night", name: "Tokyo Night (Night)" },
-    { id: "tokyo-night-storm", name: "Tokyo Night (Storm)" },
-    { id: "tokyo-night-moon", name: "Tokyo Night (Moon)" },
-    { id: "one-dark", name: "One Dark" },
-    { id: "gruvbox-dark-hard", name: "Gruvbox (Dark Hard)" },
-    { id: "gruvbox-dark-medium", name: "Gruvbox (Dark Medium)" },
-    { id: "gruvbox-dark-soft", name: "Gruvbox (Dark Soft)" },
-    { id: "darcula", name: "Darcula" },
-    { id: "system", name: "System" },
+    { id: "light",                name: "Light" },
+    { id: "dark",                 name: "Dark" },
+    { id: "nord",                 name: "Nord" },
+    { id: "catppuccin",           name: "Catppuccin" },
+    { id: "tokyo-night",          name: "Tokyo Night (Night)" },
+    { id: "tokyo-night-storm",    name: "Tokyo Night (Storm)" },
+    { id: "tokyo-night-moon",     name: "Tokyo Night (Moon)" },
+    { id: "one-dark",             name: "One Dark" },
+    { id: "gruvbox-dark-hard",    name: "Gruvbox (Dark Hard)" },
+    { id: "gruvbox-dark-medium",  name: "Gruvbox (Dark Medium)" },
+    { id: "gruvbox-dark-soft",    name: "Gruvbox (Dark Soft)" },
+    { id: "darcula",              name: "Darcula" },
+    { id: "system",               name: "System" },
   ];
 
-  /**
-   * Handles theme selection changes.
-   * Updates the global theme context with the selected theme.
-   *
-   * @param newTheme - The ThemeMode identifier selected by the user
-   */
-  const handleThemeChange = (newTheme: ThemeMode) => {
-    setTheme(newTheme);
-  };
-
   return (
-    // Root container with full flex height and theme background color
-    <View
-      className="flex-1"
-      style={{ backgroundColor: theme.colors.background }}
-    >
-      {/* Header configuration - displays "Appearance" title with close button */}
+    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <Stack.Screen
         options={{
           headerTitle: "Appearance",
           headerTransparent: true,
           headerTintColor: theme.colors.text,
-          // Close button (X icon) to dismiss the settings modal
           headerRight: () => (
             <IconButton
               icon="xmark"
@@ -120,120 +83,119 @@ export default function AppearanceSettings() {
         }}
       />
 
-      {/* Main safe area wrapper respects device notches and bottom navigation */}
       <SafeAreaView className="flex-1">
         <Suspense fallback={<Text>Loading</Text>}>
-          {/* Scrollable container for appearance settings content */}
           <ScrollView
             className="flex-1"
             contentContainerClassName="flex-grow pt-5 px-4"
           >
-            {/* ===== THEME SECTION ===== */}
-            {/* Section header label for theme selection */}
+            {/* ── THEME ─────────────────────────────────────────── */}
             <Text
-              className="text-[13px] font-bold uppercase tracking-wide mb-2"
+              className="text-[11px] font-semibold uppercase tracking-widest px-1 mb-2"
               style={{ color: theme.colors.textSecondary }}
             >
-              THEME
+              Theme
             </Text>
 
-            {/* Container for theme selection list with rounded corners */}
             <View
-              className="rounded-lg overflow-hidden"
+              className="rounded-xl overflow-hidden mb-6"
               style={{ backgroundColor: theme.colors.surface }}
             >
-              {/* Map through available themes to create selectable options */}
               {themeOptions.map((option, index) => {
-                // Determine if this theme is currently selected
                 const isSelected = themeMode === option.id;
-
-                // Calculate background colors for selected and pressed states
-                const selectedBackground = hexToRgba(theme.colors.accent, 0.14);
-                const pressedBackground = isSelected
-                  ? hexToRgba(theme.colors.accent, 0.2)
-                  : theme.colors.border;
+                const palette = THEME_PALETTE[option.id];
+                const isLast = index === themeOptions.length - 1;
 
                 return (
-                  // Pressable theme option item
                   <Pressable
                     key={option.id}
-                    onPress={() => handleThemeChange(option.id)}
-                    className="flex-row items-center justify-between px-4 py-4"
+                    onPress={() => setTheme(option.id)}
+                    className="flex-row items-center"
                     style={({ pressed }) => ({
-                      minHeight: 56,
-                      // Apply background color based on selected/pressed state
+                      minHeight: 52,
                       backgroundColor: pressed
-                        ? pressedBackground
-                        : isSelected
-                          ? selectedBackground
-                          : theme.colors.surface,
-                      // Add separator line between items (except after last item)
-                      borderBottomWidth:
-                        index < themeOptions.length - 1 ? 1 : 0,
+                        ? theme.colors.border
+                        : theme.colors.surface,
+                      borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
                       borderBottomColor: theme.colors.border,
+                      // Left accent bar marks the active theme
+                      borderLeftWidth: isSelected ? 3 : 0,
+                      borderLeftColor: theme.colors.accent,
+                      // Compensate so text doesn't shift when border appears
+                      paddingLeft: isSelected ? 13 : 16,
+                      paddingRight: 16,
                     })}
                   >
-                    {/* Theme name label container */}
-                    <View className="flex-row items-center flex-1">
-                      <Text
-                        className="text-[16px] font-semibold"
-                        style={{ color: theme.colors.text }}
-                      >
-                        {option.name}
-                      </Text>
+                    {/* Theme name */}
+                    <Text
+                      className="flex-1 text-[16px]"
+                      style={{
+                        color: isSelected ? theme.colors.accent : theme.colors.text,
+                        fontWeight: isSelected ? "600" : "400",
+                      }}
+                    >
+                      {option.name}
+                    </Text>
+
+                    {/* 3-dot palette swatch: bg → surface → accent */}
+                    <View className="flex-row items-center gap-1.5 mr-3">
+                      {palette.map((color, i) => (
+                        <View
+                          key={i}
+                          style={{
+                            width: 11,
+                            height: 11,
+                            borderRadius: 6,
+                            backgroundColor: color,
+                            borderWidth: 0.5,
+                            borderColor: "rgba(128,128,128,0.25)",
+                          }}
+                        />
+                      ))}
                     </View>
 
-                    {/* Selection indicator: checkmark for selected theme, empty space otherwise */}
+                    {/* Checkmark for the active selection */}
                     {isSelected ? (
                       <SymbolView
                         name="checkmark"
-                        size={16}
+                        size={15}
                         tintColor={theme.colors.accent}
                       />
                     ) : (
-                      <View className="w-[16px]" />
+                      <View style={{ width: 15 }} />
                     )}
                   </Pressable>
                 );
               })}
             </View>
 
-            {/* ===== CHAT DISPLAY SECTION ===== */}
-            {/* Section header label for chat display preferences */}
+            {/* ── CHAT DISPLAY ──────────────────────────────────── */}
             <Text
-              className="text-[13px] font-bold uppercase tracking-wide mb-2 mt-6"
+              className="text-[11px] font-semibold uppercase tracking-widest px-1 mb-2"
               style={{ color: theme.colors.textSecondary }}
             >
-              CHAT DISPLAY
+              Chat Display
             </Text>
 
-            {/* Container for chat display settings with rounded corners and padding */}
             <View
-              className="rounded-lg overflow-hidden p-4"
+              className="rounded-xl overflow-hidden"
               style={{ backgroundColor: theme.colors.surface }}
             >
-              {/* Row layout for settings item with label and toggle control */}
-              <View className="flex-row items-center justify-between">
-                {/* Left side: setting name and description */}
-                <View className="flex-1">
-                  {/* Primary label for the setting */}
+              <View className="flex-row items-center justify-between px-4 py-3.5">
+                <View className="flex-1 mr-3">
                   <Text
                     className="text-[16px] font-semibold"
                     style={{ color: theme.colors.text }}
                   >
                     Show Code Line Numbers
                   </Text>
-
-                  {/* Secondary description explaining what the setting does */}
                   <Text
-                    className="text-[13px] mt-1"
+                    className="text-[13px] mt-0.5"
                     style={{ color: theme.colors.textSecondary }}
                   >
                     Display line numbers in code blocks
                   </Text>
                 </View>
-
-                {/* Right side: toggle switch for enabling/disabling code line numbers */}
                 <Switch
                   value={showCodeLineNumbers}
                   onValueChange={setShowCodeLineNumbers}
@@ -250,7 +212,6 @@ export default function AppearanceSettings() {
               </View>
             </View>
 
-            {/* Bottom spacing to prevent content from being cut off by navigation */}
             <View className="h-4" />
           </ScrollView>
         </Suspense>

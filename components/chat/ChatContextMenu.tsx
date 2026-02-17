@@ -80,7 +80,7 @@ const normalizeUniqueModels = (models: string[]): string[] => {
  */
 const getStoredModelValue = (
   providerId: ProviderId,
-  displayModel: string
+  displayModel: string,
 ): string => {
   if (providerId === "apple") {
     return "system-default";
@@ -121,7 +121,9 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
   } = useProviderStore();
 
   const thinkingEnabled = useSettingsStore((state) => state.thinkingEnabled);
-  const setThinkingEnabled = useSettingsStore((state) => state.setThinkingEnabled);
+  const setThinkingEnabled = useSettingsStore(
+    (state) => state.setThinkingEnabled,
+  );
   const thinkingLevel = useSettingsStore((state) => state.thinkingLevel);
   const setThinkingLevel = useSettingsStore((state) => state.setThinkingLevel);
 
@@ -161,14 +163,15 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
       }
 
       // For Ollama, loaded models are authoritative (strict sync, including empty lists).
-      const baseModels = providerId === "ollama"
-        ? available
-        : defaultModels;
+      const baseModels = providerId === "ollama" ? available : defaultModels;
 
       // Filter out hidden models and append custom models
       const visibleDefaults = baseModels.filter((m) => !hidden.includes(m));
       const visibleCustomModels = custom.filter((m) => !hidden.includes(m));
-      return normalizeUniqueModels([...visibleDefaults, ...visibleCustomModels]);
+      return normalizeUniqueModels([
+        ...visibleDefaults,
+        ...visibleCustomModels,
+      ]);
     };
   }, [customModels, hiddenModels, availableModels]);
 
@@ -239,8 +242,9 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
     selectedProvider,
     selectedModel ?? "",
   );
-  const showOllamaThinkingHint = selectedProvider === "ollama"
-    && isOllamaThinkingHintModel(selectedModel ?? "");
+  const showOllamaThinkingHint =
+    selectedProvider === "ollama" &&
+    isOllamaThinkingHintModel(selectedModel ?? "");
 
   // ============================================================================
   // RENDER
@@ -270,17 +274,13 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
           </Button>
 
           {isThinkingLevelAvailable && (
-            <Submenu
-              button={(
-                <Button>
-                  Thinking Level
-                </Button>
-              )}
-            >
+            <Submenu button={<Button>Thinking Level</Button>}>
               {thinkingLevels.map((level) => (
                 <Button
                   key={level.value}
-                  systemImage={thinkingLevel === level.value ? "checkmark" : undefined}
+                  systemImage={
+                    thinkingLevel === level.value ? "checkmark" : undefined
+                  }
                   onPress={() => handleThinkingLevelSelect(level.value)}
                 >
                   {level.label}
@@ -290,9 +290,7 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
           )}
 
           {showOllamaThinkingHint && (
-            <Button>
-              Ollama Thinking Model Managed
-            </Button>
+            <Button>Ollama Thinking Model Managed</Button>
           )}
 
           {/* ====================================================================
@@ -326,7 +324,11 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
                   // Each model as a selectable button with checkmark indicator
                   <Button
                     key={model}
-                    systemImage={isModelSelected(providerId, model) ? "checkmark" : undefined}
+                    systemImage={
+                      isModelSelected(providerId, model)
+                        ? "checkmark"
+                        : undefined
+                    }
                     onPress={() => handleModelSelect(providerId, model)}
                   >
                     {model}
@@ -343,12 +345,12 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
 
         {/* Context menu trigger button - displays as ellipsis icon */}
         <ContextMenu.Trigger>
-          <View className="pl-1.5">
+          <View className="pl-2">
             {/* Three-dot menu icon (ellipsis) in a circle */}
             <SymbolView
               name="ellipsis.circle"
               size={22}
-              tintColor={theme.colors.text}
+              tintColor={theme.colors.accent}
             />
           </View>
         </ContextMenu.Trigger>

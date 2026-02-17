@@ -12,7 +12,7 @@ OpenRouter, and Ollama providers.
 ## Important notes
 - Assume the dev server is already started
 - Assume the ios simulator is already started
-- when building any UI use the `frontend-design` skill
+- when building any UI use the `frontend-design` skill and use `agent-device` skill the verify your work
 - when interacting with ai sdk use the `ai-sdk` skill
 
 ## Commands
