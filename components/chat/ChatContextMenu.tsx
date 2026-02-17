@@ -52,6 +52,23 @@ const getDefaultModelsForProvider = (providerId: ProviderId): string[] => {
   }
 };
 
+const normalizeUniqueModels = (models: string[]): string[] => {
+  const normalizedModels: string[] = [];
+  const seenModels = new Set<string>();
+
+  for (const model of models) {
+    const normalizedModel = model.trim();
+    if (!normalizedModel || seenModels.has(normalizedModel)) {
+      continue;
+    }
+
+    seenModels.add(normalizedModel);
+    normalizedModels.push(normalizedModel);
+  }
+
+  return normalizedModels;
+};
+
 /**
  * Map a display model name to its stored value in the provider store
  * Apple Intelligence uses a special "system-default" value regardless of display name
@@ -150,7 +167,8 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
 
       // Filter out hidden models and append custom models
       const visibleDefaults = baseModels.filter((m) => !hidden.includes(m));
-      return [...visibleDefaults, ...custom];
+      const visibleCustomModels = custom.filter((m) => !hidden.includes(m));
+      return normalizeUniqueModels([...visibleDefaults, ...visibleCustomModels]);
     };
   }, [customModels, hiddenModels, availableModels]);
 

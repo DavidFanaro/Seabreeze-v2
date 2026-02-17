@@ -63,6 +63,42 @@ function normalizeOllamaUrl(url: string): string {
     return `${normalized}/api`;
 }
 
+function extractModelName(entry: unknown): string | null {
+    if (typeof entry === "string") {
+        return entry;
+    }
+
+    if (entry && typeof entry === "object") {
+        const modelName = (entry as { name?: unknown }).name;
+        if (typeof modelName === "string") {
+            return modelName;
+        }
+    }
+
+    return null;
+}
+
+function normalizeModelNames(modelNames: unknown[]): string[] {
+    const normalizedModels: string[] = [];
+    const seenModels = new Set<string>();
+
+    for (const modelName of modelNames) {
+        if (typeof modelName !== "string") {
+            continue;
+        }
+
+        const normalizedModelName = modelName.trim();
+        if (!normalizedModelName || seenModels.has(normalizedModelName)) {
+            continue;
+        }
+
+        seenModels.add(normalizedModelName);
+        normalizedModels.push(normalizedModelName);
+    }
+
+    return normalizedModels;
+}
+
 // ============================================================================
 // PROVIDER CREATION FUNCTIONS
 // ============================================================================
@@ -224,9 +260,8 @@ export async function testOllamaConnection(url: string): Promise<boolean> {
  */
 export async function fetchOllamaModels(baseUrl: string): Promise<string[]> {
     try {
-        // Normalize URL - remove trailing slashes and ensure proper format
-        const normalizedUrl = baseUrl.replace(/\/+$/, "");
-        const apiUrl = `${normalizedUrl}/api/tags`;
+        const normalizedUrl = normalizeOllamaUrl(baseUrl);
+        const apiUrl = `${normalizedUrl}/tags`;
 
 
         // Add timeout using AbortController
@@ -251,14 +286,16 @@ export async function fetchOllamaModels(baseUrl: string): Promise<string[]> {
             const data = await response.json();
 
             // Handle different response structures
-            let models: string[] = [];
+            let modelEntries: unknown[] = [];
             if (Array.isArray(data)) {
-                models = data.map((m: any) => m.name || m);
-            } else if (data.models && Array.isArray(data.models)) {
-                models = data.models.map((m: { name: string }) => m.name);
+                modelEntries = data;
+            } else if (data && typeof data === "object" && Array.isArray((data as { models?: unknown[] }).models)) {
+                modelEntries = (data as { models: unknown[] }).models;
             }
 
-            return models;
+            return normalizeModelNames(
+                modelEntries.map((modelEntry) => extractModelName(modelEntry)),
+            );
         } finally {
             clearTimeout(timeoutId);
         }

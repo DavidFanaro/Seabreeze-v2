@@ -388,12 +388,14 @@ describe('Ollama Provider', () => {
             expect(result).toEqual(['llama3.2', 'mistral', 'codellama']);
         });
 
-        it('should handle mixed object response (objects with and without name)', async () => {
+        it('should discard invalid entries in mixed responses', async () => {
             const mockData = [
                 { name: 'llama3.2' },
                 { id: 'mistral' }, // No name field
-                'codellama', // String
+                ' codellama ', // String with extra whitespace
                 { name: 'custom-model' },
+                { name: 'custom-model' }, // Duplicate
+                null,
             ];
             const mockResponse = {
                 ok: true,
@@ -403,7 +405,28 @@ describe('Ollama Provider', () => {
 
             const result = await fetchOllamaModels('http://localhost:11434');
 
-            expect(result).toEqual(['llama3.2', { id: 'mistral' }, 'codellama', 'custom-model']);
+            expect(result).toEqual(['llama3.2', 'codellama', 'custom-model']);
+        });
+
+        it('should normalize and dedupe names from object responses', async () => {
+            const mockData = {
+                models: [
+                    { name: ' llama3.2 ' },
+                    { name: 'mistral' },
+                    { name: 'mistral' },
+                    { name: '' },
+                    { name: '   ' },
+                ],
+            };
+            const mockResponse = {
+                ok: true,
+                json: jest.fn(async () => mockData as any),
+            } as any;
+            mockedExpoFetch.mockResolvedValue(mockResponse);
+
+            const result = await fetchOllamaModels('http://localhost:11434');
+
+            expect(result).toEqual(['llama3.2', 'mistral']);
         });
 
         it('should return empty array for non-2xx response', async () => {

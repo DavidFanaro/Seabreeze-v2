@@ -576,7 +576,7 @@ describe("MessageList Component", () => {
     expect(mockScrollToEnd).toHaveBeenLastCalledWith({ animated: false });
   });
 
-  it("does not auto-scroll during streaming when user is far from bottom", () => {
+  it("does not auto-scroll during streaming when user drags away from bottom", () => {
     const streamingMessages: ModelMessage[] = [
       { role: "user", content: "write a server" },
       { role: "assistant", content: "```zig\nconst" },
@@ -587,6 +587,7 @@ describe("MessageList Component", () => {
     );
 
     act(() => {
+      latestFlashListProps.onScrollBeginDrag();
       latestFlashListProps.onScroll({
         nativeEvent: {
           contentSize: { width: 320, height: 2200 },
@@ -594,6 +595,7 @@ describe("MessageList Component", () => {
           layoutMeasurement: { width: 320, height: 500 },
         },
       });
+      latestFlashListProps.onScrollEndDrag();
     });
 
     rerender(
@@ -607,6 +609,34 @@ describe("MessageList Component", () => {
     );
 
     expect(mockScrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("keeps follow mode when far-from-bottom scroll was not user initiated", () => {
+    const streamingMessages: ModelMessage[] = [
+      { role: "user", content: "write a server" },
+      { role: "assistant", content: "```zig\nconst" },
+    ];
+
+    render(
+      <MessageList messages={streamingMessages} isStreaming={true} />
+    );
+
+    act(() => {
+      latestFlashListProps.onScroll({
+        nativeEvent: {
+          contentSize: { width: 320, height: 2200 },
+          contentOffset: { x: 0, y: 600 },
+          layoutMeasurement: { width: 320, height: 500 },
+        },
+      });
+    });
+
+    act(() => {
+      latestFlashListProps.onContentSizeChange(320, 2250);
+    });
+
+    expect(mockScrollToEnd).toHaveBeenCalledTimes(1);
+    expect(mockScrollToEnd).toHaveBeenLastCalledWith({ animated: false });
   });
 
   it("keeps follow mode during active stream on content size changes when near bottom", () => {
@@ -637,7 +667,7 @@ describe("MessageList Component", () => {
     expect(mockScrollToEnd).toHaveBeenLastCalledWith({ animated: false });
   });
 
-  it("pauses follow mode during active stream on content size changes when far from bottom", () => {
+  it("pauses follow mode during active stream on content size changes when user drags away", () => {
     const streamingMessages: ModelMessage[] = [
       { role: "user", content: "write a server" },
       { role: "assistant", content: "```zig\nconst" },
@@ -648,6 +678,7 @@ describe("MessageList Component", () => {
     );
 
     act(() => {
+      latestFlashListProps.onScrollBeginDrag();
       latestFlashListProps.onScroll({
         nativeEvent: {
           contentSize: { width: 320, height: 2200 },
@@ -655,6 +686,7 @@ describe("MessageList Component", () => {
           layoutMeasurement: { width: 320, height: 500 },
         },
       });
+      latestFlashListProps.onScrollEndDrag();
     });
 
     act(() => {
@@ -695,6 +727,43 @@ describe("MessageList Component", () => {
     );
 
     expect(mockScrollToEnd).toHaveBeenCalled();
+  });
+
+  it("force-snaps to bottom when streaming starts after user scrolled up", () => {
+    const initialMessages: ModelMessage[] = [
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "hi" },
+    ];
+
+    const { rerender } = render(
+      <MessageList messages={initialMessages} isStreaming={false} />
+    );
+
+    act(() => {
+      latestFlashListProps.onScrollBeginDrag();
+      latestFlashListProps.onScroll({
+        nativeEvent: {
+          contentSize: { width: 320, height: 2200 },
+          contentOffset: { x: 0, y: 400 },
+          layoutMeasurement: { width: 320, height: 500 },
+        },
+      });
+      latestFlashListProps.onScrollEndDrag();
+    });
+
+    rerender(
+      <MessageList
+        messages={[
+          ...initialMessages,
+          { role: "user", content: "new question" },
+          { role: "assistant", content: "" },
+        ]}
+        isStreaming={true}
+      />
+    );
+
+    expect(mockScrollToEnd).toHaveBeenCalledTimes(1);
+    expect(mockScrollToEnd).toHaveBeenLastCalledWith({ animated: false });
   });
 
   it("performs terminal settle scroll when stream finishes near bottom", () => {
@@ -753,6 +822,7 @@ describe("MessageList Component", () => {
       );
 
       act(() => {
+        latestFlashListProps.onScrollBeginDrag();
         latestFlashListProps.onScroll({
           nativeEvent: {
             contentSize: { width: 320, height: 2200 },
@@ -760,6 +830,7 @@ describe("MessageList Component", () => {
             layoutMeasurement: { width: 320, height: 500 },
           },
         });
+        latestFlashListProps.onScrollEndDrag();
       });
 
       rerender(<MessageList messages={baseMessages} isStreaming={false} />);

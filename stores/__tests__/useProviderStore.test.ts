@@ -100,6 +100,88 @@ describe("useProviderStore", () => {
     });
   });
 
+  describe("Available Models Management", () => {
+    it("should normalize and dedupe Ollama available models", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.setAvailableModels("ollama", [" llama3.2 ", "", "mistral", "mistral"]);
+      });
+
+      expect(result.current.availableModels.ollama).toEqual(["llama3.2", "mistral"]);
+    });
+
+    it("should remove custom Ollama models that overlap with fetched models", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.addCustomModel("ollama", "mistral");
+      });
+      act(() => {
+        result.current.addCustomModel("ollama", "my-local-model");
+      });
+
+      act(() => {
+        result.current.setAvailableModels("ollama", ["llama3.2", "mistral"]);
+      });
+
+      expect(result.current.customModels.ollama).toEqual(["my-local-model"]);
+    });
+
+    it("should keep selected model when overlapping custom model becomes fetched", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.setSelectedProvider("ollama");
+      });
+      act(() => {
+        result.current.addCustomModel("ollama", "custom-model");
+      });
+      act(() => {
+        result.current.setSelectedModel("custom-model");
+      });
+
+      act(() => {
+        result.current.setAvailableModels("ollama", ["custom-model", "llama3.2"]);
+      });
+
+      expect(result.current.customModels.ollama).toEqual([]);
+      expect(result.current.selectedModel).toBe("custom-model");
+    });
+
+    it("should fallback selected model when current Ollama selection is unavailable", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.setSelectedProvider("ollama");
+      });
+      act(() => {
+        result.current.setSelectedModel("stale-model");
+      });
+
+      act(() => {
+        result.current.setAvailableModels("ollama", ["mistral"]);
+      });
+
+      expect(result.current.selectedModel).toBe("mistral");
+    });
+
+    it("should normalize non-Ollama available models without mutating custom models", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.addCustomModel("openai", "custom-openai");
+      });
+
+      act(() => {
+        result.current.setAvailableModels("openai", [" gpt-4o ", "gpt-4o"]);
+      });
+
+      expect(result.current.availableModels.openai).toEqual(["gpt-4o"]);
+      expect(result.current.customModels.openai).toEqual(["custom-openai"]);
+    });
+  });
+
   describe("Custom Models Management", () => {
     it("should add custom model to provider", () => {
       const { result } = createStore();

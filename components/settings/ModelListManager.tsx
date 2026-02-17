@@ -17,6 +17,23 @@ import { ProviderId } from "@/types/provider.types";
 import { useProviderStore } from "@/stores";
 import { ModelRow } from "./ModelRow";
 
+function normalizeUniqueModels(models: string[]): string[] {
+    const normalizedModels: string[] = [];
+    const seenModels = new Set<string>();
+
+    for (const model of models) {
+        const normalizedModel = model.trim();
+        if (!normalizedModel || seenModels.has(normalizedModel)) {
+            continue;
+        }
+
+        seenModels.add(normalizedModel);
+        normalizedModels.push(normalizedModel);
+    }
+
+    return normalizedModels;
+}
+
 interface ModelListManagerProps {
     providerId: ProviderId;
     predefinedModels: string[];
@@ -71,16 +88,21 @@ export function ModelListManager({
     // Filter out any hidden models from the base list
     const baseModels = useMemo(
         () =>
-            (dynamicModels?.length ? dynamicModels : predefinedModels).filter(
+            normalizeUniqueModels((dynamicModels?.length ? dynamicModels : predefinedModels).filter(
                 (m) => !providerHiddenModels.includes(m)
-            ),
+            )),
         [dynamicModels, predefinedModels, providerHiddenModels]
+    );
+
+    const visibleCustomModels = useMemo(
+        () => normalizeUniqueModels(providerCustomModels.filter((m) => !providerHiddenModels.includes(m))),
+        [providerCustomModels, providerHiddenModels],
     );
 
     // All models: Combine provider base models with custom user-added models
     const allModels = useMemo(
-        () => [...baseModels, ...providerCustomModels],
-        [baseModels, providerCustomModels]
+        () => normalizeUniqueModels([...baseModels, ...visibleCustomModels]),
+        [baseModels, visibleCustomModels]
     );
 
     // Filtered models: Apply search query filter if present

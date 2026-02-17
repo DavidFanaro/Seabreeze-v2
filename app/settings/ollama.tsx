@@ -4,7 +4,29 @@ import { Suspense, useState, useEffect } from "react";
 import { IconButton, SettingInput, SaveButton, ModelListManager, useTheme } from "@/components";
 import { useProviderStore, useAuthStore } from "@/stores";
 import { testProviderConnection } from "@/providers/provider-factory";
+import { fetchOllamaModels } from "@/providers/ollama-provider";
 import { OLLAMA_MODELS } from "@/types/provider.types";
+
+function normalizeUniqueModelNames(models: unknown[]): string[] {
+    const normalizedModels: string[] = [];
+    const seenModels = new Set<string>();
+
+    for (const model of models) {
+        if (typeof model !== "string") {
+            continue;
+        }
+
+        const normalizedModel = model.trim();
+        if (!normalizedModel || seenModels.has(normalizedModel)) {
+            continue;
+        }
+
+        seenModels.add(normalizedModel);
+        normalizedModels.push(normalizedModel);
+    }
+
+    return normalizedModels;
+}
 
 /**
  * OllamaSettings Component
@@ -21,7 +43,7 @@ export default function OllamaSettings() {
     const { theme } = useTheme();
 
     // Get model selection and available models from the provider store
-    const { selectedModel, setSelectedModel, availableModels } = useProviderStore();
+    const { selectedModel, setSelectedModel, availableModels, setAvailableModels } = useProviderStore();
 
     // Get Ollama URL configuration from auth store for persistence
     const { ollamaUrl, setOllamaUrl } = useAuthStore();
@@ -82,38 +104,52 @@ export default function OllamaSettings() {
      */
     const handleFetchModels = async () => {
         setIsLoadingModels(true);
+        setTestResult(null);
+
+        const trimmedBaseUrl = baseUrl.trim();
+        if (!trimmedBaseUrl) {
+            setTestResult({
+                success: false,
+                message: "Please enter an Ollama URL before loading models.",
+            });
+            setIsLoadingModels(false);
+            return;
+        }
+
         try {
-            // Call Ollama API to get available models
-            const response = await fetch(`${baseUrl}/api/tags`);
+            // Use provider utility so URL normalization is shared and consistent.
+            const models = normalizeUniqueModelNames(await fetchOllamaModels(trimmedBaseUrl));
 
-            if (response.ok) {
-                // Extract model names from response
-                const data = await response.json();
-                const models = data.models.map((m: { name: string }) => m.name);
+            // Persist fetched models (store also applies provider-level safeguards).
+            setAvailableModels("ollama", models);
 
-                // Store models in provider store for later selection
-                useProviderStore.getState().setAvailableModels("ollama", models);
-
-                // Show success message with model count
+            if (models.length > 0) {
                 setTestResult({
                     success: true,
                     message: `Loaded ${models.length} models`,
                 });
-            } else {
-                // Handle HTTP error responses
-                setTestResult({
-                    success: false,
-                    message: "Failed to load models",
-                });
+                return;
             }
+
+            // Distinguish connectivity failures from truly empty model lists.
+            const connectionOk = await testProviderConnection("ollama", { url: trimmedBaseUrl });
+            setTestResult(connectionOk
+                ? {
+                    success: false,
+                    message: "Connected, but no models were returned. Run 'ollama list' to verify installed models.",
+                }
+                : {
+                    success: false,
+                    message: "Could not reach Ollama. Check your URL and server status.",
+                });
         } catch {
-            // Handle network or other errors
             setTestResult({
                 success: false,
-                message: "Connection error",
+                message: "Failed to load models",
             });
+        } finally {
+            setIsLoadingModels(false);
         }
-        setIsLoadingModels(false);
     };
 
     return (

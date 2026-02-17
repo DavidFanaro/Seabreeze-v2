@@ -2,7 +2,7 @@
  * @file ModelListManager.test.tsx
  * @purpose Test suite for ModelListManager component functionality
  */
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterAll } from '@jest/globals';
 import { render, fireEvent, screen } from '@testing-library/react-native';
 import React from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
@@ -11,31 +11,58 @@ import { ModelListManager } from '../ModelListManager';
 import { ThemeProvider } from '@/components/ui/ThemeProvider';
 import * as storesModule from '@/stores';
 
+const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
 // Mock the entire stores module
 jest.mock('@/stores');
 
-// Mock ModelRow component  
-jest.mock('../ModelRow', () => ({
-    ModelRow: ({ model, isSelected, isCustom, isEditMode, onSelect, onEdit, onDelete, theme, disabled }: any) => {
-        return (
-            <Pressable 
-                testID={`model-row-${model}`}
-                onPress={onSelect}
-                disabled={disabled || isEditMode}
-            >
-                <Text testID={`model-name-${model}`}>{model}</Text>
-                {isCustom && !isEditMode && <Text testID="custom-badge">Custom</Text>}
-                {isEditMode && (
-                    <View>
-                        {isCustom && <Text testID="edit-button" onPress={onEdit}>Edit</Text>}
-                        <Text testID="delete-button" onPress={onDelete}>Delete</Text>
-                    </View>
-                )}
-                {isSelected && !isEditMode && <Text testID="selected-indicator">✓</Text>}
-            </Pressable>
-        );
-    },
+// Mock theme provider and hook
+jest.mock('@/components/ui/ThemeProvider', () => ({
+    ThemeProvider: ({ children }: any) => children,
+    useTheme: () => ({
+        theme: {
+            colors: {
+                surface: '#FFFFFF',
+                text: '#000000',
+                textSecondary: '#8E8E93',
+                accent: '#007AFF',
+                border: '#D1D1D6',
+            },
+        },
+    }),
 }));
+
+// Mock ModelRow component
+jest.mock('../ModelRow', () => {
+    const React = require('react');
+    const { Pressable, Text, View } = require('react-native');
+
+    return {
+        ModelRow: ({ model, isSelected, isCustom, isEditMode, onSelect, onEdit, onDelete, disabled }: any) => {
+            return (
+                <Pressable
+                    testID={`model-row-${model}`}
+                    onPress={onSelect}
+                    disabled={disabled || isEditMode}
+                >
+                    <Text testID={`model-name-${model}`}>{model}</Text>
+                    {isCustom && !isEditMode && <Text testID="custom-badge">Custom</Text>}
+                    {isEditMode && isCustom && (
+                        <View>
+                            <Text testID="edit-button" onPress={onEdit}>
+                                SymbolView-pencil-18-#007AFF
+                            </Text>
+                            <Text testID="delete-button" onPress={onDelete}>
+                                SymbolView-trash-18-#FF3B30
+                            </Text>
+                        </View>
+                    )}
+                    {isSelected && !isEditMode && <Text testID="selected-indicator">✓</Text>}
+                </Pressable>
+            );
+        },
+    };
+});
 
 // Mock expo-haptics
 jest.mock('expo-haptics', () => ({
@@ -44,10 +71,16 @@ jest.mock('expo-haptics', () => ({
 }));
 
 // Mock expo-symbols
-jest.mock('expo-symbols', () => ({
-    SymbolView: ({ name, size, tintColor }: any) => 
-        `SymbolView-${name}-${size}-${tintColor}`,
-}));
+jest.mock('expo-symbols', () => {
+    const React = require('react');
+    const { Text } = require('react-native');
+
+    return {
+        SymbolView: ({ name, size, tintColor }: any) => (
+            <Text>{`SymbolView-${name}-${size}-${tintColor}`}</Text>
+        ),
+    };
+});
 
 // Helper component to wrap with ThemeProvider
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -77,6 +110,10 @@ describe('ModelListManager', () => {
         jest.clearAllMocks();
         (storesModule.useProviderStore as any).mockReturnValue(mockStore);
         defaultProps.onModelSelect.mockClear();
+    });
+
+    afterAll(() => {
+        alertSpy.mockRestore();
     });
 
     describe('Header Section', () => {
@@ -284,7 +321,7 @@ describe('ModelListManager', () => {
         });
 
         it('should filter models based on search query', () => {
-            const models = ['gpt-3.5-turbo', 'gpt-4', 'claude-3', 'gemini-pro'];
+            const models = ['gpt-3.5-turbo', 'gpt-4', 'claude-3', 'gemini-pro', 'model-5', 'model-6'];
             
             render(
                 <TestWrapper>
@@ -364,7 +401,7 @@ describe('ModelListManager', () => {
         });
 
         it('should show no results state when search has no matches', () => {
-            const models = ['gpt-3.5-turbo', 'gpt-4'];
+            const models = ['gpt-3.5-turbo', 'gpt-4', 'claude-3', 'gemini-pro', 'model-5', 'model-6'];
             
             render(
                 <TestWrapper>
@@ -508,9 +545,10 @@ describe('ModelListManager', () => {
             );
 
             const editButton = screen.getByText('Edit');
-            expect(editButton.props.disabled).toBe(true);
+            fireEvent.press(editButton);
+            expect(screen.queryByText('Done')).toBeFalsy();
 
-            const addButton = screen.getByText('SymbolView-plus.circle.fill-22-#8E8E93');
+            const addButton = screen.getByText('SymbolView-plus.circle.fill-22-#007AFF');
             fireEvent.press(addButton);
 
             // Add input should not appear when disabled

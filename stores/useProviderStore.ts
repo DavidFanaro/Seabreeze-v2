@@ -182,6 +182,43 @@ const DEFAULT_HIDDEN_MODELS: Record<ProviderId, string[]> = {
   ollama: [], // All default Ollama models shown initially
 };
 
+const normalizeModelNames = (models: string[]): string[] => {
+  const normalizedModels: string[] = [];
+  const seenModels = new Set<string>();
+
+  for (const model of models) {
+    const normalizedModel = model.trim();
+    if (!normalizedModel || seenModels.has(normalizedModel)) {
+      continue;
+    }
+
+    seenModels.add(normalizedModel);
+    normalizedModels.push(normalizedModel);
+  }
+
+  return normalizedModels;
+};
+
+const getVisibleModelsForProvider = (
+  provider: ProviderId,
+  availableModels: Record<ProviderId, string[]>,
+  customModels: Record<ProviderId, string[]>,
+  hiddenModels: Record<ProviderId, string[]>,
+): string[] => {
+  const hidden = hiddenModels[provider] || [];
+  const baseModels =
+    provider === "ollama" && (availableModels[provider] || []).length > 0
+      ? availableModels[provider] || []
+      : DEFAULT_MODELS[provider];
+
+  const visibleBaseModels = baseModels.filter((model) => !hidden.includes(model));
+  const visibleCustomModels = (customModels[provider] || []).filter(
+    (model) => !hidden.includes(model),
+  );
+
+  return normalizeModelNames([...visibleBaseModels, ...visibleCustomModels]);
+};
+
 // ============================================================================
 // ZUSTAND STORE CREATION
 // ============================================================================
@@ -251,14 +288,51 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        * Does not affect custom models or hidden models.
        */
       setAvailableModels: (provider, models) =>
-        set((state) =>
-          applyRuntimeWriteVersion(state, {
-            availableModels: {
-              ...state.availableModels,
-              [provider]: models,
-            },
-          }),
-        ),
+        set((state) => {
+          const normalizedAvailableModels = normalizeModelNames(models);
+          const nextAvailableModels = {
+            ...state.availableModels,
+            [provider]: normalizedAvailableModels,
+          };
+
+          if (provider !== "ollama") {
+            return applyRuntimeWriteVersion(state, {
+              availableModels: nextAvailableModels,
+            });
+          }
+
+          const availableModelSet = new Set(normalizedAvailableModels);
+          const providerCustomModels = normalizeModelNames(
+            (state.customModels[provider] || []).filter(
+              (model) => !availableModelSet.has(model),
+            ),
+          );
+
+          const nextCustomModels = {
+            ...state.customModels,
+            [provider]: providerCustomModels,
+          };
+
+          let nextSelectedModel = state.selectedModel;
+          if (state.selectedProvider === provider) {
+            const visibleModels = getVisibleModelsForProvider(
+              provider,
+              nextAvailableModels,
+              nextCustomModels,
+              state.hiddenModels,
+            );
+
+            if (!visibleModels.includes(state.selectedModel)) {
+              nextSelectedModel = visibleModels[0] || "";
+            }
+          }
+
+          return applyRuntimeWriteVersion(state, {
+            availableModels: nextAvailableModels,
+            customModels: nextCustomModels,
+            selectedModel: nextSelectedModel,
+          });
+        }),
 
       // ========================================================================
       // CUSTOM MODEL MANAGEMENT ACTIONS

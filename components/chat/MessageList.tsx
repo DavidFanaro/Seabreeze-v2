@@ -65,6 +65,8 @@ export const MessageList: React.FC<MessageListProps> = ({
     // Reference to the FlashList component for potential scroll interactions
     const flashListRef = useRef<FlashListRef<ModelMessage>>(null);
     const isNearBottomRef = useRef(true);
+    const shouldAutoFollowRef = useRef(true);
+    const isUserInteractingRef = useRef(false);
     const lastAutoScrollAtRef = useRef(0);
     const previousMessageCountRef = useRef(messages.length);
     const previousLastMessageContentRef = useRef<string>(
@@ -111,7 +113,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     }, [messages.length, isStreaming, thinkingOutput]);
 
     const scrollToBottom = useCallback((force = false, animated = true, bypassThrottle = false) => {
-        if (!force && !isNearBottomRef.current) {
+        if (!force && !shouldAutoFollowRef.current) {
             return;
         }
 
@@ -125,7 +127,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     }, []);
 
     const scheduleTerminalSettleScroll = useCallback(() => {
-        if (!isNearBottomRef.current) {
+        if (!shouldAutoFollowRef.current) {
             return;
         }
 
@@ -152,7 +154,37 @@ export const MessageList: React.FC<MessageListProps> = ({
         } = event.nativeEvent;
 
         const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-        isNearBottomRef.current = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
+        const isNearBottom = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
+        isNearBottomRef.current = isNearBottom;
+
+        if (isNearBottom) {
+            shouldAutoFollowRef.current = true;
+            return;
+        }
+
+        if (isUserInteractingRef.current) {
+            shouldAutoFollowRef.current = false;
+        }
+    }, []);
+
+    const handleScrollBeginDrag = useCallback(() => {
+        isUserInteractingRef.current = true;
+    }, []);
+
+    const handleScrollEndDrag = useCallback(() => {
+        isUserInteractingRef.current = false;
+    }, []);
+
+    const handleMomentumScrollBegin = useCallback(() => {
+        isUserInteractingRef.current = true;
+    }, []);
+
+    const handleMomentumScrollEnd = useCallback(() => {
+        isUserInteractingRef.current = false;
+
+        if (isNearBottomRef.current) {
+            shouldAutoFollowRef.current = true;
+        }
     }, []);
 
     const handleContentSizeChange = useCallback(() => {
@@ -176,6 +208,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         const previousWasStreaming = previousWasStreamingRef.current;
 
         const messageCountIncreased = messages.length > previousMessageCount;
+        const didStreamingStart = !previousWasStreaming && isStreaming;
         const isNewUserMessage = messageCountIncreased && lastMessage?.role === "user";
         const isStreamingAssistantUpdate =
             isStreaming
@@ -183,8 +216,12 @@ export const MessageList: React.FC<MessageListProps> = ({
             && lastMessageContent !== previousLastMessageContent;
         const didStreamingEnd = previousWasStreaming && !isStreaming;
 
-        if (isNewUserMessage) {
-            scrollToBottom(true);
+        if (didStreamingStart) {
+            shouldAutoFollowRef.current = true;
+            scrollToBottom(true, false, true);
+        } else if (isNewUserMessage) {
+            shouldAutoFollowRef.current = true;
+            scrollToBottom(true, false, true);
         } else if (isStreamingAssistantUpdate) {
             scrollToBottom(false, false, true);
         } else if (didStreamingEnd) {
@@ -283,6 +320,10 @@ export const MessageList: React.FC<MessageListProps> = ({
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="interactive"
             onScroll={handleScroll}
+            onScrollBeginDrag={handleScrollBeginDrag}
+            onScrollEndDrag={handleScrollEndDrag}
+            onMomentumScrollBegin={handleMomentumScrollBegin}
+            onMomentumScrollEnd={handleMomentumScrollEnd}
             onContentSizeChange={handleContentSizeChange}
             scrollEventThrottle={16}
             style={style}

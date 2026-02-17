@@ -6,7 +6,13 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import React from 'react';
-import OllamaSettings from '../ollama';
+
+const mockSetSelectedModel = jest.fn((_model: string | null) => undefined);
+const mockSetAvailableModels = jest.fn((_providerId: string, _models: string[]) => undefined);
+const mockSetOllamaUrl = jest.fn((_url: string) => undefined);
+
+let mockAvailableModels: { ollama: string[] } = { ollama: [] };
+let mockOllamaUrl = 'http://localhost:11434';
 
 // Mock expo-router
 jest.mock('expo-router', () => ({
@@ -20,27 +26,36 @@ jest.mock('expo-router', () => ({
 
 // Mock theme components
 jest.mock('@/components', () => ({
-  IconButton: () => null,
-  SettingInput: ({ label, value, onChangeText, placeholder }: any) => (
-    <input
-      data-testid={`setting-input-${label}`}
-      value={value}
-      onChange={(e) => onChangeText(e.target.value)}
-      placeholder={placeholder}
-    />
-  ),
-  SaveButton: ({ onPress, loading, title }: any) => (
-    <button
-      data-testid={`save-button-${title}`}
-      onClick={onPress}
-      disabled={loading}
-    >
-      {title}
-    </button>
-  ),
-  ModelListManager: ({ providerId, selectedModel }: any) => (
-    <div data-testid="model-list-manager">{providerId}</div>
-  ),
+  ...(() => {
+    const React = require('react');
+    const { View, Text, TextInput, Pressable } = require('react-native');
+
+    return {
+      IconButton: () => null,
+      SettingInput: ({ label, value, onChangeText, placeholder }: any) => (
+        <TextInput
+          testID={`setting-input-${label}`}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+        />
+      ),
+      SaveButton: ({ onPress, loading, title }: any) => (
+        <Pressable
+          testID={`save-button-${title}`}
+          onPress={onPress}
+          disabled={loading}
+        >
+          <Text>{title}</Text>
+        </Pressable>
+      ),
+      ModelListManager: ({ providerId }: any) => (
+        <View testID="model-list-manager">
+          <Text>{providerId}</Text>
+        </View>
+      ),
+    };
+  })(),
   useTheme: () => ({
     theme: {
       colors: {
@@ -59,13 +74,13 @@ jest.mock('@/components', () => ({
 jest.mock('@/stores', () => ({
   useProviderStore: () => ({
     selectedModel: null,
-    setSelectedModel: jest.fn(),
-    availableModels: { ollama: [] },
-    setAvailableModels: jest.fn(),
+    setSelectedModel: mockSetSelectedModel,
+    availableModels: mockAvailableModels,
+    setAvailableModels: mockSetAvailableModels,
   }),
   useAuthStore: () => ({
-    ollamaUrl: 'http://localhost:11434',
-    setOllamaUrl: jest.fn(),
+    ollamaUrl: mockOllamaUrl,
+    setOllamaUrl: mockSetOllamaUrl,
   }),
 }));
 
@@ -74,14 +89,46 @@ jest.mock('@/providers/provider-factory', () => ({
   testProviderConnection: jest.fn(),
 }));
 
+// Mock ollama provider utilities
+jest.mock('@/providers/ollama-provider', () => ({
+  fetchOllamaModels: jest.fn(),
+}));
+
 // Mock types
 jest.mock('@/types/provider.types', () => ({
   OLLAMA_MODELS: [],
 }));
 
+const { testProviderConnection: mockTestProviderConnection } = jest.requireMock(
+  '@/providers/provider-factory',
+) as {
+  testProviderConnection: jest.MockedFunction<
+    (providerId: string, credentials: { url: string }) => Promise<boolean>
+  >;
+};
+
+const { fetchOllamaModels: mockFetchOllamaModels } = jest.requireMock(
+  '@/providers/ollama-provider',
+) as {
+  fetchOllamaModels: jest.MockedFunction<(baseUrl: string) => Promise<string[]>>;
+};
+
+const OllamaSettings = require('../ollama').default;
+
 describe('OllamaSettings Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAvailableModels = { ollama: [] };
+    mockOllamaUrl = 'http://localhost:11434';
+
+    mockSetSelectedModel.mockReset();
+    mockSetAvailableModels.mockReset();
+    mockSetOllamaUrl.mockReset();
+    mockTestProviderConnection.mockReset();
+    mockFetchOllamaModels.mockReset();
+
+    mockTestProviderConnection.mockResolvedValue(true);
+    mockFetchOllamaModels.mockResolvedValue(['llama3.2', 'mistral']);
   });
 
   describe('SECTION 1: URL Input Field', () => {
@@ -92,14 +139,14 @@ describe('OllamaSettings Component', () => {
 
     it('should display default URL in input field', () => {
       const { getByTestId } = render(<OllamaSettings />);
-      const input = getByTestId('setting-input-Ollama Base URL') as HTMLInputElement;
-      expect(input.value).toBe('http://localhost:11434');
+      const input = getByTestId('setting-input-Ollama Base URL') as any;
+      expect(input.props.value).toBe('http://localhost:11434');
     });
 
     it('should have correct placeholder text', () => {
       const { getByTestId } = render(<OllamaSettings />);
-      const input = getByTestId('setting-input-Ollama Base URL') as HTMLInputElement;
-      expect(input.placeholder).toBe('http://localhost:11434');
+      const input = getByTestId('setting-input-Ollama Base URL') as any;
+      expect(input.props.placeholder).toBe('http://localhost:11434');
     });
 
     it('should allow user to modify the URL', () => {
@@ -107,12 +154,12 @@ describe('OllamaSettings Component', () => {
       const input = getByTestId('setting-input-Ollama Base URL') as any;
       
       fireEvent(input, 'changeText', 'http://192.168.1.100:11434');
-      expect(input.value).toBe('http://192.168.1.100:11434');
+      expect(input.props.value).toBe('http://192.168.1.100:11434');
     });
 
     it('should disable autocapitalization for URL input', () => {
       const { getByTestId } = render(<OllamaSettings />);
-      const input = getByTestId('setting-input-Ollama Base URL') as HTMLInputElement;
+      const input = getByTestId('setting-input-Ollama Base URL') as any;
       // In React Native, autoCapitalize="none" is a prop that prevents uppercase conversion
       expect(input).toBeTruthy();
     });
@@ -155,7 +202,58 @@ describe('OllamaSettings Component', () => {
       fireEvent(loadButton, 'press');
       
       await waitFor(() => {
-        expect(loadButton).toBeTruthy();
+        expect(mockFetchOllamaModels).toHaveBeenCalledWith('http://localhost:11434');
+      });
+    });
+
+    it('should normalize loaded model names before updating store', async () => {
+      mockFetchOllamaModels.mockResolvedValue([' llama3.2 ', 'mistral', 'mistral', '', '   '] as any);
+
+      const { getByTestId } = render(<OllamaSettings />);
+      const loadButton = getByTestId('save-button-Load Models');
+
+      fireEvent(loadButton, 'press');
+
+      await waitFor(() => {
+        expect(mockSetAvailableModels).toHaveBeenCalledWith('ollama', ['llama3.2', 'mistral']);
+      });
+    });
+
+    it('should use trimmed URL when loading models', async () => {
+      const { getByTestId } = render(<OllamaSettings />);
+      const input = getByTestId('setting-input-Ollama Base URL') as any;
+      fireEvent(input, 'changeText', '  http://localhost:11434/api/  ');
+
+      const loadButton = getByTestId('save-button-Load Models');
+      fireEvent(loadButton, 'press');
+
+      await waitFor(() => {
+        expect(mockFetchOllamaModels).toHaveBeenCalledWith('http://localhost:11434/api/');
+      });
+    });
+
+    it('should show actionable message when connection succeeds but no models are returned', async () => {
+      mockFetchOllamaModels.mockResolvedValue([]);
+      mockTestProviderConnection.mockResolvedValue(true);
+
+      const { getByTestId, getByText } = render(<OllamaSettings />);
+      fireEvent(getByTestId('save-button-Load Models'), 'press');
+
+      await waitFor(() => {
+        expect(getByText(/Connected, but no models were returned/)).toBeTruthy();
+      });
+    });
+
+    it('should skip fetch and show validation message when URL is empty', async () => {
+      const { getByTestId, getByText } = render(<OllamaSettings />);
+      const input = getByTestId('setting-input-Ollama Base URL') as any;
+      fireEvent(input, 'changeText', '   ');
+
+      fireEvent(getByTestId('save-button-Load Models'), 'press');
+
+      await waitFor(() => {
+        expect(mockFetchOllamaModels).not.toHaveBeenCalled();
+        expect(getByText(/Please enter an Ollama URL/)).toBeTruthy();
       });
     });
   });
@@ -167,9 +265,7 @@ describe('OllamaSettings Component', () => {
     });
 
     it('should display success message color when connection succeeds', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { testProviderConnection } = require('@/providers/provider-factory');
-      testProviderConnection.mockResolvedValue(true);
+      mockTestProviderConnection.mockResolvedValue(true);
       
       const { getByTestId } = render(<OllamaSettings />);
       const saveButton = getByTestId('save-button-Save & Test');
@@ -177,14 +273,12 @@ describe('OllamaSettings Component', () => {
       fireEvent(saveButton, 'press');
       
       await waitFor(() => {
-        expect(testProviderConnection).toHaveBeenCalled();
+        expect(mockTestProviderConnection).toHaveBeenCalled();
       });
     });
 
     it('should display error message color when connection fails', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { testProviderConnection } = require('@/providers/provider-factory');
-      testProviderConnection.mockResolvedValue(false);
+      mockTestProviderConnection.mockResolvedValue(false);
       
       const { getByTestId } = render(<OllamaSettings />);
       const saveButton = getByTestId('save-button-Save & Test');
@@ -192,7 +286,7 @@ describe('OllamaSettings Component', () => {
       fireEvent(saveButton, 'press');
       
       await waitFor(() => {
-        expect(testProviderConnection).toHaveBeenCalled();
+        expect(mockTestProviderConnection).toHaveBeenCalled();
       });
     });
   });
@@ -204,9 +298,8 @@ describe('OllamaSettings Component', () => {
     });
 
     it('should pass ollama provider ID to ModelListManager', () => {
-      const { getByTestId } = render(<OllamaSettings />);
-      const manager = getByTestId('model-list-manager');
-      expect(manager.textContent).toBe('ollama');
+      const { getByText } = render(<OllamaSettings />);
+      expect(getByText('ollama')).toBeTruthy();
     });
 
     it('should render model manager with available models', () => {
@@ -243,8 +336,8 @@ describe('OllamaSettings Component', () => {
   describe('State Management', () => {
     it('should initialize with correct default URL from auth store', () => {
       const { getByTestId } = render(<OllamaSettings />);
-      const input = getByTestId('setting-input-Ollama Base URL') as HTMLInputElement;
-      expect(input.value).toBe('http://localhost:11434');
+      const input = getByTestId('setting-input-Ollama Base URL') as any;
+      expect(input.props.value).toBe('http://localhost:11434');
     });
 
     it('should handle URL changes in local state', () => {
@@ -252,7 +345,7 @@ describe('OllamaSettings Component', () => {
       const input = getByTestId('setting-input-Ollama Base URL') as any;
       
       fireEvent(input, 'changeText', 'http://example.com:11434');
-      expect(input.value).toBe('http://example.com:11434');
+      expect(input.props.value).toBe('http://example.com:11434');
     });
   });
 

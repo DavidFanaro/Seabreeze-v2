@@ -36,7 +36,20 @@ export function ModelSelector({
     // Model list derivation - uses available models from store or falls back to defaults
     const models = useMemo(() => {
         const providerModels = availableModels[providerId] || PROVIDERS[providerId].defaultModels;
-        return providerModels;
+        const uniqueModels: string[] = [];
+        const seenModels = new Set<string>();
+
+        for (const model of providerModels) {
+            const normalizedModel = model.trim();
+            if (!normalizedModel || seenModels.has(normalizedModel)) {
+                continue;
+            }
+
+            seenModels.add(normalizedModel);
+            uniqueModels.push(normalizedModel);
+        }
+
+        return uniqueModels;
     }, [availableModels, providerId]);
 
     return (
