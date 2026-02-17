@@ -14,6 +14,15 @@ jest.mock("expo-router", () => ({
     useRouter: jest.fn(),
 }));
 
+jest.mock("react-native-gesture-handler", () => {
+    const ReactNative = jest.requireActual("react-native");
+
+    return {
+        Pressable: ReactNative.Pressable,
+        GestureHandlerRootView: ({ children }: any) => children,
+    };
+});
+
 // Mock expo-haptics
 jest.mock("expo-haptics", () => ({
     impactAsync: jest.fn(),
@@ -26,6 +35,22 @@ jest.mock("expo-haptics", () => ({
 jest.mock("expo-symbols", () => ({
     SymbolView: () => null,
 }));
+
+jest.mock("react-native-gesture-handler/ReanimatedSwipeable", () => {
+    const React = jest.requireActual("react");
+    const ReactNative = jest.requireActual("react-native");
+
+    const MockSwipeable = React.forwardRef(({ children, ...props }: any, _ref: any) => {
+        return <ReactNative.View {...props}>{children}</ReactNative.View>;
+    });
+
+    MockSwipeable.displayName = "MockSwipeable";
+
+    return {
+        __esModule: true,
+        default: MockSwipeable,
+    };
+});
 
 // Mock useTheme hook
 jest.mock("@/components/ui/ThemeProvider", () => ({
@@ -74,7 +99,7 @@ describe("ChatListItem Component", () => {
     /**
      * Test: Default title when null
      */
-    it("displays 'New Chat' when title is null", () => {
+    it("displays 'Untitled chat' when title is null", () => {
         render(
             <ChatListItem
                 id={1}
@@ -86,7 +111,7 @@ describe("ChatListItem Component", () => {
             />
         );
 
-        expect(screen.getByText("New Chat")).toBeTruthy();
+        expect(screen.getByText("Untitled chat")).toBeTruthy();
     });
 
     /**
@@ -126,6 +151,49 @@ describe("ChatListItem Component", () => {
         fireEvent.press(titleElement);
 
         expect(mockRouter.push).toHaveBeenCalledWith("/chat/42");
+    });
+
+    it("does not navigate while swipe interaction is active", () => {
+        render(
+            <ChatListItem
+                id={42}
+                title="Test Chat"
+                preview="Test preview"
+                timestamp={new Date()}
+                onDelete={mockOnDelete}
+                isScreenFocused={true}
+            />
+        );
+
+        const swipeable = screen.getByTestId("chat-list-item-swipeable-42");
+        const chatItem = screen.getByTestId("chat-list-item-42");
+
+        fireEvent(swipeable, "onSwipeableOpenStartDrag", "left");
+        fireEvent.press(chatItem);
+
+        expect(mockRouter.push).not.toHaveBeenCalled();
+    });
+
+    it("navigates when delete action is visible", () => {
+        render(
+            <ChatListItem
+                id={42}
+                title="Test Chat"
+                preview="Test preview"
+                timestamp={new Date()}
+                onDelete={mockOnDelete}
+                isScreenFocused={true}
+            />
+        );
+
+        const swipeable = screen.getByTestId("chat-list-item-swipeable-42");
+        const chatItem = screen.getByTestId("chat-list-item-42");
+
+        fireEvent(swipeable, "onSwipeableOpen", "left");
+        fireEvent.press(chatItem);
+
+        expect(mockRouter.push).toHaveBeenCalledWith("/chat/42");
+        expect(mockRouter.push).toHaveBeenCalledTimes(1);
     });
 
     /**

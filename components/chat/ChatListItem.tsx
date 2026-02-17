@@ -126,10 +126,13 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
     const router = useRouter();
     // Track if component is currently pressed for visual feedback
     const [isPressed, setIsPressed] = useState(false);
+    const [isSwipeDragging, setIsSwipeDragging] = useState(false);
+    const [isActionOpen, setIsActionOpen] = useState(false);
 
     // Display "No messages yet" if preview is empty
     const displayPreview = preview || "No messages yet";
     const displayTitle = getChatTitleForDisplay(title);
+    const isInteractionBlocked = isDeleting || isSwipeDragging;
 
     /**
      * Format timestamp into human-readable relative time
@@ -158,11 +161,17 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
      * Resets pressed state before navigating
      */
     const handleNavigate = () => {
-        if (isDeleting) {
+        if (isInteractionBlocked) {
             return;
         }
 
         setIsPressed(false);
+
+        if (isActionOpen) {
+            setIsActionOpen(false);
+            swipeableRef.current?.close();
+        }
+
         if (onOpen) {
             onOpen(id);
             return;
@@ -179,6 +188,8 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
         if (!isScreenFocused) {
             swipeableRef.current?.close();
             setIsPressed(false);
+            setIsSwipeDragging(false);
+            setIsActionOpen(false);
         }
     }, [isScreenFocused]);
 
@@ -213,23 +224,34 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
             {/* SWIPEABLE CONTAINER - Enables left swipe to reveal delete action */}
             <ReanimatedSwipeable
                 ref={swipeableRef}
+                testID={`chat-list-item-swipeable-${id}`}
                 renderRightActions={renderRightActions}
                 overshootRight={false}
                 friction={2}
                 rightThreshold={40}
                 enabled={!isDeleting} // Disable swiping while deleting
+                onSwipeableOpenStartDrag={() => setIsSwipeDragging(true)}
+                onSwipeableOpen={() => {
+                    setIsSwipeDragging(false);
+                    setIsActionOpen(true);
+                }}
+                onSwipeableCloseStartDrag={() => setIsSwipeDragging(true)}
+                onSwipeableClose={() => {
+                    setIsSwipeDragging(false);
+                    setIsActionOpen(false);
+                }}
                 containerStyle={{ backgroundColor: "transparent" }}
             >
                 {/* MAIN TOUCHABLE AREA - Navigates to chat detail on tap */}
-            <Pressable
+                <Pressable
                     testID={`chat-list-item-${id}`}
                     onPress={handleNavigate}
-                    disabled={isDeleting}
+                    disabled={isInteractionBlocked}
                     accessibilityRole="button"
                     accessibilityLabel={`Open chat ${displayTitle}`}
-                    accessibilityState={{ disabled: isDeleting }}
+                    accessibilityState={{ disabled: isInteractionBlocked }}
                     onPressIn={() => {
-                        if (isDeleting) {
+                        if (isInteractionBlocked) {
                             return;
                         }
 
