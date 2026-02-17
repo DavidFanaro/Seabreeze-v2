@@ -388,6 +388,24 @@ describe('Ollama Provider', () => {
             expect(result).toEqual(['llama3.2', 'mistral', 'codellama']);
         });
 
+        it('should return model names when response objects use model field', async () => {
+            const mockData = {
+                models: [
+                    { model: 'llama3.2:latest' },
+                    { model: 'mistral:latest' },
+                ],
+            };
+            const mockResponse = {
+                ok: true,
+                json: jest.fn(async () => mockData as any),
+            } as any;
+            mockedExpoFetch.mockResolvedValue(mockResponse);
+
+            const result = await fetchOllamaModels('http://localhost:11434');
+
+            expect(result).toEqual(['llama3.2:latest', 'mistral:latest']);
+        });
+
         it('should discard invalid entries in mixed responses', async () => {
             const mockData = [
                 { name: 'llama3.2' },

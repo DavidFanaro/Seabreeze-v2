@@ -362,11 +362,13 @@ describe("ChatContextMenu", () => {
 
       render(<ChatContextMenu onReset={mockOnReset} />);
 
-      // Available Ollama models should be used instead of defaults
-      // This test verifies dynamic model discovery for Ollama
+      expect(screen.getByTestId("button-llama2")).toBeTruthy();
+      expect(screen.getByTestId("button-mistral")).toBeTruthy();
+      expect(screen.getByTestId("button-neural-chat")).toBeTruthy();
+      expect(screen.queryByTestId("button-llama3.2")).toBeNull();
     });
 
-    it("should use default models for ollama when available models are empty", () => {
+    it("should not fallback to default models for ollama when available models are empty", () => {
       const storeWithEmptyAvailable = {
         ...mockProviderStore,
         selectedProvider: "ollama" as const,
@@ -380,8 +382,8 @@ describe("ChatContextMenu", () => {
 
       render(<ChatContextMenu onReset={mockOnReset} />);
 
-      // Default Ollama models should be used when available is empty
-      // This test verifies fallback to default models
+      expect(screen.queryByTestId("button-llama3.2")).toBeNull();
+      expect(screen.queryByTestId("button-mistral")).toBeNull();
     });
   });
 

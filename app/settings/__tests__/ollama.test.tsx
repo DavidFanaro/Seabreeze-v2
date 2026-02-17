@@ -219,6 +219,31 @@ describe('OllamaSettings Component', () => {
       });
     });
 
+    it('should strictly sync fetched models and report added/removed counts', async () => {
+      mockAvailableModels = { ollama: ['llama3.2', 'stale-model'] };
+      mockFetchOllamaModels.mockResolvedValue(['llama3.2', 'mistral']);
+
+      const { getByTestId, getByText } = render(<OllamaSettings />);
+      fireEvent(getByTestId('save-button-Load Models'), 'press');
+
+      await waitFor(() => {
+        expect(mockSetAvailableModels).toHaveBeenCalledWith('ollama', ['llama3.2', 'mistral']);
+        expect(getByText('Synced 2 models (1 added, 1 removed).')).toBeTruthy();
+      });
+    });
+
+    it('should show up-to-date message when fetched models match current list', async () => {
+      mockAvailableModels = { ollama: ['llama3.2', 'mistral'] };
+      mockFetchOllamaModels.mockResolvedValue(['llama3.2', 'mistral']);
+
+      const { getByTestId, getByText } = render(<OllamaSettings />);
+      fireEvent(getByTestId('save-button-Load Models'), 'press');
+
+      await waitFor(() => {
+        expect(getByText('Models are up to date (2 total).')).toBeTruthy();
+      });
+    });
+
     it('should use trimmed URL when loading models', async () => {
       const { getByTestId } = render(<OllamaSettings />);
       const input = getByTestId('setting-input-Ollama Base URL') as any;
@@ -261,7 +286,7 @@ describe('OllamaSettings Component', () => {
   describe('SECTION 3: Connection Test Result Message', () => {
     it('should not display test result initially', () => {
       const { queryByText } = render(<OllamaSettings />);
-      expect(queryByText(/Connected successfully|Connection failed|Connection error|Loaded .* models/)).toBeNull();
+      expect(queryByText(/Connected successfully|Connection failed|Connection error|Synced .* models|Models are up to date/)).toBeNull();
     });
 
     it('should display success message color when connection succeeds', async () => {

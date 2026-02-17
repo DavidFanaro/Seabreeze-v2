@@ -160,9 +160,9 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
         return defaultModels;
       }
 
-      // For Ollama, dynamically discovered models take precedence over defaults
-      const baseModels = providerId === "ollama" && available.length > 0 
-        ? available 
+      // For Ollama, loaded models are authoritative (strict sync, including empty lists).
+      const baseModels = providerId === "ollama"
+        ? available
         : defaultModels;
 
       // Filter out hidden models and append custom models

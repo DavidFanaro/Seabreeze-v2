@@ -9,6 +9,12 @@ OpenRouter, and Ollama providers.
 - When using the in-app chat feature, use the Apple provider/model only unless
   explicitly instructed otherwise.
 
+## Important notes
+- Assume the dev server is already started
+- Assume the ios simulator is already started
+- when building any UI use the `frontend-design` skill
+- when interacting with ai sdk use the `ai-sdk` skill
+
 ## Commands
 
 ### Development

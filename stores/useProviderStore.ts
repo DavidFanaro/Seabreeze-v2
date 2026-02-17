@@ -207,7 +207,7 @@ const getVisibleModelsForProvider = (
 ): string[] => {
   const hidden = hiddenModels[provider] || [];
   const baseModels =
-    provider === "ollama" && (availableModels[provider] || []).length > 0
+    provider === "ollama"
       ? availableModels[provider] || []
       : DEFAULT_MODELS[provider];
 
@@ -260,12 +260,19 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        * available model from the new provider to ensure a valid selection.
        */
       setSelectedProvider: (provider) =>
-        set((state) =>
-          applyRuntimeWriteVersion(state, {
+        set((state) => {
+          const visibleModels = getVisibleModelsForProvider(
+            provider,
+            state.availableModels,
+            state.customModels,
+            state.hiddenModels,
+          );
+
+          return applyRuntimeWriteVersion(state, {
             selectedProvider: provider,
-            selectedModel: DEFAULT_MODELS[provider][0] || "",
-          }),
-        ),
+            selectedModel: visibleModels[0] || "",
+          });
+        }),
 
       /**
        * Updates the currently selected model
@@ -285,7 +292,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        * @param provider - The provider to update models for
        * @param models - Array of model identifiers
        * @description Used when fetching updated model lists from provider APIs.
-       * Does not affect custom models or hidden models.
+        * For Ollama, this also reconciles overlapping custom/hidden entries.
        */
       setAvailableModels: (provider, models) =>
         set((state) => {
@@ -307,10 +314,19 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
               (model) => !availableModelSet.has(model),
             ),
           );
+          const providerHiddenModels = normalizeModelNames(
+            (state.hiddenModels[provider] || []).filter(
+              (model) => !availableModelSet.has(model),
+            ),
+          );
 
           const nextCustomModels = {
             ...state.customModels,
             [provider]: providerCustomModels,
+          };
+          const nextHiddenModels = {
+            ...state.hiddenModels,
+            [provider]: providerHiddenModels,
           };
 
           let nextSelectedModel = state.selectedModel;
@@ -319,7 +335,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
               provider,
               nextAvailableModels,
               nextCustomModels,
-              state.hiddenModels,
+              nextHiddenModels,
             );
 
             if (!visibleModels.includes(state.selectedModel)) {
@@ -330,6 +346,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           return applyRuntimeWriteVersion(state, {
             availableModels: nextAvailableModels,
             customModels: nextCustomModels,
+            hiddenModels: nextHiddenModels,
             selectedModel: nextSelectedModel,
           });
         }),
@@ -402,18 +419,19 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
         set((state) => {
           const existing = state.customModels[provider] || [];
           const customModelsFiltered = existing.filter((m) => m !== model);
-          // Calculate fallback model selection
-          const allVisible = [
-            ...DEFAULT_MODELS[provider].filter(
-              (m) => !(state.hiddenModels[provider] || []).includes(m)
-            ),
-            ...customModelsFiltered,
-          ];
+          const nextCustomModels = {
+            ...state.customModels,
+            [provider]: customModelsFiltered,
+          };
+          const allVisible = getVisibleModelsForProvider(
+            provider,
+            state.availableModels,
+            nextCustomModels,
+            state.hiddenModels,
+          );
+
           return applyRuntimeWriteVersion(state, {
-            customModels: {
-              ...state.customModels,
-              [provider]: customModelsFiltered,
-            },
+            customModels: nextCustomModels,
             // Update selection if deleted model was selected
             selectedModel:
               state.selectedModel === model
@@ -455,20 +473,24 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           }
 
           // Calculate available models after deletion
-          const allVisible = [
-            ...DEFAULT_MODELS[provider].filter((m) => !newHiddenModels.includes(m)),
-            ...newCustomModels,
-          ];
+          const nextCustomModels = {
+            ...state.customModels,
+            [provider]: newCustomModels,
+          };
+          const nextHiddenModels = {
+            ...state.hiddenModels,
+            [provider]: newHiddenModels,
+          };
+          const allVisible = getVisibleModelsForProvider(
+            provider,
+            state.availableModels,
+            nextCustomModels,
+            nextHiddenModels,
+          );
 
           return applyRuntimeWriteVersion(state, {
-            customModels: {
-              ...state.customModels,
-              [provider]: newCustomModels,
-            },
-            hiddenModels: {
-              ...state.hiddenModels,
-              [provider]: newHiddenModels,
-            },
+            customModels: nextCustomModels,
+            hiddenModels: nextHiddenModels,
             // Update selection if deleted model was selected
             selectedModel:
               state.selectedModel === model

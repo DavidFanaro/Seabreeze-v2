@@ -166,6 +166,62 @@ describe("useProviderStore", () => {
       expect(result.current.selectedModel).toBe("mistral");
     });
 
+    it("should clear selected model when strict Ollama sync returns no models", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.setSelectedProvider("ollama");
+      });
+      act(() => {
+        result.current.setSelectedModel("stale-model");
+      });
+
+      act(() => {
+        result.current.setAvailableModels("ollama", []);
+      });
+
+      expect(result.current.availableModels.ollama).toEqual([]);
+      expect(result.current.selectedModel).toBe("");
+    });
+
+    it("should keep custom Ollama models visible when strict sync returns no fetched models", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.setSelectedProvider("ollama");
+      });
+      act(() => {
+        result.current.addCustomModel("ollama", "my-local-model");
+      });
+      act(() => {
+        result.current.setSelectedModel("my-local-model");
+      });
+
+      act(() => {
+        result.current.setAvailableModels("ollama", []);
+      });
+
+      expect(result.current.availableModels.ollama).toEqual([]);
+      expect(result.current.customModels.ollama).toEqual(["my-local-model"]);
+      expect(result.current.selectedModel).toBe("my-local-model");
+    });
+
+    it("should unhide fetched Ollama models during sync", () => {
+      const { result } = createStore();
+
+      act(() => {
+        result.current.deleteModel("ollama", "mistral");
+      });
+      expect(result.current.hiddenModels.ollama).toContain("mistral");
+
+      act(() => {
+        result.current.setAvailableModels("ollama", ["llama3.2", "mistral"]);
+      });
+
+      expect(result.current.hiddenModels.ollama).not.toContain("mistral");
+      expect(result.current.availableModels.ollama).toEqual(["llama3.2", "mistral"]);
+    });
+
     it("should normalize non-Ollama available models without mutating custom models", () => {
       const { result } = createStore();
 

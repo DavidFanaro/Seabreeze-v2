@@ -84,15 +84,16 @@ export function ModelListManager({
         [hiddenModels, providerId]
     );
 
-    // Base models: Use dynamic models if available (e.g., Ollama), otherwise use predefined
-    // Filter out any hidden models from the base list
-    const baseModels = useMemo(
-        () =>
-            normalizeUniqueModels((dynamicModels?.length ? dynamicModels : predefinedModels).filter(
-                (m) => !providerHiddenModels.includes(m)
-            )),
-        [dynamicModels, predefinedModels, providerHiddenModels]
-    );
+    // Base models: Ollama always uses loaded dynamic models (including empty strict-sync results).
+    // Other providers use dynamic models only when non-empty.
+    const baseModels = useMemo(() => {
+        const shouldUseDynamicModels = providerId === "ollama"
+            ? Array.isArray(dynamicModels)
+            : Boolean(dynamicModels?.length);
+        const sourceModels = shouldUseDynamicModels ? (dynamicModels ?? []) : predefinedModels;
+
+        return normalizeUniqueModels(sourceModels.filter((m) => !providerHiddenModels.includes(m)));
+    }, [providerId, dynamicModels, predefinedModels, providerHiddenModels]);
 
     const visibleCustomModels = useMemo(
         () => normalizeUniqueModels(providerCustomModels.filter((m) => !providerHiddenModels.includes(m))),

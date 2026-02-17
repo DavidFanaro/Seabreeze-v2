@@ -118,15 +118,23 @@ export default function OllamaSettings() {
 
         try {
             // Use provider utility so URL normalization is shared and consistent.
+            const existingModels = normalizeUniqueModelNames(availableModels.ollama ?? []);
+            const existingModelSet = new Set(existingModels);
             const models = normalizeUniqueModelNames(await fetchOllamaModels(trimmedBaseUrl));
+            const fetchedModelSet = new Set(models);
+            const addedModelCount = models.filter((model) => !existingModelSet.has(model)).length;
+            const removedModelCount = existingModels.filter((model) => !fetchedModelSet.has(model)).length;
 
-            // Persist fetched models (store also applies provider-level safeguards).
+            // Persist fetched models (strict sync to current Ollama response).
             setAvailableModels("ollama", models);
 
             if (models.length > 0) {
                 setTestResult({
                     success: true,
-                    message: `Loaded ${models.length} models`,
+                    message:
+                        addedModelCount === 0 && removedModelCount === 0
+                            ? `Models are up to date (${models.length} total).`
+                            : `Synced ${models.length} models (${addedModelCount} added, ${removedModelCount} removed).`,
                 });
                 return;
             }

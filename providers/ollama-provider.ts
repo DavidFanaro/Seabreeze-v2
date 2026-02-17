@@ -69,9 +69,14 @@ function extractModelName(entry: unknown): string | null {
     }
 
     if (entry && typeof entry === "object") {
-        const modelName = (entry as { name?: unknown }).name;
-        if (typeof modelName === "string") {
-            return modelName;
+        const modelEntry = entry as { name?: unknown; model?: unknown };
+
+        if (typeof modelEntry.name === "string") {
+            return modelEntry.name;
+        }
+
+        if (typeof modelEntry.model === "string") {
+            return modelEntry.model;
         }
     }
 
@@ -247,7 +252,7 @@ export async function testOllamaConnection(url: string): Promise<boolean> {
  * Response Format Handling:
  * Ollama servers may return different JSON structures:
  * - Array format: ["model1", "model2", "model3"]
- * - Object format: { models: [{ name: "model1" }, { name: "model2" }] }
+ * - Object format: { models: [{ name: "model1" }, { model: "model2" }] }
  * This function handles both formats for maximum compatibility.
  * 
  * Error Handling:

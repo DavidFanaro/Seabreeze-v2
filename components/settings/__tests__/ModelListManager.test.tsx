@@ -518,6 +518,38 @@ describe('ModelListManager', () => {
             expect(screen.queryByText('gpt-3.5-turbo')).toBeFalsy();
         });
 
+        it('should not fallback to predefined models for ollama when dynamic models are empty', () => {
+            render(
+                <TestWrapper>
+                    <ModelListManager
+                        {...defaultProps}
+                        providerId="ollama"
+                        predefinedModels={['fallback-model']}
+                        dynamicModels={[]}
+                        selectedModel=""
+                    />
+                </TestWrapper>
+            );
+
+            expect(screen.queryByText('fallback-model')).toBeFalsy();
+            expect(screen.getByText('No models available. Tap + to add one.')).toBeTruthy();
+        });
+
+        it('should keep predefined fallback behavior for non-ollama providers when dynamic models are empty', () => {
+            render(
+                <TestWrapper>
+                    <ModelListManager
+                        {...defaultProps}
+                        providerId="openai"
+                        predefinedModels={['gpt-4o']}
+                        dynamicModels={[]}
+                    />
+                </TestWrapper>
+            );
+
+            expect(screen.getByText('gpt-4o')).toBeTruthy();
+        });
+
         it('should filter out hidden models from dynamic models', () => {
             const dynamicModels = ['llama-2', 'hidden-model', 'codellama'];
             
