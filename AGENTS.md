@@ -1,45 +1,20 @@
-# Seabreeze Agent Guide
-
-Expo + React Native AI chat application supporting Apple Intelligence, OpenAI,
-OpenRouter, and Ollama providers.
-
-## Repo Rules
-- No Cursor or Copilot rule files were found.
-- Do not start `expo start` without explicit user request.
-- When using the in-app chat feature, use the Apple provider/model only unless
-  explicitly instructed otherwise.
-
-## Important notes
+## Important Rules
+- IGNORE THE `docs` FOLDER!!!!!!!!!!!! As this is for user documentation only. Agents should ignore this because it can be out of date.
+- When using the in-app chat feature, use the Apple provider/model only unless explicitly instructed otherwise.
 - check if there is a currently opened dev server and ios simulator. if not then start one. BUT ONLY IF ONE IS NOT ALREADY RUNNING
+- If an iOS simulator is already running, do not start another one just because you think the app is misbehaving on that simulator. It's more likely an issue with the current dev server than the simulator. Restart the dev server or reload the app on that simulator. Do not change the simulator. 
 - when building any UI use the `frontend-design` skill and use `agent-device` skill the verify your work
 - when interacting with ai sdk use the `ai-sdk` skill
 
-## Commands
-
-### Development
-- `npm run start` - Expo dev server (ask before running).
-- `npm run ios` - Build + run on iOS simulator/device.
-- `npm run android` - Build + run on Android emulator/device.
-- `npm run web` - Run web build in browser.
-
-### Linting / Typecheck
-- `npm run lint` - ESLint (Expo config, flat `eslint.config.js`).
-- `npx tsc --noEmit` - TypeScript typecheck (strict mode).
-
-### Tests (Jest)
-- `npm test` - Jest in watch-all mode.
-- `npx jest path/to/test.tsx` - Run a single test file.
-- `npx jest -t "test name"` - Run tests matching a name pattern.
-- `npm test -- path/to/test.tsx -t "name"` - Single file + name match.
-
-### Database (Drizzle)
-- `npm run db:generate` - Generate migrations from `db/schema.ts`.
-- `npm run db:push` - Push schema changes to SQLite.
-- `npm run db:studio` - Drizzle Studio UI.
+## Important behaviors
+- Be very willing to do searches for documentation and web searches. You should not be holding back on searches whatsoever.
+- When building UIs make sure to use the React best practices and front end design skills in order to avoid AI slop looking user interfaces. Be creative; don't just go with something safe. 
+- Use TanStackQuery as much as possible when doing any kind of requests that can fail or can take a while through some async requests.
+- 
 
 ## Tooling Tips
 - Docs lookup: use Context7 tools when needed.
-- Web info: use SearXNG tools.
+- Web info: use SearXNG mcp tools.
 - GitHub search: use `gh_grep` tools.
 - iOS simulator: use `agent-device` skill.
 
