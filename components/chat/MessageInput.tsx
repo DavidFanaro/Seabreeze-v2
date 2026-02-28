@@ -1,5 +1,6 @@
 import React from "react";
 import {
+    Text,
     View,
     TextInput,
     TouchableOpacity,
@@ -10,6 +11,8 @@ import {
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { SymbolView } from "expo-symbols";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
+import { attachmentLabel } from "@/lib/chat-attachments";
+import type { ChatAttachment, ChatSendInput } from "@/types/chat.types";
 
 // ============================================================================
 // SECTION: Props Interface
@@ -29,7 +32,10 @@ import useHapticFeedback from "@/hooks/useHapticFeedback";
 interface MessageInputProps {
     value: string;
     onChangeText: (text: string) => void;
-    onSend: (textOverride?: string) => void;
+    onSend: (input?: ChatSendInput) => void;
+    attachments?: ChatAttachment[];
+    onAddAttachment?: () => void;
+    onRemoveAttachment?: (attachmentId: string) => void;
     placeholder?: string;
     disabled?: boolean;
     isStreaming?: boolean;
@@ -54,6 +60,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     value,
     onChangeText,
     onSend,
+    attachments = [],
+    onAddAttachment,
+    onRemoveAttachment,
     placeholder = "Message...",
     disabled = false,
     isStreaming = false,
@@ -69,7 +78,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const { triggerPress } = useHapticFeedback();
     // Determine if the send button should be enabled:
     // - Only enabled if input has non-whitespace text AND component is not disabled
-    const canSend = value.trim().length > 0 && !disabled;
+    const canSend = (value.trim().length > 0 || attachments.length > 0) && !disabled;
 
     // ============================================================================
     // SECTION: Event Handlers
@@ -85,7 +94,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const handleSend = () => {
         if (canSend) {
             triggerPress("light");
-            onSend();
+            onSend({
+                text: value,
+                attachments,
+            });
         }
     };
 
@@ -102,95 +114,165 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         event: NativeSyntheticEvent<TextInputSubmitEditingEventData>
     ) => {
         const submittedText = event.nativeEvent.text;
-        if (submittedText.trim().length === 0 || disabled) {
+        const hasText = submittedText.trim().length > 0;
+        if ((!hasText && attachments.length === 0) || disabled) {
             return;
         }
 
         triggerPress("light");
+        if (attachments.length > 0) {
+            onSend({
+                text: submittedText,
+                attachments,
+            });
+            return;
+        }
+
         onSend(submittedText);
     };
 
+    const handleAddAttachment = () => {
+        if (!disabled) {
+            triggerPress("light");
+            onAddAttachment?.();
+        }
+    };
+
+    const handleRemoveAttachment = (attachmentId: string) => {
+        triggerPress("light");
+        onRemoveAttachment?.(attachmentId);
+    };
+
     return (
-        // ====================================================================
-        // SECTION: Layout Wrapper
-        // ====================================================================
         <View
             testID="message-input-wrapper"
-            className="flex-row items-end w-full px-4 my-2"
+            className="w-full px-4 my-2"
         >
-            {/* ================================================================
-                SECTION: Text Input Container
-                ================================================================
-                Visual container for the text input to keep it distinct from the
-                send button. Provides surface styling and padding.
-            */}
-            <View
-                testID="message-input-field"
-                className="flex-1 pl-4 pr-2 py-1 rounded-xl min-h-12"
-                style={[{ backgroundColor: theme.colors.surface }, style]}
-            >
-                <TextInput
-                    testID="message-input-text-input"
-                    className="py-2 max-h-[120px] text-base"
-                    style={{ color: theme.colors.text }}
-                    onChangeText={onChangeText}
-                    value={value}
-                    placeholder={placeholder}
-                    placeholderTextColor={theme.colors.textSecondary}
-                    editable={!disabled}
-                    returnKeyType="send"
-                    enablesReturnKeyAutomatically
-                    onSubmitEditing={handleSubmitEditing}
-                    multiline
-                />
-            </View>
+            {attachments.length > 0 ? (
+                <View testID="message-input-attachments" className="flex-row flex-wrap mb-2">
+                    {attachments.map((attachment) => (
+                        <View
+                            key={attachment.id}
+                            testID="message-input-attachment-chip"
+                            className="flex-row items-center rounded-full px-3 py-1 mr-2 mb-2"
+                            style={{
+                                backgroundColor: theme.colors.surface,
+                                borderColor: theme.colors.border ?? theme.colors.surface,
+                                borderWidth: 1,
+                            }}
+                        >
+                            <SymbolView
+                                name={attachment.kind === "video" ? "video" : "photo"}
+                                size={12}
+                                tintColor={theme.colors.textSecondary}
+                            />
+                            <Text
+                                className="ml-2 mr-1 text-xs max-w-[140px]"
+                                style={{ color: theme.colors.text }}
+                                numberOfLines={1}
+                            >
+                                {attachmentLabel(attachment)}
+                            </Text>
+                            <TouchableOpacity
+                                testID={`message-input-remove-attachment-${attachment.id}`}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Remove ${attachmentLabel(attachment)}`}
+                                onPress={() => handleRemoveAttachment(attachment.id)}
+                                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                            >
+                                <SymbolView
+                                    name="xmark"
+                                    size={10}
+                                    tintColor={theme.colors.textSecondary}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </View>
+            ) : null}
 
-            {/* ================================================================
-                SECTION: Send / Stop Button
-                ================================================================
-                Dual-purpose circular button:
-                - During streaming: stop icon that cancels the response
-                - Otherwise: send arrow that dispatches the message
-            */}
-            {isStreaming ? (
+            <View className="flex-row items-end w-full">
                 <TouchableOpacity
-                    testID="message-input-stop"
-                    onPress={handleCancel}
+                    testID="message-input-add"
+                    onPress={handleAddAttachment}
+                    disabled={disabled || !onAddAttachment}
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                     accessibilityRole="button"
-                    accessibilityLabel="Stop streaming"
-                    accessibilityHint="Stops the current response generation"
-                    className="w-11 h-11 rounded-full justify-center items-center ml-2"
+                    accessibilityLabel="Add attachment"
+                    accessibilityHint="Add photos or videos"
+                    accessibilityState={{ disabled: disabled || !onAddAttachment }}
+                    className="w-11 h-11 rounded-full justify-center items-center mr-2"
                     style={{ backgroundColor: theme.colors.surface }}
                 >
                     <SymbolView
-                      name="stop"
-                      size={16}
-                      tintColor={theme.colors.text}
+                        name="plus"
+                        size={18}
+                        tintColor={theme.colors.text}
                     />
                 </TouchableOpacity>
-            ) : (
-                <TouchableOpacity
-                    testID="message-input-send"
-                    onPress={handleSend}
-                    disabled={!canSend}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Send message"
-                    accessibilityHint="Sends the current message"
-                    accessibilityState={{ disabled: !canSend }}
-                    className="w-11 h-11 rounded-full justify-center items-center ml-2"
-                    style={{ backgroundColor: canSend ? theme.colors.accent : theme.colors.surface }}
+
+                <View
+                    testID="message-input-field"
+                    className="flex-1 pl-4 pr-2 py-1 rounded-xl min-h-12"
+                    style={[{ backgroundColor: theme.colors.surface }, style]}
                 >
-                    <SymbolView
-                      name="arrow.up"
-                      size={18}
-                      tintColor={canSend ? theme.colors.surface : theme.colors.textSecondary}
+                    <TextInput
+                        testID="message-input-text-input"
+                        className="py-2 max-h-[120px] text-base"
+                        style={{ color: theme.colors.text }}
+                        onChangeText={onChangeText}
+                        value={value}
+                        placeholder={placeholder}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        editable={!disabled}
+                        returnKeyType="send"
+                        enablesReturnKeyAutomatically
+                        onSubmitEditing={handleSubmitEditing}
+                        multiline
                     />
-                </TouchableOpacity>
-            )}
+                </View>
+
+                {isStreaming ? (
+                    <TouchableOpacity
+                        testID="message-input-stop"
+                        onPress={handleCancel}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Stop streaming"
+                        accessibilityHint="Stops the current response generation"
+                        className="w-11 h-11 rounded-full justify-center items-center ml-2"
+                        style={{ backgroundColor: theme.colors.surface }}
+                    >
+                        <SymbolView
+                            name="stop"
+                            size={16}
+                            tintColor={theme.colors.text}
+                        />
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        testID="message-input-send"
+                        onPress={handleSend}
+                        disabled={!canSend}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Send message"
+                        accessibilityHint="Sends the current message"
+                        accessibilityState={{ disabled: !canSend }}
+                        className="w-11 h-11 rounded-full justify-center items-center ml-2"
+                        style={{ backgroundColor: canSend ? theme.colors.accent : theme.colors.surface }}
+                    >
+                        <SymbolView
+                            name="arrow.up"
+                            size={18}
+                            tintColor={canSend ? theme.colors.surface : theme.colors.textSecondary}
+                        />
+                    </TouchableOpacity>
+                )}
+            </View>
         </View>
     );
 };

@@ -53,6 +53,12 @@
     </dict>
     <key>NSFaceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>The app uses your camera so you can take photos to share with the AI Chat.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>The app saves selected media metadata while composing AI messages.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>The app accesses your photos to let you share them with the AI Chat.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

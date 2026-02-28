@@ -87,8 +87,8 @@ describe('useChat', () => {
       expect(result.current.isThinking).toBe(false);
       expect(result.current.isStreaming).toBe(false);
       expect(result.current.title).toBe('Test Chat');
-      expect(result.current.currentProvider).toBe('apple');
-      expect(result.current.currentModel).toBe('system-default'); // Default when no chatId
+      expect(result.current.currentProvider).toBe('ollama');
+      expect(result.current.currentModel).toBe('gpt-oss:latest'); // Default when no chatId
       expect(result.current.isUsingFallback).toBe(false);
       expect(result.current.canRetry).toBe(false);
     });
@@ -357,6 +357,166 @@ describe('useChat', () => {
       expect(mockExecuteStreaming).toHaveBeenCalled();
       const [options] = mockExecuteStreaming.mock.calls[0] as [{ thinkingLevel?: string }];
       expect(options.thinkingLevel).toBe('high');
+    });
+
+    it('blocks video sends when selected provider is not video-capable', async () => {
+      const onError = jest.fn();
+      const { result } = renderHook(() => useChat({
+        providerId: 'openai' as any,
+        modelId: 'gpt-5',
+        onError,
+      }));
+
+      await act(async () => {
+        await result.current.sendMessage({
+          text: 'Analyze this video',
+          attachments: [
+            {
+              id: 'video-1',
+              kind: 'video',
+              uri: 'data:video/mp4;base64,Zm9v',
+              mediaType: 'video/mp4',
+              fileName: 'clip.mp4',
+            },
+          ],
+        });
+      });
+
+      expect(mockExecuteStreaming).not.toHaveBeenCalled();
+      expect(result.current.messages).toHaveLength(1);
+      const compatibilityMessage = result.current.messages[0] as {
+        role: string;
+        content: string;
+        annotations?: Array<{ type?: string; source?: string }>;
+      };
+
+      expect(compatibilityMessage.role).toBe('assistant');
+      expect(compatibilityMessage.content).toContain('**Video Not Supported**');
+      expect(compatibilityMessage.content).toContain('**Possible fixes:**');
+      expect(compatibilityMessage.annotations).toEqual([
+        expect.objectContaining({
+          type: 'error',
+          source: 'compatibility',
+        }),
+      ]);
+      expect(result.current.errorMessage).toContain('Video messages require OpenRouter');
+      expect(onError).toHaveBeenCalledTimes(1);
+    });
+
+    it('blocks video sends on OpenRouter when selected model is not video-capable', async () => {
+      const { result } = renderHook(() => useChat({
+        providerId: 'openrouter' as any,
+        modelId: 'openai/gpt-5',
+      }));
+
+      await act(async () => {
+        await result.current.sendMessage({
+          text: 'Analyze this video',
+          attachments: [
+            {
+              id: 'video-1',
+              kind: 'video',
+              uri: 'data:video/mp4;base64,Zm9v',
+              mediaType: 'video/mp4',
+              fileName: 'clip.mp4',
+            },
+          ],
+        });
+      });
+
+      expect(mockExecuteStreaming).not.toHaveBeenCalled();
+      expect(result.current.messages).toHaveLength(1);
+      const compatibilityMessage = result.current.messages[0] as {
+        role: string;
+        content: string;
+        annotations?: Array<{ type?: string; source?: string }>;
+      };
+
+      expect(compatibilityMessage.role).toBe('assistant');
+      expect(compatibilityMessage.content).toContain('**Video Not Supported**');
+      expect(compatibilityMessage.content).toContain('**Possible fixes:**');
+      expect(compatibilityMessage.annotations).toEqual([
+        expect.objectContaining({
+          type: 'error',
+          source: 'compatibility',
+        }),
+      ]);
+      expect(result.current.errorMessage).toContain('Video messages require OpenRouter');
+    });
+
+    it('allows video sends on video-capable OpenRouter models and keeps fallback disabled', async () => {
+      const { result } = renderHook(() => useChat({
+        providerId: 'openrouter' as any,
+        modelId: 'google/gemini-2.5-flash',
+      }));
+
+      await act(async () => {
+        await result.current.sendMessage({
+          text: 'Analyze this video',
+          attachments: [
+            {
+              id: 'video-1',
+              kind: 'video',
+              uri: 'data:video/mp4;base64,Zm9v',
+              mediaType: 'video/mp4',
+              fileName: 'clip.mp4',
+            },
+          ],
+        });
+      });
+
+      expect(mockExecuteStreaming).toHaveBeenCalledTimes(1);
+      const [options] = mockExecuteStreaming.mock.calls[0] as [{
+        activeProvider?: string;
+        model?: { modelId?: string };
+        enableFallback?: boolean;
+      }];
+
+      expect(options.activeProvider).toBe('openrouter');
+      expect(options.model?.modelId).toBe('google/gemini-2.5-flash');
+      expect(options.enableFallback).toBe(false);
+      expect(result.current.messages).toHaveLength(2);
+    });
+
+    it('does not auto-fallback providers for video messages in strict mode', async () => {
+      mockExecuteStreaming.mockReset();
+      mockExecuteStreaming.mockImplementationOnce(async () => ({
+        success: false,
+        shouldRetryWithFallback: true,
+        accumulated: '',
+        nextProvider: 'apple',
+        nextModel: 'gpt-4',
+      }));
+
+      const { result } = renderHook(() => useChat({
+        providerId: 'openrouter' as any,
+        modelId: 'google/gemini-2.5-flash',
+      }));
+
+      await act(async () => {
+        await result.current.sendMessage({
+          text: 'Analyze this video',
+          attachments: [
+            {
+              id: 'video-1',
+              kind: 'video',
+              uri: 'data:video/mp4;base64,Zm9v',
+              mediaType: 'video/mp4',
+              fileName: 'clip.mp4',
+            },
+          ],
+        });
+      });
+
+      expect(mockExecuteStreaming).toHaveBeenCalledTimes(1);
+
+      const [options] = mockExecuteStreaming.mock.calls[0] as [{
+        activeProvider?: string;
+        enableFallback?: boolean;
+      }];
+
+      expect(options.activeProvider).toBe('openrouter');
+      expect(options.enableFallback).toBe(false);
     });
   });
 

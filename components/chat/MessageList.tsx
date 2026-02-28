@@ -18,7 +18,19 @@ import {
 import { ModelMessage } from "ai";
 import { MessageBubble } from "./MessageBubble";
 import { useTheme } from "@/components/ui/ThemeProvider";
-import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
+import { getErrorAnnotation } from "@/lib/chat-error-annotations";
+
+const serializeMessageContent = (content: ModelMessage["content"] | undefined): string => {
+    if (typeof content === "string") {
+        return content;
+    }
+
+    try {
+        return JSON.stringify(content ?? "");
+    } catch {
+        return String(content ?? "");
+    }
+};
 
 /**
  * Props for the MessageList component
@@ -70,7 +82,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     const lastAutoScrollAtRef = useRef(0);
     const previousMessageCountRef = useRef(messages.length);
     const previousLastMessageContentRef = useRef<string>(
-        normalizeMessageContentForRender(messages[messages.length - 1]?.content)
+        serializeMessageContent(messages[messages.length - 1]?.content)
     );
     const previousWasStreamingRef = useRef(isStreaming);
     const terminalSettleUntilRef = useRef(0);
@@ -99,15 +111,15 @@ export const MessageList: React.FC<MessageListProps> = ({
         // Only show streaming indicator for assistant's last message during active streaming
         const isStreamingThisMessage = isLastMessage && item.role === "assistant" && isStreaming;
         const messageThinkingOutput = thinkingOutput[index] ?? "";
-
-        const normalizedContent = normalizeMessageContentForRender(item.content);
+        const isError = item.role === "assistant" && getErrorAnnotation(item) !== null;
 
         return (
             <MessageBubble
-                content={normalizedContent}
+                content={item.content}
                 isUser={item.role === "user"}
                 isStreaming={isStreamingThisMessage}
                 thinkingOutput={messageThinkingOutput}
+                isError={isError}
             />
         );
     }, [messages.length, isStreaming, thinkingOutput]);
@@ -202,7 +214,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1];
-        const lastMessageContent = normalizeMessageContentForRender(lastMessage?.content);
+        const lastMessageContent = serializeMessageContent(lastMessage?.content);
         const previousMessageCount = previousMessageCountRef.current;
         const previousLastMessageContent = previousLastMessageContentRef.current;
         const previousWasStreaming = previousWasStreamingRef.current;

@@ -3,9 +3,11 @@ import { renderHook, act } from '@testing-library/react-native';
 import { useChatStreaming } from '../useChatStreaming';
 import { classifyError, getNextFallbackProvider } from '@/providers/fallback-chain';
 import { executeWithRetry } from '@/hooks/useErrorRecovery';
-import { formatErrorForChat, getProviderErrorHint } from '@/lib/error-messages';
+import { formatErrorForChat, getErrorFixes, getProviderErrorHint } from '@/lib/error-messages';
 import { streamText } from 'ai';
 import type { ModelMessage } from 'ai';
+import { fetch as expoFetch } from 'expo/fetch';
+import { getProviderAuth } from '@/stores';
 import type { ProviderId } from '@/types/provider.types';
 
 // Mock all dependencies
@@ -13,14 +15,23 @@ jest.mock('@/providers/fallback-chain');
 jest.mock('@/hooks/useErrorRecovery');
 jest.mock('@/lib/error-messages');
 jest.mock('ai');
+jest.mock('expo/fetch', () => ({
+  fetch: jest.fn(),
+}));
+jest.mock('@/stores', () => ({
+  getProviderAuth: jest.fn(),
+}));
 
 describe('useChatStreaming', () => {
   const mockClassifyError = classifyError as jest.MockedFunction<typeof classifyError>;
   const mockGetNextFallbackProvider = getNextFallbackProvider as jest.MockedFunction<typeof getNextFallbackProvider>;
   const mockExecuteWithRetry = executeWithRetry as jest.MockedFunction<typeof executeWithRetry>;
   const mockFormatErrorForChat = formatErrorForChat as jest.MockedFunction<typeof formatErrorForChat>;
+  const mockGetErrorFixes = getErrorFixes as jest.MockedFunction<typeof getErrorFixes>;
   const mockGetProviderErrorHint = getProviderErrorHint as jest.MockedFunction<typeof getProviderErrorHint>;
   const mockStreamText = streamText as jest.MockedFunction<typeof streamText>;
+  const mockExpoFetch = expoFetch as unknown as jest.MockedFunction<typeof expoFetch>;
+  const mockGetProviderAuth = getProviderAuth as jest.MockedFunction<typeof getProviderAuth>;
 
   // Test data
   const mockModel = {
@@ -59,7 +70,10 @@ describe('useChatStreaming', () => {
     });
 
     mockFormatErrorForChat.mockReturnValue('Error occurred');
+    mockGetErrorFixes.mockReturnValue(['Try again', 'Switch providers']);
     mockGetProviderErrorHint.mockReturnValue('Check your internet connection');
+    mockGetProviderAuth.mockReturnValue({ apiKey: 'test-openrouter-key' } as any);
+    mockExpoFetch.mockReset();
 
     // Mock streaming implementation
     const mockFullStream = {
@@ -245,6 +259,50 @@ describe('useChatStreaming', () => {
       expect(setMessagesMock).toHaveBeenCalledTimes(3);
     });
 
+    it('preserves existing assistant annotations while streaming updates', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          defaultOptions,
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      const firstUpdater = setMessagesMock.mock.calls[0]?.[0] as ((prev: ModelMessage[]) => ModelMessage[]) | undefined;
+      expect(typeof firstUpdater).toBe('function');
+
+      const previousAssistantMessage = {
+        role: 'assistant',
+        content: '',
+        annotations: [
+          {
+            type: 'error',
+            error: 'previous error',
+            fixes: ['Retry message'],
+            source: 'streaming',
+          },
+        ],
+      } as unknown as ModelMessage;
+
+      const nextMessages = firstUpdater!([previousAssistantMessage]);
+      const nextAssistantMessage = nextMessages[0] as ModelMessage & {
+        annotations?: Array<{ type?: string; error?: string; source?: string }>;
+      };
+
+      expect(nextAssistantMessage.content).toBe('Hello');
+      expect(nextAssistantMessage.annotations).toEqual([
+        expect.objectContaining({
+          type: 'error',
+          error: 'previous error',
+          source: 'streaming',
+        }),
+      ]);
+    });
+
     it('emits lifecycle callbacks through successful stream completion', async () => {
       const { result } = renderHook(() => useChatStreaming());
       const lifecycleEvents: string[] = [];
@@ -362,6 +420,99 @@ describe('useChatStreaming', () => {
           },
         })
       );
+    });
+
+    it('uses OpenRouter video transport for video file messages', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const mockOnChunk = jest.fn();
+      const mockOnThinkingChunk = jest.fn();
+
+      const videoMessages: ModelMessage[] = [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'file',
+              data: 'ZmlsZS1iYXNlNjQ=',
+              mediaType: 'video/mp4',
+              filename: 'clip.mp4',
+            },
+          ] as any,
+        },
+      ];
+
+      const encoder = new TextEncoder();
+      const streamChunks = [
+        'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":" world"},"finish_reason":"stop"}]}\n\n',
+        'data: [DONE]\n\n',
+      ];
+      let chunkIndex = 0;
+
+      mockExpoFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        body: {
+          getReader: () => ({
+            read: async () => {
+              if (chunkIndex >= streamChunks.length) {
+                return { done: true, value: undefined };
+              }
+
+              const value = encoder.encode(streamChunks[chunkIndex]);
+              chunkIndex += 1;
+              return { done: false, value };
+            },
+          }),
+        },
+      } as any);
+
+      const streamingResult = await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            model: {
+              ...mockModel,
+              provider: 'openrouter' as ProviderId,
+              modelId: 'google/gemini-2.5-flash',
+            },
+            activeProvider: 'openrouter' as ProviderId,
+            effectiveProviderId: 'openrouter' as ProviderId,
+            thinkingLevel: 'high',
+            onChunk: mockOnChunk,
+            onThinkingChunk: mockOnThinkingChunk,
+          },
+          videoMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      expect(mockExpoFetch).toHaveBeenCalledTimes(1);
+      expect(mockStreamText).not.toHaveBeenCalled();
+
+      const [fetchUrl, fetchInit] = mockExpoFetch.mock.calls[0] as [string, RequestInit];
+      expect(fetchUrl).toBe('https://openrouter.ai/api/v1/chat/completions');
+
+      const requestBody = JSON.parse(String(fetchInit.body)) as {
+        messages: Array<{ content: Array<{ type: string; video_url?: { url?: string } }> }>;
+      };
+
+      expect(requestBody.messages[0].content[0]).toEqual(
+        expect.objectContaining({
+          type: 'video_url',
+          video_url: {
+            url: 'data:video/mp4;base64,ZmlsZS1iYXNlNjQ=',
+          },
+        })
+      );
+
+      expect(mockOnThinkingChunk).not.toHaveBeenCalled();
+      expect(mockOnChunk).toHaveBeenNthCalledWith(1, 'Hello', 'Hello');
+      expect(mockOnChunk).toHaveBeenNthCalledWith(2, ' world', 'Hello world');
+      expect(streamingResult.success).toBe(true);
+      expect(streamingResult.accumulated).toBe('Hello world');
     });
 
     it('should pass Ollama think options when thinking is enabled', async () => {
@@ -650,6 +801,61 @@ describe('useChatStreaming', () => {
       // the hook should set shouldRetryWithFallback to false and success to true
       expect(streamingResult.success).toBe(true);
       expect(streamingResult.shouldRetryWithFallback).toBe(false);
+    });
+
+    it('annotates assistant message when retry fails and fallback is unavailable', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      mockExecuteWithRetry.mockResolvedValue({
+        success: false,
+        attempts: 2,
+        shouldFallback: true,
+        error: {
+          category: 'server_error',
+          isRetryable: true,
+          shouldFallback: true,
+          message: 'Retry failed hard',
+        },
+      });
+      mockGetNextFallbackProvider.mockReturnValue(null);
+      mockFormatErrorForChat.mockReturnValue('Rendered error');
+      mockGetErrorFixes.mockReturnValue(['Retry now', 'Switch provider']);
+      mockGetProviderErrorHint.mockReturnValue(null);
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            enableRetry: true,
+            enableFallback: true,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef
+        );
+      });
+
+      const updater = setMessagesMock.mock.calls.at(-1)?.[0] as ((prev: ModelMessage[]) => ModelMessage[]) | undefined;
+      expect(typeof updater).toBe('function');
+
+      const nextMessages = updater!([
+        { role: 'assistant', content: '' } as ModelMessage,
+      ]);
+
+      const annotatedAssistant = nextMessages[0] as ModelMessage & {
+        annotations?: Array<{ type?: string; error?: string; source?: string; fixes?: string[] }>;
+      };
+
+      expect(annotatedAssistant.content).toBe('Rendered error');
+      expect(annotatedAssistant.annotations).toEqual([
+        expect.objectContaining({
+          type: 'error',
+          error: 'Retry failed hard',
+          source: 'streaming',
+          fixes: ['Retry now', 'Switch provider'],
+        }),
+      ]);
     });
 
     it('should handle unexpected errors without retry enabled', async () => {

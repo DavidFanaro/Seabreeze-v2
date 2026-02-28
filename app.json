@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.davidfanaro.seabreeze.v1"
+      "bundleIdentifier": "com.davidfanaro.seabreeze.v1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "The app uses your camera so you can take photos to share with the AI Chat.",
+        "NSPhotoLibraryUsageDescription": "The app accesses your photos to let you share them with the AI Chat.",
+        "NSPhotoLibraryAddUsageDescription": "The app saves selected media metadata while composing AI messages."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +31,21 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with the AI Chat.",
+          "cameraPermission": "The app uses your camera so you can take photos to share with the AI Chat."
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

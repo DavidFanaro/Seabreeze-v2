@@ -5,6 +5,7 @@
 
 import React from "react";
 import { fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import { MessageBubble } from "../MessageBubble";
 
 // Mock CustomMarkdown component
@@ -93,12 +94,18 @@ describe("MessageBubble Component", () => {
    * Test: AI message has transparent background
    */
   it("applies transparent background to AI messages", () => {
-    render(
+    const { getByTestId } = render(
       <MessageBubble
         content="AI response"
         isUser={false}
       />
     );
+
+    const bubbleContainer = getByTestId("message-bubble-container");
+    const bubbleStyle = StyleSheet.flatten(bubbleContainer.props.style);
+
+    expect(bubbleStyle.backgroundColor).toBe("transparent");
+    expect(bubbleStyle.borderWidth).toBe(0);
 
     // Verify CustomMarkdown was called with isUser=false
     expect(mockCustomMarkdown).toHaveBeenCalledWith(
@@ -107,6 +114,23 @@ describe("MessageBubble Component", () => {
         isUser: false,
       })
     );
+  });
+
+  it("applies red styling to annotated AI error messages", () => {
+    const { getByTestId } = render(
+      <MessageBubble
+        content="Generation failed"
+        isUser={false}
+        isError={true}
+      />
+    );
+
+    const bubbleContainer = getByTestId("message-bubble-container");
+    const bubbleStyle = StyleSheet.flatten(bubbleContainer.props.style);
+
+    expect(bubbleStyle.backgroundColor).toBe("rgba(255, 0, 0, 0.14)");
+    expect(bubbleStyle.borderColor).toBe("#ff0000");
+    expect(bubbleStyle.borderWidth).toBe(1);
   });
 
   /**

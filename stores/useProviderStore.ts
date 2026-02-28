@@ -26,8 +26,8 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import * as SecureStore from "expo-secure-store";
 import type { ProviderId } from "@/types/provider.types";
+import { safeSecureStore } from "@/lib/safe-secure-store";
 import {
   applyRuntimeWriteVersion,
   INITIAL_HYDRATION_META,
@@ -104,7 +104,7 @@ const secureStorage = {
    */
   getItem: async (name: string): Promise<string | null> => {
     try {
-      return await SecureStore.getItemAsync(name);
+      return await safeSecureStore.getItemAsync(name);
     } catch {
       // Silently fail and return null if secure storage is unavailable
       return null;
@@ -118,7 +118,7 @@ const secureStorage = {
    */
   setItem: async (name: string, value: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(name, value);
+      await safeSecureStore.setItemAsync(name, value);
     } catch (error) {
       // Silently fail if storage is unavailable - app continues to work
     }
@@ -130,7 +130,7 @@ const secureStorage = {
    */
   removeItem: async (name: string): Promise<void> => {
     try {
-      await SecureStore.deleteItemAsync(name);
+      await safeSecureStore.deleteItemAsync(name);
     } catch (error) {
       // Silently fail if storage is unavailable
     }
@@ -155,7 +155,7 @@ const DEFAULT_MODELS: Record<ProviderId, string[]> = {
     "openai/gpt-4o-mini",
     "anthropic/claude-sonnet-4-20250514", // Anthropic models via OpenRouter
   ],
-  ollama: ["llama3.2", "mistral", "codellama", "qwen2.5"], // Popular local models
+  ollama: ["gpt-oss:latest", "llama3.2", "mistral", "codellama", "qwen2.5"], // Popular local models
 };
 
 /**
@@ -236,10 +236,10 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       // INITIAL STATE
       // ========================================================================
       
-      /** Start with Apple Intelligence as the default provider */
-      selectedProvider: "apple",
-      /** Start with Apple's system default model */
-      selectedModel: "system-default",
+      /** Start with Ollama as the default provider */
+      selectedProvider: "ollama",
+      /** Start with the requested local default model */
+      selectedModel: "gpt-oss:latest",
       /** Initialize with default built-in models */
       availableModels: DEFAULT_MODELS,
       /** Initialize with empty custom model lists */
@@ -511,8 +511,8 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       resetToDefaults: () =>
         set((state) =>
           applyRuntimeWriteVersion(state, {
-            selectedProvider: "apple",
-            selectedModel: "system-default",
+            selectedProvider: "ollama",
+            selectedModel: "gpt-oss:latest",
             availableModels: DEFAULT_MODELS,
             customModels: DEFAULT_CUSTOM_MODELS,
             hiddenModels: DEFAULT_HIDDEN_MODELS,

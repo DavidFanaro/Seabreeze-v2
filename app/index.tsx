@@ -14,9 +14,9 @@ import {
   runChatOperation,
   runListOperation,
 } from "@/lib/chat-persistence-coordinator";
-import { ModelMessage } from "ai";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { SymbolView } from "expo-symbols";
+import { getMessagePreviewText } from "@/lib/chat-content-parts";
 import {
   failPersistenceOperation,
   startPersistenceOperation,
@@ -40,14 +40,10 @@ export const getPreview = (messages: unknown): string | null => {
       return null;
     }
 
-    const lastMessage = messages[messages.length - 1] as ModelMessage;
+    const lastMessage = messages[messages.length - 1] as { content?: unknown };
     if (!lastMessage?.content) return null;
 
-    const content =
-      typeof lastMessage.content === "string"
-        ? lastMessage.content
-        : String(lastMessage.content);
-    return content.length > 80 ? content.slice(0, 80) + "..." : content;
+    return getMessagePreviewText(lastMessage.content);
   } catch {
     return null;
   }

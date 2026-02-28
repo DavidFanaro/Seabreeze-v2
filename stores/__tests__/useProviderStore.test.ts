@@ -43,8 +43,8 @@ describe("useProviderStore", () => {
     it("should initialize with default state values", () => {
       const { result } = createStore();
 
-      expect(result.current.selectedProvider).toBe("apple");
-      expect(result.current.selectedModel).toBe("system-default");
+      expect(result.current.selectedProvider).toBe("ollama");
+      expect(result.current.selectedModel).toBe("gpt-oss:latest");
     });
 
     it("should provide all required actions", () => {
@@ -452,8 +452,8 @@ describe("useProviderStore", () => {
         result.current.resetToDefaults();
       });
 
-      expect(result.current.selectedProvider).toBe("apple");
-      expect(result.current.selectedModel).toBe("system-default");
+      expect(result.current.selectedProvider).toBe("ollama");
+      expect(result.current.selectedModel).toBe("gpt-oss:latest");
       expect(result.current.customModels).toEqual({
         apple: [],
         openai: [],
@@ -474,7 +474,7 @@ describe("useProviderStore", () => {
       expect(getDefaultModelForProvider("apple")).toBe("system-default");
       expect(getDefaultModelForProvider("openai")).toBe("gpt-4o");
       expect(getDefaultModelForProvider("openrouter")).toBe("openai/gpt-4o");
-      expect(getDefaultModelForProvider("ollama")).toBe("llama3.2");
+      expect(getDefaultModelForProvider("ollama")).toBe("gpt-oss:latest");
     });
   });
 

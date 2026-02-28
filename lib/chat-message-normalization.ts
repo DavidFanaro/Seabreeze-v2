@@ -18,6 +18,9 @@ const SUPPORTED_ROLES = new Set<ModelMessage["role"]>([
   "user",
 ]);
 
+type UserMessage = Extract<ModelMessage, { role: "user" }>;
+type UserContent = UserMessage["content"];
+
 const UNSERIALIZABLE_CONTENT_FALLBACK = "[Unserializable legacy message content]";
 
 function stringifyUnknownContent(value: unknown): string {
@@ -53,6 +56,69 @@ function extractTextFromLegacyPart(part: unknown): string | null {
 
   return null;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return !!value && typeof value === "object";
+};
+
+const isValidUserMultipartContent = (value: unknown): value is Extract<UserContent, unknown[]> => {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  return value.every((part) => {
+    if (!isRecord(part) || typeof part.type !== "string") {
+      return false;
+    }
+
+    if (part.type === "text") {
+      return typeof part.text === "string";
+    }
+
+    if (part.type === "image") {
+      const imageValue = part.image;
+      return typeof imageValue === "string" || imageValue instanceof URL;
+    }
+
+    if (part.type === "file") {
+      const fileValue = part.data;
+      const hasValidData = typeof fileValue === "string" || fileValue instanceof URL;
+      return hasValidData && typeof part.mediaType === "string";
+    }
+
+    return false;
+  });
+};
+
+const normalizeUserContent = (
+  content: unknown,
+): { content: UserContent; didCoerceContent: boolean } => {
+  if (typeof content === "string") {
+    return {
+      content,
+      didCoerceContent: false,
+    };
+  }
+
+  if (isValidUserMultipartContent(content)) {
+    return {
+      content,
+      didCoerceContent: false,
+    };
+  }
+
+  if (isRecord(content) && isValidUserMultipartContent(content.parts)) {
+    return {
+      content: content.parts,
+      didCoerceContent: true,
+    };
+  }
+
+  return {
+    content: coerceMessageContentToString(content),
+    didCoerceContent: true,
+  };
+};
 
 /**
  * Coerce persisted/legacy message payload content into render-safe text.
@@ -148,9 +214,17 @@ export function normalizePersistedMessages(value: unknown): NormalizePersistedMe
       return;
     }
 
-    const normalizedContent = coerceMessageContentToString(sourceContent);
-    if (typeof sourceContent !== "string") {
-      didCoerceContent = true;
+    let normalizedContent: ModelMessage["content"];
+
+    if (role === "user") {
+      const normalizedUserContent = normalizeUserContent(sourceContent);
+      normalizedContent = normalizedUserContent.content;
+      didCoerceContent = didCoerceContent || normalizedUserContent.didCoerceContent;
+    } else {
+      normalizedContent = coerceMessageContentToString(sourceContent);
+      if (typeof sourceContent !== "string") {
+        didCoerceContent = true;
+      }
     }
 
     const normalizedMessage: ModelMessage = {

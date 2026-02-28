@@ -1,17 +1,18 @@
 {
-  "name": "Chat Persistence + Retrieval Rebuild",
-  "branchName": "feature/chat-persistence-retrieval-rebuild",
+  "name": "Repository-Wide Documentation and Onboarding Pass",
+  "branchName": "feature/repository-wide-documentation-onboarding-pass",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Implement per-chat persistence orchestrator",
-      "description": "As a user, I want chat persistence operations to be ordered per conversation so that saves are deterministic and race-safe.",
+      "title": "Create docs foundation and navigation index",
+      "description": "As a new engineer, I want a clear docs entrypoint and information architecture so that I can quickly locate the right documentation area.",
       "acceptanceCriteria": [
-        "A single orchestration layer handles create and append persistence flows.",
-        "Critical mutations for the same chat are serialized in deterministic order.",
-        "Duplicate writes from retries or rerenders are prevented by idempotency guards.",
+        "Create `docs/README.md` as the canonical docs entrypoint with links to all required top-level docs.",
+        "Create folder structure for architecture, ui, state, hooks, providers, and contributing docs.",
+        "`docs/README.md` describes how to navigate between topic index docs and deep-dive docs.",
         "npm run lint passes",
-        "npx tsc --noEmit passes"
+        "npx tsc --noEmit passes",
+        "Targeted tests for changed behavior areas pass"
       ],
       "priority": 1,
       "passes": true,
@@ -20,197 +21,144 @@
     },
     {
       "id": "US-002",
-      "title": "Deliver optimistic send with durable checkpoints",
-      "description": "As a user, I want sent messages to appear immediately and persist reliably afterward.",
+      "title": "Document architecture overview and codebase map",
+      "description": "As a new engineer, I want architecture boundaries and a codebase map so that I can identify where to make safe changes.",
       "acceptanceCriteria": [
-        "Message send updates memory state immediately for optimistic UX.",
-        "Durable DB checkpoints complete in per-chat deterministic order.",
-        "Refresh or reopen does not show duplicate or phantom messages.",
-        "Write failure surfaces a non-blocking error state with continued app usability.",
+        "Create `docs/architecture/overview.md` with system boundaries, core modules, and interaction model.",
+        "Create `docs/architecture/codebase-map.md` with major folders, key files, and ownership boundaries.",
+        "Both docs follow the required format standard: Purpose, Concepts, File Map, Flow, Examples, Gotchas, Change Guide.",
+        "Cross-link architecture docs with `docs/README.md`.",
         "npm run lint passes",
-        "npx tsc --noEmit passes"
+        "npx tsc --noEmit passes",
+        "Targeted tests for changed behavior areas pass"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "dependsOn": [
         "US-001"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
-      "title": "Build deterministic chat retrieval and hydration",
-      "description": "As a user, I want opening an existing chat to load a complete and consistent snapshot without hangs.",
+      "title": "Document UI layout, navigation, and feature flows",
+      "description": "As a contributor, I want UI layout and feature flow documentation so that I can understand rendering paths and user interactions without reverse-engineering screens.",
       "acceptanceCriteria": [
-        "Chat metadata and message history load from DB as one consistent snapshot.",
-        "Hydration guards prevent partial reads and stale in-memory references.",
-        "Hydration failure exits to a recoverable state instead of trapping the UI.",
+        "Create `docs/ui/layout-and-navigation.md` covering screen structure, route/navigation behavior, and layout boundaries.",
+        "Create `docs/ui/feature-flows.md` covering core user journeys and UI state transitions.",
+        "Add meaningful inline comments in UI-focused modules to clarify intent, invariants, and non-obvious behavior.",
+        "UI docs are cross-linked with architecture docs and include change guides.",
         "npm run lint passes",
-        "npx tsc --noEmit passes"
+        "npx tsc --noEmit passes",
+        "Targeted tests for changed behavior areas pass"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "dependsOn": [
-        "US-001"
-      ],
-      "completionNotes": "Completed by agent"
+        "US-001",
+        "US-002"
+      ]
     },
     {
       "id": "US-004",
-      "title": "Add retrieval recovery UX with retry",
-      "description": "As a user, I want a clear recovery path when chat retrieval fails so that I can continue using the app.",
+      "title": "Document state model and lifecycle data flow",
+      "description": "As a contributor, I want state boundaries and lifecycle documentation so that I can safely modify update flows and avoid state regressions.",
       "acceptanceCriteria": [
-        "Opening chat on retrieval failure shows a recoverable error view, not a dead state.",
-        "Recovery view includes a retry path that re-runs retrieval safely.",
-        "Retry path does not duplicate messages or corrupt in-memory state.",
+        "Create `docs/state/state-model.md` covering state boundaries, ownership, and transition rules.",
+        "Create `docs/state/state-lifecycle-and-data-flow.md` covering runtime lifecycle and data/control flow.",
+        "Add meaningful inline comments in state modules for side effects, invariants, and edge cases.",
+        "State docs include file maps and change guides and are cross-linked from `docs/README.md`.",
         "npm run lint passes",
-        "npx tsc --noEmit passes"
+        "npx tsc --noEmit passes",
+        "Targeted tests for changed behavior areas pass"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "dependsOn": [
-        "US-003"
-      ],
-      "completionNotes": "Completed by agent"
+        "US-001",
+        "US-002"
+      ]
     },
     {
       "id": "US-005",
-      "title": "Stabilize chat list load and refresh",
-      "description": "As a user, I want the chat list to stay responsive during load, refresh, and transient error states.",
+      "title": "Build hooks catalog and hook implementation guide",
+      "description": "As a contributor, I want a hooks catalog and gotchas guide so that I can understand hook contracts, side effects, and safe extension patterns.",
       "acceptanceCriteria": [
-        "List hydration has no permanent spinner or blocked interaction state.",
-        "Faulty or partial rows do not block full list rendering.",
-        "List refresh remains non-blocking under transient DB or provider errors.",
+        "Create `docs/hooks/hooks-catalog.md` documenting each major custom hook with purpose, inputs/outputs, side effects, and pitfalls.",
+        "Create `docs/hooks/hook-patterns-and-gotchas.md` with recommended patterns and anti-patterns.",
+        "Add meaningful inline comments in hook modules to explain non-obvious control and data flow.",
+        "Hook docs follow the format standard and link to relevant state and UI docs.",
         "npm run lint passes",
-        "npx tsc --noEmit passes"
+        "npx tsc --noEmit passes",
+        "Targeted tests for changed behavior areas pass"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "dependsOn": [
-        "US-001"
-      ],
-      "completionNotes": "Completed by agent"
+        "US-004"
+      ]
     },
     {
       "id": "US-006",
-      "title": "Handle title generation failure safely",
-      "description": "As a user, I want chat flow to continue when title generation fails so that I can still use and rename conversations.",
+      "title": "Document provider architecture and extension process",
+      "description": "As a contributor, I want a complete provider extension guide so that I can add local and remote providers safely.",
       "acceptanceCriteria": [
-        "Failed title generation does not block save, open, or list flows.",
-        "Untitled chats render with fallback label UX.",
-        "Manual rename persists reliably for untitled chats.",
+        "Create `docs/providers/provider-architecture.md` covering provider internals and extension boundaries.",
+        "Create `docs/providers/adding-a-provider.md` with step-by-step interface contracts, required files, registration points, config, and env requirements for local and remote providers.",
+        "Create `docs/providers/provider-validation-and-troubleshooting.md` covering validation checklist, smoke-test path, fallback behavior, and common failure modes.",
+        "Provider docs include compatibility and safety constraints and are cross-linked from `docs/README.md`.",
         "npm run lint passes",
-        "npx tsc --noEmit passes"
+        "npx tsc --noEmit passes",
+        "Targeted tests for changed behavior areas pass"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "dependsOn": [
-        "US-003",
-        "US-005"
-      ],
-      "completionNotes": "Completed by agent"
+        "US-002"
+      ]
     },
     {
       "id": "US-007",
-      "title": "Apply additive schema updates for compatibility",
-      "description": "As a user, I want my existing chats to remain readable after release so that no data is lost during upgrade.",
+      "title": "Publish contributor onboarding and quality workflow docs",
+      "description": "As a contributor, I want onboarding and quality workflow documentation so that I can set up the project and follow lint/typecheck/test requirements consistently.",
       "acceptanceCriteria": [
-        "Any schema changes are additive only (new columns, tables, or indexes).",
-        "No destructive migrations run against existing chat or message data.",
-        "Pre-release validation confirms legacy records remain readable post-upgrade.",
+        "Create `docs/contributing/dev-setup-and-workflow.md` with setup and day-to-day contribution workflow.",
+        "Create `docs/contributing/lint-typecheck-test-guide.md` with linting, typecheck, targeted test execution, and review expectations.",
+        "Document a coverage matrix process for reviewed files, updated docs, and comment additions.",
+        "Document phase labels and reviewer checks for docs accuracy and comment quality.",
         "npm run lint passes",
-        "npx tsc --noEmit passes"
+        "npx tsc --noEmit passes",
+        "Targeted tests for changed behavior areas pass"
       ],
       "priority": 7,
-      "passes": true,
-      "dependsOn": [],
-      "completionNotes": "Completed by agent"
+      "passes": false,
+      "dependsOn": [
+        "US-001"
+      ]
     },
     {
       "id": "US-008",
-      "title": "Harden concurrency across persistence flows",
-      "description": "As a user, I want overlapping chat operations to preserve consistent state so that concurrency does not corrupt conversations.",
+      "title": "Complete repository-wide deep dives and final consistency pass",
+      "description": "As a new engineer and AI coding agent, I want complete deep dives and validated cross-links so that I can identify change points quickly across all major areas.",
       "acceptanceCriteria": [
-        "Create, append, edit, delete, list, and open flows have explicit lock and ordering semantics.",
-        "Streaming updates cannot race DB checkpoints into inconsistent state.",
-        "Known race-condition reproductions from current bug set no longer reproduce.",
-        "Defensive handling is added for likely unknown race windows.",
+        "Create at least one deep-dive doc for every major feature/folder area with purpose, boundary, key files, flow, extension points, and pitfalls.",
+        "Ensure all major docs use the required format standard and include file maps and change guides.",
+        "Validate that cross-links are accurate and the docs index is complete.",
+        "Perform a repository-wide inline comment pass targeting meaningful coverage near 80 percent of functions/hooks/modules.",
         "npm run lint passes",
-        "npx tsc --noEmit passes"
+        "npx tsc --noEmit passes",
+        "Targeted tests for changed behavior areas pass"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "dependsOn": [
-        "US-002",
         "US-003",
         "US-005",
         "US-006",
         "US-007"
-      ],
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "US-009",
-      "title": "Instrument persistence telemetry",
-      "description": "As an engineer, I want structured telemetry for persistence flows so that regressions are easy to detect and triage.",
-      "acceptanceCriteria": [
-        "Structured started, succeeded, and failed events exist for save, load, list, title generation, and manual rename.",
-        "Each event includes correlation ID and error classification fields.",
-        "Metrics include success and failure counts plus latency histograms for key operations.",
-        "npm run lint passes",
-        "npx tsc --noEmit passes"
-      ],
-      "priority": 9,
-      "passes": true,
-      "dependsOn": [
-        "US-002",
-        "US-003",
-        "US-005",
-        "US-006"
-      ],
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "US-010",
-      "title": "Add alerting hooks for regressions",
-      "description": "As an engineer, I want alerting hooks on persistence telemetry so that critical failures and latency regressions are surfaced quickly.",
-      "acceptanceCriteria": [
-        "Alerting hooks exist for failure-rate spikes in critical persistence flows.",
-        "Alerting hooks exist for latency regressions above defined SLA thresholds.",
-        "Alerting hooks exist for repeated softlock-signature events.",
-        "npm run lint passes",
-        "npx tsc --noEmit passes"
-      ],
-      "priority": 10,
-      "passes": true,
-      "dependsOn": [
-        "US-009"
-      ],
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "US-011",
-      "title": "Complete big-bang cutover validation",
-      "description": "As a release owner, I want full pre-release validation for the rebuilt persistence path so that the big-bang cutover is safe.",
-      "acceptanceCriteria": [
-        "Validation covers representative small, large, and legacy chat datasets.",
-        "Warm and cold performance measurements meet stated p95 targets.",
-        "Release validation confirms zero reproducible blocking softlock states.",
-        "Rollback procedure is documented for severe post-release regression.",
-        "npm run lint passes",
-        "npx tsc --noEmit passes"
-      ],
-      "priority": 11,
-      "passes": true,
-      "dependsOn": [
-        "US-004",
-        "US-008",
-        "US-010"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
-    "updatedAt": "2026-02-09T06:00:17.959Z"
+    "updatedAt": "2026-02-28T05:20:40.040Z"
   }
 }

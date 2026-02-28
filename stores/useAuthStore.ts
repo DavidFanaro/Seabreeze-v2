@@ -6,8 +6,8 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import * as SecureStore from "expo-secure-store";
 import type { ProviderId } from "@/types/provider.types";
+import { safeSecureStore } from "@/lib/safe-secure-store";
 import {
   applyRuntimeWriteVersion,
   INITIAL_HYDRATION_META,
@@ -33,20 +33,20 @@ interface AuthActions {
 const secureStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
-      return await SecureStore.getItemAsync(name);
+      return await safeSecureStore.getItemAsync(name);
     } catch {
       return null;
     }
   },
   setItem: async (name: string, value: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(name, value);
+      await safeSecureStore.setItemAsync(name, value);
     } catch (error) {
     }
   },
   removeItem: async (name: string): Promise<void> => {
     try {
-      await SecureStore.deleteItemAsync(name);
+      await safeSecureStore.deleteItemAsync(name);
     } catch (error) {
     }
   },

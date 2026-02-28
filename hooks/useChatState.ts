@@ -19,8 +19,8 @@
 import { useCallback, useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import * as SecureStore from "expo-secure-store";
 import type { ProviderId } from "@/types/provider.types";
+import { safeSecureStore } from "@/lib/safe-secure-store";
 import { useProviderStore } from "@/stores";
 import {
   applyRuntimeWriteVersion,
@@ -120,7 +120,7 @@ const secureStorage = {
    */
   getItem: async (name: string): Promise<string | null> => {
     try {
-      return await SecureStore.getItemAsync(name);
+      return await safeSecureStore.getItemAsync(name);
     } catch {
       // Silent failure - return null if secure storage fails
       return null;
@@ -134,7 +134,7 @@ const secureStorage = {
    */
   setItem: async (name: string, value: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(name, value);
+      await safeSecureStore.setItemAsync(name, value);
     } catch (error) {
       // Silent failure - don't crash if storage fails
     }
@@ -146,7 +146,7 @@ const secureStorage = {
    */
   removeItem: async (name: string): Promise<void> => {
     try {
-      await SecureStore.deleteItemAsync(name);
+      await safeSecureStore.deleteItemAsync(name);
     } catch (error) {
       // Silent failure - don't crash if removal fails
     }

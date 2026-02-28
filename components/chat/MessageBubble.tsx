@@ -6,9 +6,14 @@
 
 import React, { memo, useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View, ViewStyle } from "react-native";
+import { Image } from "expo-image";
+import type { ModelMessage } from "ai";
+
 import { CustomMarkdown } from "./CustomMarkdown";
 import { useTheme } from "@/components/ui/ThemeProvider";
+import { parseMessageContent } from "@/lib/chat-content-parts";
 import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
+import { isImageMediaType, isVideoMediaType } from "@/lib/chat-attachments";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
 /**
@@ -20,12 +25,41 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
  * @property {ViewStyle} [style] - Optional additional styles to apply to the container
  */
 interface MessageBubbleProps {
-  content: string;
+  content: ModelMessage["content"];
   isUser: boolean;
   isStreaming?: boolean;
   thinkingOutput?: string;
+  isError?: boolean;
   style?: ViewStyle;
 }
+
+const withAlpha = (color: string, alpha: number): string => {
+  const normalizedAlpha = Math.min(Math.max(alpha, 0), 1);
+  const trimmed = color.trim();
+  const hex = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
+
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    const r = parseInt(hex[0] + hex[0], 16);
+    const g = parseInt(hex[1] + hex[1], 16);
+    const b = parseInt(hex[2] + hex[2], 16);
+    return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+  }
+
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+  }
+
+  const rgbMatch = trimmed.match(/^rgb\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\)$/i);
+  if (rgbMatch) {
+    const [, r, g, b] = rgbMatch;
+    return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+  }
+
+  return `rgba(220, 38, 38, ${normalizedAlpha})`;
+};
 
 /**
  * MessageBubble component
@@ -41,7 +75,7 @@ interface MessageBubbleProps {
  * - Theme-aware styling with responsive width constraints
  */
 export const MessageBubble: React.FC<MessageBubbleProps> = memo(
-  ({ content, isUser, isStreaming = false, thinkingOutput, style }) => {
+  ({ content, isUser, isStreaming = false, thinkingOutput, isError = false, style }) => {
     // ========== Hooks Section ==========
     // Retrieve theme colors and spacing values for consistent styling across the app
     const { theme } = useTheme();
@@ -53,10 +87,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
 
     const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
     const [hasAutoExpandedThinking, setHasAutoExpandedThinking] = useState(false);
-    const normalizedContent = normalizeMessageContentForRender(content);
+    const parsedContent = parseMessageContent(content);
+    const mediaImageParts = [
+      ...parsedContent.images,
+      ...parsedContent.files
+        .filter((filePart) => isImageMediaType(filePart.mediaType))
+        .map((filePart) => ({
+          uri: filePart.uri,
+          mediaType: filePart.mediaType,
+        })),
+    ];
+    const fileParts = parsedContent.files.filter(
+      (filePart) => !isImageMediaType(filePart.mediaType),
+    );
+    const hasStructuredMedia = mediaImageParts.length > 0 || fileParts.length > 0;
+    const normalizedContent = parsedContent.text.length > 0
+      ? parsedContent.text
+      : (hasStructuredMedia ? "" : normalizeMessageContentForRender(content));
     const normalizedThinkingOutput = thinkingOutput?.trim() ?? "";
     const hasThinkingOutput = !isUser && normalizedThinkingOutput.length > 0;
     const shouldDeferThinkingMarkdown = isStreaming && normalizedContent.includes("```");
+    const isAssistantError = !isUser && isError;
+    const errorColor = theme.colors.error ?? "#dc2626";
+    const errorBackgroundColor = withAlpha(errorColor, 0.14);
 
     const toggleThinkingOutput = useCallback(() => {
       setIsThinkingExpanded((prev) => !prev);
@@ -150,33 +203,94 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
         {/* Provides consistent vertical and horizontal spacing around the message bubble */}
 
         <View
+          testID="message-bubble-container"
           style={{
-            /* ========== Message Bubble Container Section ========== */
-            /* Dynamic container that adapts styling based on message source (user vs AI) */
-            
-            /* Alignment: User messages right-aligned, AI messages left-aligned */
             alignSelf: isUser ? "flex-end" : "flex-start",
-            /* Width constraint: User messages max 85% width, AI messages full width for flexibility */
             maxWidth: isUser ? "85%" : "100%",
-            /* Background styling: User messages have theme surface color, AI messages transparent */
-            backgroundColor: isUser ? theme.colors.surface : "transparent",
-            /* Rounded corners using theme spacing for consistency */
+            backgroundColor: isUser
+              ? theme.colors.surface
+              : (isAssistantError ? errorBackgroundColor : "transparent"),
+            borderWidth: isAssistantError ? 1 : 0,
+            borderColor: isAssistantError ? errorColor : "transparent",
             borderRadius: theme.borderRadius.md,
-            /* Vertical padding for visual spacing inside the bubble */
             paddingVertical: 4,
-            /* Horizontal padding: User messages have more padding (8), AI messages minimal (2) */
-            paddingHorizontal: isUser ? 8 : 2,
+            paddingHorizontal: isUser || isAssistantError ? 8 : 2,
           }}
         >
           {/* ========== Content Rendering Section ========== */}
           {/* CustomMarkdown component handles rendering markdown content with syntax highlighting */}
-          <CustomMarkdown
-            content={normalizedContent}
-            isStreaming={isStreaming}
-            showLineNumbers={showCodeLineNumbers}
-            showCopyAll={!isStreaming && !isUser}
-            isUser={isUser}
-          />
+          {normalizedContent.length > 0 || !hasStructuredMedia ? (
+            <CustomMarkdown
+              content={normalizedContent}
+              isStreaming={isStreaming}
+              showLineNumbers={showCodeLineNumbers}
+              showCopyAll={!isStreaming && !isUser}
+              isUser={isUser}
+            />
+          ) : null}
+
+          {mediaImageParts.length > 0 ? (
+            <View className="mt-2">
+              {mediaImageParts.map((imagePart, index) => (
+                <View
+                  key={`${imagePart.uri}-${index}`}
+                  testID="message-bubble-image"
+                  className="mb-2 overflow-hidden"
+                  style={{
+                    borderRadius: theme.borderRadius.md,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border ?? theme.colors.surface,
+                  }}
+                >
+                  <Image
+                    source={{ uri: imagePart.uri }}
+                    style={{ width: 220, height: 160 }}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {fileParts.length > 0 ? (
+            <View className="mt-2">
+              {fileParts.map((filePart, index) => (
+                <View
+                  key={`${filePart.uri}-${index}`}
+                  testID="message-bubble-file"
+                  className="mb-2 px-3 py-2"
+                  style={{
+                    borderRadius: theme.borderRadius.md,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border ?? theme.colors.surface,
+                    backgroundColor: isUser
+                      ? theme.colors.glass ?? theme.colors.surface
+                      : theme.colors.surface,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 12,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {isVideoMediaType(filePart.mediaType) ? "Video attachment" : "File attachment"}
+                  </Text>
+                  <Text
+                    style={{
+                      color: theme.colors.textSecondary ?? theme.colors.text,
+                      fontSize: 11,
+                      marginTop: 2,
+                    }}
+                  >
+                    {filePart.filename ?? filePart.mediaType}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
       </View>
     );

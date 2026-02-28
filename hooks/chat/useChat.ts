@@ -40,7 +40,9 @@
 
 import { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import type { LanguageModel, ModelMessage } from "ai";
-import { ProviderId } from "@/types/provider.types";
+import * as FileSystem from "expo-file-system/legacy";
+
+import { type ProviderId, isVideoCapableModel } from "@/types/provider.types";
 import { getProviderModel } from "@/providers/provider-factory";
 import { getCachedModel } from "@/providers/provider-cache";
 import { type FallbackResult } from "@/providers/fallback-chain";
@@ -49,21 +51,263 @@ import { useChatState } from "@/hooks/useChatState";
 import { useTitleGeneration } from "./useTitleGeneration";
 import { useChatStreaming, type StreamingResult } from "./useChatStreaming";
 import { useStreamLifecycle } from "./useStreamLifecycle";
-import type { UseChatOptions, StreamState } from "@/types/chat.types";
+import type {
+    ChatAttachment,
+    ChatSendInput,
+    ChatSendPayload,
+    UseChatOptions,
+    StreamState,
+} from "@/types/chat.types";
 import {
     createIdempotencyKey,
     createIdempotencyRegistry,
     createSequenceGuard,
 } from "@/lib/concurrency";
+import { isDataUri, isLocalAssetUri, isVideoMediaType } from "@/lib/chat-attachments";
+import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
+import { getErrorFixes } from "@/lib/error-messages";
+import {
+    createErrorAnnotation,
+    withErrorAnnotation,
+} from "@/lib/chat-error-annotations";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
 
 interface RetryableOperation {
     operationKey: string;
-    content: string;
+    payload: ChatSendPayload;
+    messageSignature: string;
 }
 
+type UserMessage = Extract<ModelMessage, { role: "user" }>;
+type UserMessageContent = UserMessage["content"];
+
 const DEFAULT_PLACEHOLDER_TEXT = "...";
+
+const normalizePossibleFixes = (fixes: string[]): string[] => {
+    return fixes
+        .map((fix) => fix.trim())
+        .filter((fix) => fix.length > 0)
+        .slice(0, 3);
+};
+
+const getErrorMessageText = (error: unknown): string => {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    if (typeof error === "object" && error !== null && "message" in error) {
+        const message = (error as { message?: unknown }).message;
+        if (typeof message === "string" && message.length > 0) {
+            return message;
+        }
+    }
+
+    return String(error);
+};
+
+const formatAnnotatedErrorContent = (
+    title: string,
+    errorMessage: string,
+    fixes: string[],
+): string => {
+    const normalizedFixes = normalizePossibleFixes(fixes);
+    const lines = [`**${title}**`, "", errorMessage.trim()];
+
+    if (normalizedFixes.length > 0) {
+        lines.push(
+            "",
+            "**Possible fixes:**",
+            ...normalizedFixes.map((fix) => `- ${fix}`),
+        );
+    }
+
+    return lines.join("\n");
+};
+
+interface ResolvedSendPayload {
+    text: string;
+    attachments: ChatAttachment[];
+    usedOverrideText: boolean;
+}
+
+const serializeContentForSignature = (content: ModelMessage["content"]): string => {
+    if (typeof content === "string") {
+        return content;
+    }
+
+    try {
+        return JSON.stringify(content);
+    } catch {
+        return String(content);
+    }
+};
+
+const buildMessageSignature = (content: ModelMessage["content"]): string => {
+    return createIdempotencyKey("chat-message-signature", [
+        serializeContentForSignature(content),
+    ]);
+};
+
+const isSameMessageContent = (
+    left: ModelMessage["content"],
+    right: ModelMessage["content"],
+): boolean => {
+    return buildMessageSignature(left) === buildMessageSignature(right);
+};
+
+const normalizeAttachments = (attachments: ChatSendPayload["attachments"]): ChatAttachment[] => {
+    if (!Array.isArray(attachments)) {
+        return [];
+    }
+
+    return attachments.filter((attachment) => (
+        typeof attachment?.uri === "string"
+        && attachment.uri.length > 0
+        && typeof attachment.mediaType === "string"
+        && attachment.mediaType.length > 0
+    ));
+};
+
+const resolveSendPayload = (
+    input: ChatSendInput | undefined,
+    currentText: string,
+): ResolvedSendPayload => {
+    if (typeof input === "string") {
+        return {
+            text: input.trim(),
+            attachments: [],
+            usedOverrideText: true,
+        };
+    }
+
+    if (input && typeof input === "object") {
+        const rawText = typeof input.text === "string" ? input.text : currentText;
+        return {
+            text: rawText.trim(),
+            attachments: normalizeAttachments(input.attachments),
+            usedOverrideText: false,
+        };
+    }
+
+    return {
+        text: currentText.trim(),
+        attachments: [],
+        usedOverrideText: false,
+    };
+};
+
+const createUserMessageContent = (
+    payload: Pick<ResolvedSendPayload, "text" | "attachments">,
+): UserMessageContent => {
+    if (payload.attachments.length === 0) {
+        return payload.text;
+    }
+
+    const parts: Array<Record<string, unknown>> = [];
+
+    if (payload.text.length > 0) {
+        parts.push({
+            type: "text",
+            text: payload.text,
+        });
+    }
+
+    payload.attachments.forEach((attachment) => {
+        if (attachment.kind === "image") {
+            parts.push({
+                type: "image",
+                image: attachment.uri,
+                mediaType: attachment.mediaType,
+            });
+            return;
+        }
+
+        parts.push({
+            type: "file",
+            data: attachment.uri,
+            mediaType: attachment.mediaType,
+            filename: attachment.fileName,
+        });
+    });
+
+    return parts as unknown as UserMessageContent;
+};
+
+const hasSendableContent = (
+    payload: Pick<ResolvedSendPayload, "text" | "attachments">,
+): boolean => {
+    return payload.text.length > 0 || payload.attachments.length > 0;
+};
+
+const hasVideoAttachment = (attachments: ChatAttachment[]): boolean => {
+    return attachments.some((attachment) => (
+        attachment.kind === "video"
+        || isVideoMediaType(attachment.mediaType)
+    ));
+};
+
+const contentHasVideoPart = (content: ModelMessage["content"]): boolean => {
+    if (!Array.isArray(content)) {
+        return false;
+    }
+
+    return content.some((part) => {
+        if (!part || typeof part !== "object") {
+            return false;
+        }
+
+        const partRecord = part as Record<string, unknown>;
+        return partRecord.type === "file"
+            && typeof partRecord.mediaType === "string"
+            && isVideoMediaType(partRecord.mediaType);
+    });
+};
+
+const conversationHasVideoContent = (messages: ModelMessage[]): boolean => {
+    return messages.some((message) => (
+        message.role === "user" && contentHasVideoPart(message.content)
+    ));
+};
+
+const stripDataUriPrefix = (value: string): string => {
+    const marker = ";base64,";
+    const markerIndex = value.indexOf(marker);
+
+    if (markerIndex === -1) {
+        return value;
+    }
+
+    return value.slice(markerIndex + marker.length);
+};
+
+const messageNeedsPreparation = (message: ModelMessage): boolean => {
+    if (message.role !== "user" || !Array.isArray(message.content)) {
+        return false;
+    }
+
+    return message.content.some((part) => {
+        if (!part || typeof part !== "object") {
+            return false;
+        }
+
+        const partRecord = part as unknown as Record<string, unknown>;
+
+        if (partRecord.type === "image" && typeof partRecord.image === "string") {
+            return isDataUri(partRecord.image) || isLocalAssetUri(partRecord.image);
+        }
+
+        if (partRecord.type === "file" && typeof partRecord.data === "string") {
+            return isDataUri(partRecord.data) || isLocalAssetUri(partRecord.data);
+        }
+
+        return false;
+    });
+};
+
+const needsProviderMessagePreparation = (messages: ModelMessage[]): boolean => {
+    return messages.some(messageNeedsPreparation);
+};
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -98,8 +342,8 @@ export interface UseChatReturn {
     isStreaming: boolean;
     /** Current stream state for lifecycle tracking */
     streamState: StreamState;
-    /** Send a message to the AI (optionally override current text) */
-    sendMessage: (overrideText?: string) => Promise<void>;
+    /** Send a message to the AI (optionally with attachment payload) */
+    sendMessage: (input?: ChatSendInput) => Promise<void>;
     /** Cancel the current streaming response */
     cancel: () => void;
     /** Reset all chat state to initial values */
@@ -179,10 +423,10 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     // or legacy direct provider specification
     const effectiveProviderId = chatId 
         ? chatState.provider                    // Use unified chat state
-        : (legacyProviderId || "apple");       // Fallback to legacy or default
+        : (legacyProviderId || "ollama");      // Fallback to legacy or default
     const effectiveModelId = chatId 
-        ? chatState.model                      // Use unified chat state  
-        : (legacyModelId || "system-default"); // Fallback to legacy or default
+        ? chatState.model                       // Use unified chat state
+        : (legacyModelId || "gpt-oss:latest"); // Fallback to legacy or default
 
     // =============================================================================
     // CORE REACT STATE
@@ -220,11 +464,12 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     const failedProvidersRef = useRef<ProviderId[]>([]);     // Track failed providers for fallback
     
     // Retry and cancellation tracking
-    const lastUserMessageRef = useRef<string | null>(null); // Store last user message for retry
+    const lastUserMessageRef = useRef<ChatSendPayload | null>(null); // Store last user message for retry
     const [canRetry, setCanRetry] = useState<boolean>(false); // Whether retry is available
     const [errorMessage, setErrorMessage] = useState<string | null>(null); // Error message for display
     const canceledRef = useRef<boolean>(false);             // Track if streaming was canceled
     const messagesRef = useRef<ModelMessage[]>(initialMessages);
+    const attachmentDataCacheRef = useRef<Map<string, string>>(new Map());
     const sendSequenceGuardRef = useRef(createSequenceGuard(`chat-send-${chatId ?? "default"}`));
     const retryOperationRegistryRef = useRef(createIdempotencyRegistry<void>());
     const lastRetryableOperationRef = useRef<RetryableOperation | null>(null);
@@ -293,7 +538,10 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     // in the UI and database storage.
     
     const { title, setTitle, generateTitle } = useTitleGeneration(
-        messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' })),
+        messages.map(m => ({
+            role: m.role,
+            content: normalizeMessageContentForRender(m.content),
+        })),
         model,
         enableRetry,
         mergedRetryConfig
@@ -343,9 +591,14 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             setErrorMessage(error.message);
             setCanRetry(true);
             if (lastUserMessageRef.current) {
+                const messageContent = createUserMessageContent({
+                    text: lastUserMessageRef.current.text ?? "",
+                    attachments: normalizeAttachments(lastUserMessageRef.current.attachments),
+                });
                 lastRetryableOperationRef.current = {
                     operationKey: createIdempotencyKey("lifecycle-error", [chatId ?? "default"]),
-                    content: lastUserMessageRef.current,
+                    payload: lastUserMessageRef.current,
+                    messageSignature: buildMessageSignature(messageContent),
                 };
             }
 
@@ -415,6 +668,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         setIsUsingFallback(false);                // Clear fallback state
         failedProvidersRef.current = [];         // Clear failed providers list
         lastUserMessageRef.current = null;       // Clear retry message
+        attachmentDataCacheRef.current.clear();
         setCanRetry(false);                      // Disable retry capability
         setErrorMessage(null);                   // Clear error message
         lastRetryableOperationRef.current = null;
@@ -434,6 +688,78 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         setIsThinking(false);
         cancelStream(); // Use stream lifecycle cancel for comprehensive cancellation
     }, [cancelStream]);
+
+    const prepareMessagesForProvider = useCallback(async (
+        sourceMessages: ModelMessage[],
+    ): Promise<ModelMessage[]> => {
+        const readAttachmentAsBase64 = async (uri: string): Promise<string> => {
+            const cached = attachmentDataCacheRef.current.get(uri);
+            if (cached) {
+                return cached;
+            }
+
+            const base64 = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.Base64,
+            });
+
+            attachmentDataCacheRef.current.set(uri, base64);
+            return base64;
+        };
+
+        const preparePart = async (part: unknown): Promise<unknown> => {
+            if (!part || typeof part !== "object") {
+                return part;
+            }
+
+            const partRecord = part as Record<string, unknown>;
+
+            if (partRecord.type === "image" && typeof partRecord.image === "string") {
+                if (isDataUri(partRecord.image)) {
+                    return {
+                        ...partRecord,
+                        image: stripDataUriPrefix(partRecord.image),
+                    };
+                }
+
+                if (isLocalAssetUri(partRecord.image)) {
+                    return {
+                        ...partRecord,
+                        image: await readAttachmentAsBase64(partRecord.image),
+                    };
+                }
+            }
+
+            if (partRecord.type === "file" && typeof partRecord.data === "string") {
+                if (isDataUri(partRecord.data)) {
+                    return {
+                        ...partRecord,
+                        data: stripDataUriPrefix(partRecord.data),
+                    };
+                }
+
+                if (isLocalAssetUri(partRecord.data)) {
+                    return {
+                        ...partRecord,
+                        data: await readAttachmentAsBase64(partRecord.data),
+                    };
+                }
+            }
+
+            return part;
+        };
+
+        return Promise.all(sourceMessages.map(async (message): Promise<ModelMessage> => {
+            if (message.role !== "user" || !Array.isArray(message.content)) {
+                return message;
+            }
+
+            const preparedContent = await Promise.all(message.content.map(preparePart));
+            return {
+                ...message,
+                content: preparedContent as unknown as UserMessageContent,
+            };
+        }));
+    }, []);
 
         // =============================================================================
     // CORE MESSAGE SENDING LOGIC
@@ -459,21 +785,63 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
      * 5. Completion callbacks
      */
     const sendMessage = useCallback(
-        async (overrideText?: string) => {
+        async (input?: ChatSendInput) => {
             // ────────────────────────────────────────────────────────────────
             // INPUT VALIDATION AND PREPARATION
             // ────────────────────────────────────────────────────────────────
-            const rawValue: unknown = overrideText ?? (text as unknown);
-            const content = typeof rawValue === "string" ? rawValue.trim() : "";
+            const resolvedPayload = resolveSendPayload(input, text);
             
             // Exit early if no valid content to send
-            if (!content) return;
+            if (!hasSendableContent(resolvedPayload)) {
+                return;
+            }
+
+            const requestIncludesVideo = hasVideoAttachment(resolvedPayload.attachments)
+                || conversationHasVideoContent(messagesRef.current);
+
+            if (requestIncludesVideo && !isVideoCapableModel(activeProvider, activeModel)) {
+                const compatibilityError = new Error(
+                    "Video messages require OpenRouter with a video-capable model (for example google/gemini-2.5-flash or google/gemini-2.5-pro). Switch the model in Settings and resend.",
+                );
+                const compatibilityFixes = [
+                    "Switch to OpenRouter with a video-capable model such as google/gemini-2.5-flash.",
+                    "Open Settings and confirm the selected model supports video input.",
+                    "Remove the video attachment and resend as text-only.",
+                ];
+                const compatibilityMessage = withErrorAnnotation(
+                    {
+                        role: "assistant",
+                        content: formatAnnotatedErrorContent(
+                            "Video Not Supported",
+                            compatibilityError.message,
+                            compatibilityFixes,
+                        ),
+                    },
+                    createErrorAnnotation({
+                        error: compatibilityError.message,
+                        fixes: compatibilityFixes,
+                        source: "compatibility",
+                        provider: activeProvider,
+                    }),
+                );
+
+                setMessages((prev) => [...prev, compatibilityMessage]);
+                setThinkingOutput((prev) => [...prev, ""]);
+
+                setErrorMessage(compatibilityError.message);
+                setCanRetry(false);
+                onError?.(compatibilityError);
+                return;
+            }
+
+            const userMessageContent = createUserMessageContent(resolvedPayload);
+            const messageSignature = buildMessageSignature(userMessageContent);
 
             const sendToken = sendSequenceGuardRef.current.next();
             const sendOperationKey = createIdempotencyKey("chat-send", [
                 chatId ?? "default",
                 sendToken.sequence,
-                content,
+                messageSignature,
             ]);
 
             const finalizeCurrentSendState = (): void => {
@@ -493,7 +861,11 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             canceledRef.current = false;            // Clear cancellation flag
             setCanRetry(false);                     // Disable retry until needed
             lastRetryableOperationRef.current = null;
-            lastUserMessageRef.current = content;   // Store for retry capability
+            const retryPayload: ChatSendPayload = {
+                text: resolvedPayload.text,
+                attachments: [...resolvedPayload.attachments],
+            };
+            lastUserMessageRef.current = retryPayload; // Store for retry capability
             
             // Initialize stream lifecycle management
             const streamController = initializeStream();
@@ -507,13 +879,16 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // ────────────────────────────────────────────────────────────────
             // MESSAGE HISTORY MANAGEMENT
             // ────────────────────────────────────────────────────────────────
-            const userMessage: ModelMessage = { role: "user", content };
+            const userMessage: ModelMessage = {
+                role: "user",
+                content: userMessageContent,
+            };
             const updatedMessages = [...messagesRef.current, userMessage];
             setMessages(updatedMessages);
             setThinkingOutput((prev) => [...prev, ""]);
 
             // Clear input field if we're using the current text (not override)
-            if (overrideText === undefined) {
+            if (!resolvedPayload.usedOverrideText) {
                 setText("");
             }
 
@@ -531,6 +906,59 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             let attemptProvider = activeProvider;
             let attemptModel = activeModel;
             let attemptResolvedModel = resolveModelForSelection(attemptProvider, attemptModel);
+            let providerMessages = updatedMessages;
+
+            try {
+                if (needsProviderMessagePreparation(updatedMessages)) {
+                    providerMessages = await prepareMessagesForProvider(updatedMessages);
+                }
+            } catch (error) {
+                const attachmentError = error instanceof Error
+                    ? error
+                    : new Error("Failed to prepare one or more attachments.");
+                const attachmentErrorMessage = getErrorMessageText(attachmentError);
+                const attachmentFixes = normalizePossibleFixes([
+                    ...getErrorFixes(attachmentError, attemptProvider),
+                    "Try selecting the attachment again.",
+                    "Make sure the file is still available on this device.",
+                ]);
+
+                markError(attachmentError);
+                setErrorMessage(attachmentError.message);
+                setCanRetry(true);
+                lastRetryableOperationRef.current = {
+                    operationKey: sendOperationKey,
+                    payload: retryPayload,
+                    messageSignature,
+                };
+                setMessages((prev) => {
+                    const next = [...prev];
+                    next[assistantIndex] = withErrorAnnotation(
+                        {
+                            role: "assistant",
+                            content: formatAnnotatedErrorContent(
+                                "Attachment Error",
+                                attachmentErrorMessage,
+                                attachmentFixes,
+                            ),
+                        },
+                        createErrorAnnotation({
+                            error: attachmentErrorMessage,
+                            fixes: attachmentFixes,
+                            source: "attachment",
+                            provider: attemptProvider,
+                        }),
+                    );
+                    return next;
+                });
+                onError?.(attachmentError);
+                finalizeCurrentSendState();
+                return;
+            }
+
+            if (!canMutateForCurrentSend()) {
+                return;
+            }
 
             // ────────────────────────────────────────────────────────────────
             // MODEL VALIDATION
@@ -585,7 +1013,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                     } as FallbackResult,
                     enableRetry,
                     retryConfig: mergedRetryConfig,
-                    enableFallback,
+                    enableFallback: requestIncludesVideo ? false : enableFallback,
                     activeProvider: attemptProvider,
                     effectiveProviderId: attemptProvider,
                     thinkingLevel,
@@ -626,7 +1054,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                             setCanRetry(true);
                             lastRetryableOperationRef.current = {
                                 operationKey: sendOperationKey,
-                                content,
+                                payload: retryPayload,
+                                messageSignature,
                             };
                             onError?.(error);
                         } else {
@@ -636,7 +1065,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                             setCanRetry(true);
                             lastRetryableOperationRef.current = {
                                 operationKey: sendOperationKey,
-                                content,
+                                payload: retryPayload,
+                                messageSignature,
                             };
                             onError?.(wrappedError);
                         }
@@ -660,7 +1090,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 // lifecycle onError callback above.
                 const result: StreamingResult = await executeStreaming(
                     streamingOptions,
-                    updatedMessages,
+                    providerMessages,
                     setMessages,
                     assistantIndex,
                     failedProvidersRef
@@ -670,7 +1100,13 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                     return;
                 }
 
-                if (result.shouldRetryWithFallback && result.nextProvider && result.nextModel && !canceledRef.current) {
+                if (
+                    !requestIncludesVideo
+                    && result.shouldRetryWithFallback
+                    && result.nextProvider
+                    && result.nextModel
+                    && !canceledRef.current
+                ) {
                     const fallbackModel = resolveModelForSelection(result.nextProvider, result.nextModel);
                     if (!fallbackModel) {
                         break;
@@ -724,6 +1160,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             thinkingLevel,
             onThinkingChunk,
             resolveModelForSelection,
+            prepareMessagesForProvider,
         ],
     );
 
@@ -750,9 +1187,14 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         // Guard against invalid retry attempts
         if (!lastUserMessageRef.current || !canRetry || !retryableOperation) return;
 
+        const retryUserContent = createUserMessageContent({
+            text: retryableOperation.payload.text?.trim() ?? "",
+            attachments: normalizeAttachments(retryableOperation.payload.attachments),
+        });
+
         const retryOperationKey = createIdempotencyKey("chat-retry", [
             retryableOperation.operationKey,
-            retryableOperation.content,
+            retryableOperation.messageSignature,
         ]);
 
         await retryOperationRegistryRef.current.run(retryOperationKey, async () => {
@@ -769,8 +1211,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             if (
                 lastMessage
                 && lastMessage.role === "user"
-                && typeof lastMessage.content === "string"
-                && lastMessage.content === retryableOperation.content
+                && isSameMessageContent(lastMessage.content, retryUserContent)
             ) {
                 nextMessages = nextMessages.slice(0, -1);
                 removedCount += 1;
@@ -785,7 +1226,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             setErrorMessage(null);
             lastRetryableOperationRef.current = null;
 
-            await sendMessage(retryableOperation.content);
+            await sendMessage(retryableOperation.payload);
         });
     }, [canRetry, sendMessage]);
 

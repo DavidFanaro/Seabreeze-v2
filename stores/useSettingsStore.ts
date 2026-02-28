@@ -6,7 +6,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import * as SecureStore from "expo-secure-store";
+import { safeSecureStore } from "@/lib/safe-secure-store";
 
 import type { ThinkingLevel } from "@/types/chat.types";
 import {
@@ -37,7 +37,7 @@ const secureStorage = {
    */
   getItem: async (name: string): Promise<string | null> => {
     try {
-      return await SecureStore.getItemAsync(name);
+      return await safeSecureStore.getItemAsync(name);
     } catch {
       // Silent fail on security exceptions (access denied, etc.)
       return null;
@@ -51,7 +51,7 @@ const secureStorage = {
    */
   setItem: async (name: string, value: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(name, value);
+      await safeSecureStore.setItemAsync(name, value);
     } catch (error) {
       // Silent fail on security exceptions
       // Log could be added here for debugging in development
@@ -64,7 +64,7 @@ const secureStorage = {
    */
   removeItem: async (name: string): Promise<void> => {
     try {
-      await SecureStore.deleteItemAsync(name);
+      await safeSecureStore.deleteItemAsync(name);
     } catch (error) {
       // Silent fail on security exceptions
     }

@@ -251,16 +251,30 @@ export function formatErrorForChat(
   currentProvider?: ProviderId
 ): string {
   const friendly = getHumanReadableError(error, currentProvider);
-  
   let message = `**${friendly.title}**\n\n${friendly.message}`;
-  
-  // Add suggestion based on severity
-  if (friendly.severity === "warning" && friendly.actions.length > 0) {
-    const primaryAction = friendly.actions[0];
-    message += `\n\n*Suggestion: ${primaryAction.description}*`;
+
+  const fixes = friendly.actions
+    .map((action) => action.description.trim())
+    .filter((description) => description.length > 0)
+    .slice(0, 3);
+
+  if (fixes.length > 0) {
+    const fixLines = fixes.map((fix) => `- ${fix}`).join("\n");
+    message += `\n\n**Possible fixes:**\n${fixLines}`;
   }
-  
+
   return message;
+}
+
+export function getErrorFixes(
+  error: unknown,
+  currentProvider?: ProviderId
+): string[] {
+  const friendly = getHumanReadableError(error, currentProvider);
+  return friendly.actions
+    .map((action) => action.description.trim())
+    .filter((description) => description.length > 0)
+    .slice(0, 3);
 }
 
 /**

@@ -41,7 +41,24 @@ export const OPENROUTER_MODELS: string[] = [
   "mistralai/mistral-medium-3",
 ];
 
+export const OPENROUTER_VIDEO_MODELS: string[] = [
+  "google/gemini-2.5-pro",
+  "google/gemini-2.5-flash",
+  "google/gemini-1.5-pro",
+  "google/gemini-1.5-flash",
+  "google/gemini-2.0-flash-001",
+  "google/gemini-2.5-flash-lite",
+  "google/gemini-2.5-flash-lite-preview-09-2025",
+  "google/gemini-3-flash-preview",
+  "google/gemini-3-pro-preview",
+  "google/gemini-3.1-pro-preview",
+  "qwen/qwen3.5-plus-02-15",
+  "qwen/qwen3.5-397b-a17b",
+  "openrouter/auto",
+];
+
 export const OLLAMA_MODELS: string[] = [
+  "gpt-oss:latest",
   "llama4",
   "llama3.3",
   "llama3.2",
@@ -140,6 +157,24 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability> = {
     supportsStreaming: true,
     supportsSystemMessages: true,
   },
+};
+
+const modelMatchesCandidate = (modelId: string, candidate: string): boolean => {
+  return modelId === candidate || modelId.startsWith(`${candidate}:`);
+};
+
+export const isVideoCapableModel = (
+  providerId: ProviderId,
+  modelId: string,
+): boolean => {
+  if (providerId !== "openrouter" || !modelId) {
+    return false;
+  }
+
+  const normalizedModelId = modelId.trim().toLowerCase();
+  return OPENROUTER_VIDEO_MODELS.some((candidate) =>
+    modelMatchesCandidate(normalizedModelId, candidate.toLowerCase()),
+  );
 };
 
 const OPENAI_REASONING_MODEL_PREFIXES: string[] = [

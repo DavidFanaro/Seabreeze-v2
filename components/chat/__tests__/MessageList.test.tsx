@@ -53,10 +53,48 @@ jest.mock("../MessageBubble", () => {
       content,
       isUser,
       isStreaming,
+      isError,
     }: any) {
+      const renderContent = (): string => {
+        if (typeof content === "string") {
+          return content;
+        }
+
+        if (Array.isArray(content)) {
+          return content
+            .map((part) => {
+              if (typeof part === "string") {
+                return part;
+              }
+
+              if (!part || typeof part !== "object") {
+                return "";
+              }
+
+              if (typeof (part as { text?: unknown }).text === "string") {
+                return (part as { text: string }).text;
+              }
+
+              if ((part as { type?: unknown }).type === "image") {
+                return "[image]";
+              }
+
+              if ((part as { type?: unknown }).type === "file") {
+                return "[file]";
+              }
+
+              return "";
+            })
+            .join("");
+        }
+
+        return String(content ?? "");
+      };
+
       return (
         <Text testID={`message-${isUser ? "user" : "ai"}`}>
-          {content}
+          {renderContent()}
+          {isError && " (error)"}
           {isStreaming && " (streaming)"}
         </Text>
       );
@@ -242,6 +280,29 @@ describe("MessageList Component", () => {
     );
 
     expect(getByTestId("message-ai")).toBeDefined();
+  });
+
+  it("marks annotated assistant errors as error bubbles", () => {
+    const annotatedAssistantMessages: ModelMessage[] = [
+      {
+        role: "assistant",
+        content: "Generation failed",
+        annotations: [
+          {
+            type: "error",
+            error: "Provider timeout",
+            fixes: ["Retry"],
+            source: "streaming",
+          },
+        ],
+      } as unknown as ModelMessage,
+    ];
+
+    const { getByText } = render(
+      <MessageList messages={annotatedAssistantMessages} isStreaming={false} />
+    );
+
+    expect(getByText("Generation failed (error)")).toBeDefined();
   });
 
   /**

@@ -9,9 +9,46 @@ import type { ProviderId } from "./provider.types";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
 
+export type ChatAttachmentKind = "image" | "video";
+
+export interface ChatAttachment {
+  id: string;
+  uri: string;
+  kind: ChatAttachmentKind;
+  mediaType: string;
+  fileName?: string;
+  fileSize?: number;
+  width?: number;
+  height?: number;
+  durationMs?: number | null;
+}
+
+export interface ChatSendPayload {
+  text?: string;
+  attachments?: ChatAttachment[];
+}
+
+export type ChatSendInput = string | ChatSendPayload;
+
 export type StreamState = "idle" | "streaming" | "completing" | "completed" | "error" | "cancelled";
 
 export type ThinkingLevel = "low" | "medium" | "high";
+
+export type ChatErrorAnnotationSource = "streaming" | "attachment" | "compatibility";
+
+export interface ChatErrorAnnotation {
+  type: "error";
+  error: string;
+  fixes: string[];
+  source: ChatErrorAnnotationSource;
+  provider?: ProviderId;
+}
+
+export type ChatMessageAnnotation = ChatErrorAnnotation;
+
+export type AnnotatedModelMessage = ModelMessage & {
+  annotations?: ChatMessageAnnotation[];
+};
 
 export interface UseChatOptions {
   initialMessages?: ModelMessage[];
