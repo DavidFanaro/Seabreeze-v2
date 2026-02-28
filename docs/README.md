@@ -15,7 +15,7 @@ This documentation is organized in two layers:
 |-------|-----------|----------------|
 | Architecture | `docs/architecture/README.md` | `docs/architecture/overview.md`, `docs/architecture/codebase-map.md` |
 | UI Components | `docs/ui/README.md` | `docs/ui/*.md` |
-| State Management | `docs/state/README.md` | `docs/state/*.md` |
+| State Management | `docs/state/README.md` | `docs/state/state-model.md`, `docs/state/state-lifecycle-and-data-flow.md` |
 | Hooks | `docs/hooks/README.md` | `docs/hooks/*.md` |
 | Providers | `docs/providers/README.md` | `docs/providers/*.md` |
 | Contributing | `docs/contributing/README.md` | `docs/contributing/*.md` |

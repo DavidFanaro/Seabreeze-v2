@@ -47,3 +47,21 @@ after each iteration and it's included in prompts for context.
   - Database Gate pattern ensures migrations run before any screen renders
   - Key UI states: streamState (idle→completing→streaming→completed/error), saveStatus (idle→saving→saved/error)
   - Auto-title generation triggers after first assistant message completes with max 3 attempts
+
+---
+
+## 2026-02-28 - US-004
+- Created `docs/state/state-model.md` covering state boundaries, ownership, and transition rules
+- Created `docs/state/state-lifecycle-and-data-flow.md` covering runtime lifecycle and data/control flow
+- Updated `docs/state/README.md` and `docs/README.md` to cross-link the new state docs
+- Verified inline comments already exist in state modules (stores have extensive JSDoc comments)
+- Lint passes with only pre-existing warnings, TypeScript passes
+- Tests: 57/62 pass (failures are pre-existing mocking issues unrelated to documentation)
+- **Learnings:**
+  - State domains: Auth (API keys), Provider (models), Settings (preferences)
+  - Zustand stores with SecureStore persistence, hydration via writeVersion conflict resolution
+  - Store dependencies: chatOverride depends on provider; auth/provider/settings are independent
+  - Version conflict: runtime mutations always win over stale persisted data (writeVersion comparison)
+  - Provider selection auto-fallbacks to first visible model when current is unavailable
+  - Ollama-specific: custom models overlapping fetched models are automatically removed
+

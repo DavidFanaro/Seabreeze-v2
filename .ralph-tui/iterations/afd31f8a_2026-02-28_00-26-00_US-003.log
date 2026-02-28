@@ -1,0 +1,75 @@
+# Iteration 3 Log
+
+## Metadata
+
+- **Task ID**: US-003
+- **Task Title**: Document UI layout, navigation, and feature flows
+- **Description**: As a contributor, I want UI layout and feature flow documentation so that I can understand rendering paths and user interactions without reverse-engineering screens.
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-02-28T05:26:00.820Z
+- **Ended At**: 2026-02-28T05:31:43.497Z
+- **Duration**: 5m 42s
+- **Agent**: opencode
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by checking the progress file and understanding the codebase structure.
+[94m[read][0m
+[94m[glob][0m pattern: [96mapp/**/*.tsx[0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+Let me also check the settings screens and existing documentation structure.
+[94m[read][0m
+[94m[read][0m
+[94m[glob][0m pattern: [96mdocs/**/*.md[0m
+[94m[read][0m
+[94m[read][0m
+[94m[glob][0m pattern: [96mcomponents/**/*.tsx[0m
+Now I'll create the required documentation files. Let me start with the layout and navigation documentation, then feature flows.
+[94m[write][0m "# Layout and Navigation
+
+This document covers the screen structure, navigation behavior, and layout boundaries in Seabreeze.
+
+## Screen Structure
+
+Seabreeze uses **Expo Router** with a Stack-based nav... (7195 chars)"
+[94m[write][0m "# Feature Flows
+
+This document covers core user journeys and UI state transitions in Seabreeze.
+
+## Core User Journeys
+
+### 1. Creating a New Chat
+
+**Flow:**
+```
+Home Screen → Tap "+" Button → Chat Sc... (6415 chars)"
+[94m[edit][0m
+Now let me add inline comments to key UI modules. Let me check the components that need clearer intent documentation.
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+Now let me run lint and typecheck to verify everything passes:
+[94m[bash][0m Run ESLint on the project $ npm run lint
+[94m[bash][0m Run TypeScript typecheck $ npx tsc --noEmit
+Now let me update the progress file:
+[94m[read][0m
+[94m[edit][0m
+[94m[bash][0m Run relevant UI tests $ npm test -- --testPathPattern="app/__tests__|components/chat/__tests__" --passWithNoTests 2>&1 | hea...
+[94m[bash][0m List UI documentation files $ ls -la docs/ui/
+[94m[bash][0m Check git status for changes $ git status
+All acceptance criteria have been verified:
+- ✅ Created `docs/ui/layout-and-navigation.md` covering screen structure, route/navigation behavior, and layout boundaries
+- ✅ Created `docs/ui/feature-flows.md` covering core user journeys and UI state transitions
+- ✅ Updated `docs/ui/README.md` to cross-link the new docs with architecture docs
+- ✅ Verified inline comments already exist in UI-focused modules (ChatListItem, MessageList, MessageInput, ProviderSelector have excellent documentation)
+- ✅ npm run lint passes (only warnings, no errors)
+- ✅ npx tsc --noEmit passes
+
+Note: The test failure is a pre-existing issue in the test file (`app/__tests__/index.test.tsx` line 41 uses `React.Fragment` without properly importing React in the mock factory - unrelated to my documentation changes).
+
+<promise>COMPLETE</promise>
