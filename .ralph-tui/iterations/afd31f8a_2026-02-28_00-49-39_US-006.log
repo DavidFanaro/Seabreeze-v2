@@ -1,0 +1,95 @@
+# Iteration 6 Log
+
+## Metadata
+
+- **Task ID**: US-006
+- **Task Title**: Document provider architecture and extension process
+- **Description**: As a contributor, I want a complete provider extension guide so that I can add local and remote providers safely.
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-02-28T05:49:39.444Z
+- **Ended At**: 2026-02-28T06:00:01.731Z
+- **Duration**: 10m 22s
+- **Agent**: opencode
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by checking the progress file and understanding the codebase structure for the provider architecture documentation.
+[94m[read][0m
+[94m[glob][0m pattern: [96mdocs/**/*[0m
+[94m[read][0m
+[94m[glob][0m pattern: [96mapp/providers/**/*[0m
+[94m[grep][0m pattern: [96mprovider|Provider[0m
+[94m[glob][0m pattern: [96m**/*provider*.ts[0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+Now I have a complete understanding of the provider architecture. Let me create the required documentation files.
+[94m[todowrite][0m
+[94m[write][0m "# Provider Architecture
+
+This document covers the internal architecture of Seabreeze's AI provider system and the extension boundaries for adding new providers.
+
+## Purpose
+
+Seabreeze supports multipl... (7401 chars)"
+[94m[todowrite][0m
+[94m[write][0m "# Adding a Provider
+
+This guide provides step-by-step instructions for adding a new AI provider to Seabreeze.
+
+## Overview
+
+Adding a new provider involves modifications across four key areas:
+
+1. **Ty... (10632 chars)"
+[94m[todowrite][0m
+[94m[write][0m "# Provider Validation and Troubleshooting
+
+This guide covers validation procedures, smoke testing, fallback behavior, and common failure modes for AI providers.
+
+## Validation Checklist
+
+Before a prov... (8842 chars)"
+[94m[todowrite][0m
+[94m[edit][0m
+Now I need to verify the docs/README.md already has the providers entry. Let me update it to ensure it properly links to the new docs.
+[94m[edit][0m
+[94m[todowrite][0m
+[94m[bash][0m Run ESLint to check for errors $ npm run lint
+[94m[bash][0m Run TypeScript typecheck $ npx tsc --noEmit
+[94m[bash][0m Run provider-related tests $ npm test -- --testPathPattern="providers" 2>&1
+[94m[todowrite][0m
+[94m[read][0m
+[94m[edit][0m
+[94m[read][0m
+[94m[read][0m
+[94m[edit][0m
+[94m[read][0m
+[94m[prune][0m
+[94m[glob][0m pattern: [96mdocs/providers/*.md[0m
+[94m[todowrite][0m
+<promise>COMPLETE</promise>
+
+## Summary
+
+Successfully completed US-006 - Document provider architecture and extension process:
+
+**Files Created:**
+- `docs/providers/provider-architecture.md` - Covers provider internals, file map, flow diagrams, extension boundaries, and gotchas
+- `docs/providers/adding-a-provider.md` - Step-by-step guide with interface contracts, required files, registration points for both local (URL-based) and remote (API key-based) providers
+- `docs/providers/provider-validation-and-troubleshooting.md` - Validation checklist, smoke test path, fallback behavior, error categories, and common failure modes
+
+**Files Updated:**
+- `docs/providers/README.md` - Cross-linked to new docs
+- `docs/README.md` - Linked provider docs in index table
+
+**Verification:**
+- `npm run lint` passes
+- `npx tsc --noEmit` passes  
+- Provider tests: 7/7 pass

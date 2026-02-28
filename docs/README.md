@@ -18,7 +18,7 @@ This documentation is organized in two layers:
 | State Management | `docs/state/README.md` | `docs/state/state-model.md`, `docs/state/state-lifecycle-and-data-flow.md` |
 | Hooks | `docs/hooks/README.md` | `docs/hooks/*.md` |
 | Providers (AI) | `docs/providers/README.md` | `docs/providers/provider-architecture.md`, `docs/providers/adding-a-provider.md`, `docs/providers/provider-validation-and-troubleshooting.md` |
-| Contributing | `docs/contributing/README.md` | `docs/contributing/*.md` |
+| Contributing | `docs/contributing/README.md` | `docs/contributing/dev-setup-and-workflow.md`, `docs/contributing/lint-typecheck-test-guide.md` |
 
 ## Quick Links
 

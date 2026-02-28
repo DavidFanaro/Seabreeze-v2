@@ -1,10 +1,11 @@
 # Contributing to Seabreeze
 
-Thank you for your interest in contributing!
+Thank you for your interested in contributing!
 
-## Development Setup
+## Getting Started
 
-See the main [README.md](../../README.md) for setup instructions.
+- [Developer Setup and Workflow](./dev-setup-and-workflow.md) - Setup and day-to-day contribution workflow
+- [Lint, Typecheck, and Test Guide](./lint-typecheck-test-guide.md) - Quality checks and testing strategies
 
 ## Code Conventions
 
@@ -23,3 +24,5 @@ See the main [README.md](../../README.md) for setup instructions.
 
 - [Architecture](../architecture/README.md)
 - [UI Components](../ui/README.md)
+- [Hooks](../hooks/README.md)
+- [Providers](../providers/README.md)

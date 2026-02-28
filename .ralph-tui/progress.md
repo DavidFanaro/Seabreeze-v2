@@ -100,6 +100,20 @@ after each iteration and it's included in prompts for context.
   - Stream lifecycle state machine: idle→streaming→completing→completed/error/cancelled with timeout protection
   - Checkpoint saves every 15s + 10s intervals during long streams
   - Provider fallback chain: Apple → OpenAI → OpenRouter → Ollama
-  - Title generation: version tracking prevents stale generations overwriting manual titles
 ---
+
+## 2026-02-28 - US-007
+- Created `docs/contributing/dev-setup-and-workflow.md` with complete setup instructions (clone, install, env config, database setup, iOS pods), day-to-day workflow (branch creation → make changes → quality checks → commit → PR), project structure overview, key conventions (provider hierarchy, stream lifecycle, fallback chain), and common tasks (adding screens, hooks, database changes)
+- Created `docs/contributing/lint-typecheck-test-guide.md` with quality check commands, targeted test execution strategies by area (providers/hooks/components/db/stores), review expectations checklist, phase labels and reviewer responsibilities, and coverage matrix process for tracking reviewed files, updated docs, and comments
+- Updated `docs/contributing/README.md` to link to the new guides
+- Updated `docs/README.md` navigation table to include new contributing docs
+- npm run lint passes (12 pre-existing warnings, 0 errors)
+- npx tsc --noEmit passes
+- **Learnings:**
+  - Commands: npm run lint, npx tsc --noEmit, npm test, npx jest path/to/test.tsx, npx jest -t "pattern"
+  - Test areas: providers, hooks, components, db, stores, integration
+  - Pre-existing test warnings: require() imports in test files, unused imports in test files
+  - Documentation coverage matrix tracks files reviewed, docs updated, and comments added
+  - Reviewer responsibilities: code correctness, type safety, test coverage for code; accuracy, cross-links, terminology for docs; "why" not "what" for comments
+
 
