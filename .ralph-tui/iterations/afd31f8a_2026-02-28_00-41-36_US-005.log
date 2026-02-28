@@ -1,0 +1,57 @@
+# Iteration 5 Log
+
+## Metadata
+
+- **Task ID**: US-005
+- **Task Title**: Build hooks catalog and hook implementation guide
+- **Description**: As a contributor, I want a hooks catalog and gotchas guide so that I can understand hook contracts, side effects, and safe extension patterns.
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-02-28T05:41:36.222Z
+- **Ended At**: 2026-02-28T05:49:38.258Z
+- **Duration**: 8m 2s
+- **Agent**: opencode
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+[94m[read][0m
+[94m[glob][0m pattern: [96m**/hooks/**/*.{ts,tsx}[0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+[94m[distill][0m
+[94m[read][0m
+[94m[write][0m "# Hooks Catalog
+
+This document catalogs each major custom hook in Seabreeze with purpose, inputs/outputs, side effects, and pitfalls.
+
+## Purpose
+
+The hooks catalog provides a comprehensive reference ... (14770 chars)"
+[94m[write][0m "# Hook Patterns and Gotchas
+
+This guide documents recommended patterns and anti-patterns for working with Seabreeze's custom hooks.
+
+## Purpose
+
+Provide actionable guidance for contributors extending ... (9189 chars)"
+[94m[edit][0m
+[94m[bash][0m Run ESLint to check code $ npm run lint
+[94m[bash][0m Run TypeScript typecheck $ npx tsc --noEmit
+[94m[bash][0m Run tests related to hooks $ npm test -- --testPathPattern="hooks" --passWithNoTests
+[94m[read][0m
+[94m[edit][0m
+[94m[edit][0m
+[94m[bash][0m List hook docs to verify files $ ls -la docs/hooks/
+[94m[read][0m
+[94m[prune][0m
+<promise>COMPLETE</promise>

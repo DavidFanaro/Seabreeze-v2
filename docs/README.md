@@ -17,7 +17,7 @@ This documentation is organized in two layers:
 | UI Components | `docs/ui/README.md` | `docs/ui/*.md` |
 | State Management | `docs/state/README.md` | `docs/state/state-model.md`, `docs/state/state-lifecycle-and-data-flow.md` |
 | Hooks | `docs/hooks/README.md` | `docs/hooks/*.md` |
-| Providers | `docs/providers/README.md` | `docs/providers/*.md` |
+| Providers (AI) | `docs/providers/README.md` | `docs/providers/provider-architecture.md`, `docs/providers/adding-a-provider.md`, `docs/providers/provider-validation-and-troubleshooting.md` |
 | Contributing | `docs/contributing/README.md` | `docs/contributing/*.md` |
 
 ## Quick Links
