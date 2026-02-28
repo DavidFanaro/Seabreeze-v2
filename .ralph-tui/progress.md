@@ -116,4 +116,21 @@ after each iteration and it's included in prompts for context.
   - Documentation coverage matrix tracks files reviewed, docs updated, and comments added
   - Reviewer responsibilities: code correctness, type safety, test coverage for code; accuracy, cross-links, terminology for docs; "why" not "what" for comments
 
+---
+
+## 2026-02-28 - US-008
+- Created `docs/db/README.md` and `docs/db/database-architecture.md` with schema design, migration strategy, persistence patterns, file map, flow diagrams, examples, gotchas, and change guide
+- Created `docs/lib/README.md` and `docs/lib/utilities-deep-dive.md` covering concurrency primitives, persistence coordination, security utilities, all file mappings, extension points, gotchas, and change guide
+- Updated `docs/README.md` navigation table and quick links to include new Database and Utilities sections
+- Added inline comments to lib/chat-title.ts, lib/constants.ts, and lib/safe-secure-store.ts to improve documentation coverage
+- npm run lint passes (12 pre-existing warnings, 0 errors)
+- npx tsc --noEmit passes
+- **Learnings:**
+  - Database uses Drizzle ORM with SQLite via expo-sqlite for local chat persistence
+  - Single `chat` table with JSON columns for messages, thinking output, and provider metadata
+  - Queue coordination via chat-persistence-coordinator ensures ordered saves/deletes
+  - Softlock watchdog detects stuck operations (>8s timeout)
+  - lib/ folder contains cross-cutting utilities: concurrency primitives, attachment handling, content parsing, secure storage, device capabilities
+  - Constants grouped by domain (LAYOUT, CACHE) with `as const` for type safety
+  - Fallback storage (in-memory Map) when SecureStore unavailable
 

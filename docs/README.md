@@ -18,6 +18,8 @@ This documentation is organized in two layers:
 | State Management | `docs/state/README.md` | `docs/state/state-model.md`, `docs/state/state-lifecycle-and-data-flow.md` |
 | Hooks | `docs/hooks/README.md` | `docs/hooks/*.md` |
 | Providers (AI) | `docs/providers/README.md` | `docs/providers/provider-architecture.md`, `docs/providers/adding-a-provider.md`, `docs/providers/provider-validation-and-troubleshooting.md` |
+| Database | `docs/db/README.md` | `docs/db/database-architecture.md` |
+| Utilities | `docs/lib/README.md` | `docs/lib/utilities-deep-dive.md` |
 | Contributing | `docs/contributing/README.md` | `docs/contributing/dev-setup-and-workflow.md`, `docs/contributing/lint-typecheck-test-guide.md` |
 
 ## Quick Links
@@ -27,6 +29,8 @@ This documentation is organized in two layers:
 - [State Management](./state/README.md)
 - [Custom Hooks](./hooks/README.md)
 - [Providers](./providers/README.md)
+- [Database](./db/README.md)
+- [Utilities](./lib/README.md)
 - [Contributing Guide](./contributing/README.md)
 
 ## Getting Started

@@ -1,13 +1,26 @@
+/**
+ * @file safe-secure-store.ts
+ * @purpose SecureStore wrapper with fallback for development/testing
+ * @connects-to useAuthStore, provider credentials storage
+ */
+
+/** Minimal interface for expo-secure-store module */
 type SecureStoreModule = {
   getItemAsync: (key: string) => Promise<string | null>;
   setItemAsync: (key: string, value: string) => Promise<void>;
   deleteItemAsync: (key: string) => Promise<void>;
 };
 
+/** Fallback in-memory storage when SecureStore unavailable */
 const fallbackStore = new Map<string, string>();
 
+/** Cached promise for lazy module loading */
 let secureStoreModulePromise: Promise<SecureStoreModule | null> | null = null;
 
+/**
+ * Lazily loads expo-secure-store module with validation.
+ * Returns null if module unavailable or missing required methods.
+ */
 const loadSecureStoreModule = async (): Promise<SecureStoreModule | null> => {
   if (!secureStoreModulePromise) {
     secureStoreModulePromise = (async () => {

@@ -1,0 +1,63 @@
+# Iteration 7 Log
+
+## Metadata
+
+- **Task ID**: US-007
+- **Task Title**: Publish contributor onboarding and quality workflow docs
+- **Description**: As a contributor, I want onboarding and quality workflow documentation so that I can set up the project and follow lint/typecheck/test requirements consistently.
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-02-28T06:00:02.923Z
+- **Ended At**: 2026-02-28T06:04:33.974Z
+- **Duration**: 4m 31s
+- **Agent**: opencode
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the progress file and checking what already exists.
+[94m[read][0m
+[94m[glob][0m pattern: [96mdocs/contributing/**[0m
+[94m[read][0m
+[94m[read][0m
+Now I'll create the two required documentation files:
+[94m[write][0m "# Developer Setup and Contribution Workflow
+
+This guide covers setting up the development environment and day-to-day workflows for contributing to Seabreeze.
+
+## Prerequisites
+
+- Node.js 20.x or later... (3994 chars)"
+[94m[write][0m "# Lint, Typecheck, and Test Guide
+
+This guide covers running quality checks and test execution strategies for Seabreeze contributions.
+
+## Running Quality Checks
+
+### Linting
+
+```bash
+npm run lint
+```... (4490 chars)"
+Now let me update the contributing README to link to the new docs:
+[94m[edit][0m
+Now let me run the quality checks:
+[94m[bash][0m Run ESLint $ npm run lint
+[94m[bash][0m Run TypeScript typecheck $ npx tsc --noEmit
+Lint passes (only pre-existing warnings). TypeScript also passes. Let me update the main docs README:
+[94m[read][0m
+Let me update the navigation table to include the new contributing docs:
+[94m[edit][0m
+Now let me update the progress.md file:
+[94m[read][0m
+[94m[edit][0m
+[94m[edit][0m
+All acceptance criteria met:
+- Created `docs/contributing/dev-setup-and-workflow.md` with setup and workflow
+- Created `docs/contributing/lint-typecheck-test-guide.md` with quality checks, test execution, review expectations
+- Documented coverage matrix process
+- Documented phase labels and reviewer checks
+- `npm run lint` passes (12 pre-existing warnings, 0 errors)
+- `npx tsc --noEmit` passes
+- Documentation changes don't require behavioral tests
+<promise>COMPLETE</promise>
