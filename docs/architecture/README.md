@@ -8,7 +8,8 @@ Seabreeze is an Expo + React Native AI chat application supporting multiple AI p
 
 ## Contents
 
-- [Add deep-dive architecture docs here]
+- [Overview](./overview.md) - System architecture, core concepts, and interaction model
+- [Codebase Map](./codebase-map.md) - Major folders, key files, and ownership boundaries
 
 ## Related
 

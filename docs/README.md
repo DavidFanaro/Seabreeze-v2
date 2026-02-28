@@ -13,7 +13,7 @@ This documentation is organized in two layers:
 
 | Topic | Index Doc | Deep-Dive Docs |
 |-------|-----------|----------------|
-| Architecture | `docs/architecture/README.md` | `docs/architecture/*.md` |
+| Architecture | `docs/architecture/README.md` | `docs/architecture/overview.md`, `docs/architecture/codebase-map.md` |
 | UI Components | `docs/ui/README.md` | `docs/ui/*.md` |
 | State Management | `docs/state/README.md` | `docs/state/*.md` |
 | Hooks | `docs/hooks/README.md` | `docs/hooks/*.md` |
