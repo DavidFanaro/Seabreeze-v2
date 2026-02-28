@@ -12,6 +12,22 @@ after each iteration and it's included in prompts for context.
 - Navigation table in index doc helps users locate relevant documentation quickly
 - Each subfolder contains its own index README with "Contents" and "Related" sections
 
+### Hook Patterns
+- **Composition over inheritance**: useChat orchestrates child hooks for separation of concerns
+- **Refs for async state**: Use refs (messagesRef) to access latest state in async callbacks without stale closures
+- **Sequence guards**: createSequenceGuard prevents concurrent operations from corrupting state
+- **Idempotency keys**: createIdempotencyKey prevents duplicate saves/operations
+- **AbortSignal**: Propagate cancellations through standard AbortSignal across async boundaries
+
+### Stream Lifecycle
+- State machine: idle → streaming → completing → completed/error/cancelled
+- Timeout protection: inactivity timeout (30s), max duration (5 min), completion grace (8s)
+- Checkpoint saves: 15s initial + 10s intervals during long streams
+
+### Provider Fallback
+- Chain: Apple → OpenAI → OpenRouter → Ollama
+- Automatic reset after each message to clear fallback state
+
 ---
 
 ## 2026-02-28 - US-001
@@ -50,18 +66,20 @@ after each iteration and it's included in prompts for context.
 
 ---
 
-## 2026-02-28 - US-004
-- Created `docs/state/state-model.md` covering state boundaries, ownership, and transition rules
-- Created `docs/state/state-lifecycle-and-data-flow.md` covering runtime lifecycle and data/control flow
-- Updated `docs/state/README.md` and `docs/README.md` to cross-link the new state docs
-- Verified inline comments already exist in state modules (stores have extensive JSDoc comments)
-- Lint passes with only pre-existing warnings, TypeScript passes
-- Tests: 57/62 pass (failures are pre-existing mocking issues unrelated to documentation)
+## 2026-02-28 - US-005
+- Created `docs/hooks/hooks-catalog.md` documenting all 9 custom hooks with purpose, inputs/outputs, side effects, and pitfalls
+- Created `docs/hooks/hook-patterns-and-gotchas.md` with 6 recommended patterns and 5 anti-patterns
+- Updated `docs/hooks/README.md` to link to the new documentation
+- Verified inline comments already exist in hook modules (all hooks have extensive JSDoc headers)
+- npm run lint passes (only pre-existing warnings)
+- npx tsc --noEmit passes
+- Tests: 6/9 pass (3 pre-existing failures in useDatabase test for db name mismatch)
 - **Learnings:**
-  - State domains: Auth (API keys), Provider (models), Settings (preferences)
-  - Zustand stores with SecureStore persistence, hydration via writeVersion conflict resolution
-  - Store dependencies: chatOverride depends on provider; auth/provider/settings are independent
-  - Version conflict: runtime mutations always win over stale persisted data (writeVersion comparison)
-  - Provider selection auto-fallbacks to first visible model when current is unavailable
-  - Ollama-specific: custom models overlapping fetched models are automatically removed
+  - Hook architecture: useChat as orchestrator, delegates to child hooks (useChatState, useChatStreaming, useStreamLifecycle, useTitleGeneration)
+  - Key patterns: refs for async state access, sequence guards for concurrent ops, idempotency keys for deduplication, AbortSignal for cancellation
+  - Stream lifecycle state machine: idle→streaming→completing→completed/error/cancelled with timeout protection
+  - Checkpoint saves every 15s + 10s intervals during long streams
+  - Provider fallback chain: Apple → OpenAI → OpenRouter → Ollama
+  - Title generation: version tracking prevents stale generations overwriting manual titles
+---
 
