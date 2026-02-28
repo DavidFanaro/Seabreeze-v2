@@ -33,3 +33,17 @@ after each iteration and it's included in prompts for context.
   - Ownership boundaries: Core team owns providers, stores, hooks, db, lib, types; UI team owns components and app pages
   - Key gotchas: Polyfills must be imported first, database schema changes require migrations, secure storage for API keys
   - Safe change areas: UI components (low risk), store logic (medium risk), database schema (high risk)
+
+---
+
+## 2026-02-28 - US-003
+- Created `docs/ui/layout-and-navigation.md` covering screen structure, route/navigation behavior, and layout boundaries
+- Created `docs/ui/feature-flows.md` covering core user journeys and UI state transitions
+- Updated `docs/ui/README.md` to cross-link the new docs
+- Verified inline comments already exist in UI components (ChatListItem, MessageList, MessageInput, ProviderSelector)
+- **Learnings:**
+  - Screen structure uses Expo Router with Stack Navigator
+  - Provider hierarchy pattern: GestureHandler → HeroUI → Theme → SQLite → Navigation → Query
+  - Database Gate pattern ensures migrations run before any screen renders
+  - Key UI states: streamState (idle→completing→streaming→completed/error), saveStatus (idle→saving→saved/error)
+  - Auto-title generation triggers after first assistant message completes with max 3 attempts

@@ -8,7 +8,8 @@ Seabreeze uses React Native with Expo Router for UI development.
 
 ## Contents
 
-- [Add deep-dive UI docs here]
+- [Layout and Navigation](./layout-and-navigation.md) - Screen structure, routes, and layout boundaries
+- [Feature Flows](./feature-flows.md) - Core user journeys and UI state transitions
 
 ## Related
 

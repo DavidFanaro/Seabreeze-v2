@@ -1,0 +1,103 @@
+# Iteration 2 Log
+
+## Metadata
+
+- **Task ID**: US-002
+- **Task Title**: Document architecture overview and codebase map
+- **Description**: As a new engineer, I want architecture boundaries and a codebase map so that I can identify where to make safe changes.
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-02-28T05:20:41.352Z
+- **Ended At**: 2026-02-28T05:25:59.603Z
+- **Duration**: 5m 18s
+- **Agent**: opencode
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+[94m[glob][0m pattern: [96m.ralph-tui/progress.md[0m
+[94m[glob][0m pattern: [96mdocs/**/*.md[0m
+[94m[bash][0m List root directory contents $ ls -la
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+Now I need to explore the codebase structure to understand the architecture. Let me examine the key directories and files.
+[94m[bash][0m List app directory contents $ ls -la app/
+[94m[bash][0m List lib directory contents $ ls -la lib/
+[94m[bash][0m List db directory contents $ ls -la db/
+[94m[bash][0m List stores directory contents $ ls -la stores/
+[94m[bash][0m List providers directory $ ls -la providers/
+[94m[bash][0m List hooks directory $ ls -la hooks/
+[94m[bash][0m List components directory $ ls -la components/
+[94m[bash][0m List types directory $ ls -la types/
+<prunable-tools>
+The following tools have been invoked and are available for pruning. This list does not mandate immediate action. Consider your current goals and the resources you need before pruning valuable tool outputs. Be thorough.
+
+PROTOCOL
+- Read the tool outputs below BEFORE using any context management tool
+- If raw data contains signal you need for your task, use distill to preserve it
+- If raw data is noise with no further value, prune it
+
+Current prunable tools:
+6: bash, List app directory contents (~187 tokens)
+7: bash, List lib directory contents (~464 tokens)
+8: bash, List db directory contents (~110 tokens)
+9: bash, bash, List stores directory contents (~224 tokens)
+10: bash, List providers directory (~318 tokens)
+11: bash, List hooks directory (~253 tokens)
+12: bash, List components directory (~152 tokens)
+13: bash, bash, List types directory (~197 tokens)
+</instruction>
+<think>
+Let me continue to explore the codebase and then create the required documentation. Let me get the app subdirectories.
+</think>
+[94m[bash][0m List app/chat directory $ ls -la app/chat/
+[94m[bash][0m List app/settings directory $ ls -la app/settings/
+[94m[read][0m
+[94m[read][0m
+[94m[read][0m
+
+Now I have enough context to create the architecture documentation. Let me create both required files.
+[94m[todowrite][0m
+[94m[write][0m "# Architecture Overview
+
+## Purpose
+
+This document describes the high-level system architecture of Seabreeze, an Expo + React Native AI chat application supporting multiple AI providers (Apple Intelli... (5995 chars)"
+[94m[todowrite][0m
+[94m[write][0m "# Codebase Map
+
+## Purpose
+
+This document provides a map of the Seabreeze codebase, identifying key files, ownership boundaries, and areas where safe changes can be made.
+
+## Concepts
+
+### Directory S... (7042 chars)"
+Now let me cross-link the architecture docs with the main README.
+[94m[todowrite][0m
+[94m[edit][0m
+[94m[edit][0m
+[94m[todowrite][0m
+[94m[bash][0m Run ESLint $ npm run lint
+[94m[bash][0m Run TypeScript typecheck $ npx tsc --noEmit
+Lint passes (warnings only, no errors). Typecheck passes. Now let me update the progress.md with learnings.
+[94m[todowrite][0m
+[94m[read][0m
+[94m[edit][0m
+[94m[read][0m
+[94m[edit][0m
+Now let me verify the files exist and then prune unnecessary context.
+[94m[glob][0m pattern: [96mdocs/architecture/*.md[0m
+[94m[todowrite][0m
+All tasks completed:
+
+**Acceptance Criteria Status:**
+- ✅ Created `docs/architecture/overview.md` with system boundaries, core modules, and interaction model
+- ✅ Created `docs/architecture/codebase-map.md` with major folders, key files, and ownership boundaries  
+- ✅ Both docs follow the required format: Purpose, Concepts, File Map, Flow, Examples, Gotchas, Change Guide
+- ✅ Cross-linked architecture docs with `docs/README.md` and `docs/architecture/README.md`
+- ✅ `npm run lint` passes (warnings only, no errors)
+- ✅ `npx tsc --noEmit` passes (no output = success)
+- ✅ No targeted tests needed for documentation changes
+<promise>COMPLETE</promise>
