@@ -255,7 +255,7 @@ describe('useTitleGeneration', () => {
       expect(title).toBe('Trimmed Title');
     });
 
-    it('should construct prompt with all messages', async () => {
+    it('should construct prompt with initial user request only', async () => {
       const messages: Message[] = [
         { role: 'user', content: 'First message' },
         { role: 'assistant', content: 'First response' },
@@ -275,9 +275,29 @@ describe('useTitleGeneration', () => {
       });
 
       const prompt = generateText.mock.calls[0][0].prompt;
-      expect(prompt).toContain('user: First message');
-      expect(prompt).toContain('assistant: First response');
-      expect(prompt).toContain('user: Second message');
+      expect(prompt).toContain('Initial request:');
+      expect(prompt).toContain('First message');
+      expect(prompt).not.toContain('First response');
+      expect(prompt).not.toContain('Second message');
+    });
+
+    it('should return empty string when there is no non-empty user message', async () => {
+      const messages: Message[] = [
+        { role: 'assistant', content: 'Hello from assistant' },
+        { role: 'user', content: '   ' },
+      ];
+
+      const { result } = renderHook(() =>
+        useTitleGeneration(messages, mockModel as any)
+      );
+
+      const title = await act(async () => {
+        return await result.current.generateTitle();
+      });
+
+      expect(title).toBe('');
+      expect(generateText).not.toHaveBeenCalled();
+      expect(executeWithRetry).not.toHaveBeenCalled();
     });
   });
 
@@ -375,7 +395,7 @@ describe('useTitleGeneration', () => {
       const prompt = generateText.mock.calls[0][0].prompt;
       expect(prompt).toContain('2-4 word title');
       expect(prompt).toContain('Return only the title, nothing else');
-      expect(prompt).toContain('Messages:');
+      expect(prompt).toContain('Initial request:');
     });
   });
 });

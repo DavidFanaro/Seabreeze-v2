@@ -28,6 +28,8 @@ import useHapticFeedback from "@/hooks/useHapticFeedback";
 interface ChatContextMenuProps {
   /** Callback function triggered when user selects the reset option */
   onReset: () => void;
+  /** Callback function triggered when user selects the rename option */
+  onRename?: () => void;
 }
 
 /**
@@ -98,7 +100,7 @@ const getStoredModelValue = (
  *
  * Uses haptic feedback for user interactions and displays checkmarks for active selections
  */
-export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
+export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
   // ============================================================================
   // STATE & HOOKS
   // ============================================================================
@@ -203,6 +205,15 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
   };
 
   /**
+   * Handle rename button press
+   * Triggers light intensity haptic feedback and calls the onRename callback
+   */
+  const handleRename = () => {
+    triggerPress("light");
+    onRename?.();
+  };
+
+  /**
    * Toggle model thinking output capture
    */
   const handleThinkingToggle = () => {
@@ -259,6 +270,10 @@ export function ChatContextMenu({ onReset }: ChatContextMenuProps) {
           {/* ====================================================================
               RESET BUTTON SECTION
               ==================================================================== */}
+
+          <Button systemImage="pencil" onPress={handleRename}>
+            Rename Chat
+          </Button>
 
           {/* Button to reset the current chat session */}
           <Button systemImage="arrow.clockwise" onPress={handleReset}>

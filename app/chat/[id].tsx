@@ -12,8 +12,8 @@ import { normalizePersistedMessages } from "@/lib/chat-message-normalization";
 import { eq } from "drizzle-orm";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState, useCallback, useRef } from "react";
-import { ActionSheetIOS, Alert, Linking, Platform, View, unstable_batchedUpdates } from "react-native";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { ActionSheetIOS, Alert, Linking, Modal, Platform, Pressable, Text, TextInput, View, unstable_batchedUpdates } from "react-native";
 import { KeyboardAvoidingView, KeyboardStickyView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated";
@@ -67,6 +67,8 @@ export default function Chat() {
     const [hydrationError, setHydrationError] = useState<string | null>(null);
     const [hydrationAttempt, setHydrationAttempt] = useState(0);
     const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+    const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
+    const [renameTitleDraft, setRenameTitleDraft] = useState("");
     const hydrationGuardRef = useRef(createSequenceGuard("chat-hydration"));
     const lastHydratedSignatureRef = useRef<string | null>(null);
     const currentChatIdRef = useRef<string | null>(null);
@@ -110,8 +112,23 @@ export default function Chat() {
 
     const isInputLocked = streamState === "streaming" || streamState === "completing";
 
+    const initialUserRequest = useMemo(() => {
+        for (const message of messages) {
+            if (message.role !== "user") {
+                continue;
+            }
+
+            const preview = getMessagePreviewText(message.content)?.trim() ?? "";
+            if (preview.length > 0) {
+                return preview;
+            }
+        }
+
+        return "";
+    }, [messages]);
+
     const attemptAutoTitleGeneration = useCallback(async () => {
-        if (messages.length === 0) {
+        if (!initialUserRequest) {
             return;
         }
 
@@ -143,7 +160,7 @@ export default function Chat() {
         } finally {
             isAutoTitleGenerationInFlightRef.current = false;
         }
-    }, [generateTitle, messages.length, title]);
+    }, [generateTitle, initialUserRequest, title]);
 
     // Use atomic message persistence with retry logic
     const {
@@ -163,7 +180,6 @@ export default function Chat() {
         title,
         onSaveComplete: (savedChatId) => {
             setChatID((current) => (current === 0 ? savedChatId : current));
-            void attemptAutoTitleGeneration();
         },
         onSaveError: (error, attempts) => {
             console.error(`[Chat] Save failed after ${attempts} attempts:`, error);
@@ -174,9 +190,44 @@ export default function Chat() {
     const handleReset = useCallback(() => {
         reset();
         setPendingAttachments([]);
+        setIsRenameModalVisible(false);
+        setRenameTitleDraft("");
         // Clear any chat-specific overrides
         clearOverride();
+        autoTitleAttemptCountRef.current = 0;
+        isAutoTitleGenerationInFlightRef.current = false;
+        autoTitleSucceededRef.current = false;
+        lastAutoTitleTriggerSignatureRef.current = null;
     }, [reset, clearOverride]);
+
+    const handleOpenRenameModal = useCallback(() => {
+        const currentTitle = title.trim() === DEFAULT_CHAT_TITLE ? "" : title.trim();
+        setRenameTitleDraft(currentTitle);
+        setIsRenameModalVisible(true);
+    }, [title]);
+
+    const handleCloseRenameModal = useCallback(() => {
+        setIsRenameModalVisible(false);
+        setRenameTitleDraft("");
+    }, []);
+
+    const handleRenameSubmit = useCallback(() => {
+        const nextTitle = renameTitleDraft.trim();
+
+        if (nextTitle.length === 0) {
+            Alert.alert("Title required", "Please enter a chat title before saving.");
+            return;
+        }
+
+        if (nextTitle === title.trim()) {
+            handleCloseRenameModal();
+            return;
+        }
+
+        setTitle(nextTitle);
+        autoTitleSucceededRef.current = true;
+        handleCloseRenameModal();
+    }, [handleCloseRenameModal, renameTitleDraft, setTitle, title]);
 
     const sendChatMessages = useCallback(async (input?: ChatSendInput) => {
         await sendMessage(input);
@@ -539,7 +590,7 @@ export default function Chat() {
             return;
         }
 
-        if (messages.length === 0) {
+        if (!initialUserRequest) {
             return;
         }
 
@@ -548,24 +599,9 @@ export default function Chat() {
             return;
         }
 
-        if (
-            streamState !== "completed"
-            && streamState !== "error"
-            && streamState !== "cancelled"
-        ) {
-            return;
-        }
-
-        const lastMessage = messages[messages.length - 1];
-        const lastContent = getMessagePreviewText(lastMessage?.content) ?? "";
         const triggerSignature = createIdempotencyKey("auto-title-trigger", [
             chatIdParam,
-            String(lastSavedChatId ?? ""),
-            String(messages.length),
-            String(lastMessage?.role ?? ""),
-            lastContent,
-            streamState,
-            title,
+            initialUserRequest,
         ]);
 
         if (lastAutoTitleTriggerSignatureRef.current === triggerSignature) {
@@ -577,10 +613,8 @@ export default function Chat() {
     }, [
         attemptAutoTitleGeneration,
         chatIdParam,
+        initialUserRequest,
         isInitializing,
-        lastSavedChatId,
-        messages,
-        streamState,
         title,
     ]);
 
@@ -752,13 +786,14 @@ export default function Chat() {
                      /* Apply theme color to header text and back button */
                      headerTintColor: theme.colors.text,
                      /* Right header button: context menu with reset functionality */
-                     headerRight: () => (
-                         <ChatContextMenu 
-                             onReset={handleReset}
-                         />
-                     ),
-                 }}
-             />
+                      headerRight: () => (
+                          <ChatContextMenu 
+                              onReset={handleReset}
+                              onRename={handleOpenRenameModal}
+                          />
+                      ),
+                  }}
+              />
              
              {/* ============================================================================ */}
              {/* MAIN CONTAINER */}
@@ -834,9 +869,9 @@ export default function Chat() {
                             />
                         </Animated.View>
                     </KeyboardStickyView>
-                ) : (
-                    <Animated.View style={animatedBottomStyle}>
-                        <MessageInput
+                 ) : (
+                     <Animated.View style={animatedBottomStyle}>
+                         <MessageInput
                             value={text}
                             onChangeText={setText}
                             onSend={sendChatMessages}
@@ -846,10 +881,126 @@ export default function Chat() {
                             disabled={isInputLocked}
                             isStreaming={isStreaming}
                             onCancel={cancel}
-                        />
-                    </Animated.View>
-                )}
-            </View>
-        </>
-    );
+                         />
+                     </Animated.View>
+                 )}
+
+                 <Modal
+                     animationType="fade"
+                     transparent
+                     visible={isRenameModalVisible}
+                     onRequestClose={handleCloseRenameModal}
+                 >
+                     <KeyboardAvoidingView
+                         behavior={isIos ? "translate-with-padding" : "padding"}
+                         keyboardVerticalOffset={isIos ? -10 : 0}
+                         className="flex-1"
+                     >
+                         <View
+                             className="flex-1 justify-center px-6"
+                             style={{ backgroundColor: "rgba(0, 0, 0, 0.35)" }}
+                         >
+                             <Pressable
+                                 style={{
+                                     position: "absolute",
+                                     top: 0,
+                                     left: 0,
+                                     right: 0,
+                                     bottom: 0,
+                                 }}
+                                 onPress={handleCloseRenameModal}
+                             />
+
+                             <View
+                                 style={{
+                                     backgroundColor: theme.colors.surface,
+                                     borderColor: theme.colors.border,
+                                     borderWidth: 1,
+                                     borderRadius: 16,
+                                     padding: 16,
+                                 }}
+                             >
+                                 <Text
+                                     style={{
+                                         color: theme.colors.text,
+                                         fontSize: 18,
+                                         fontWeight: "600",
+                                     }}
+                                 >
+                                     Rename Chat
+                                 </Text>
+
+                                 <Text
+                                     style={{
+                                         color: theme.colors.textSecondary,
+                                         fontSize: 14,
+                                         marginTop: 6,
+                                         marginBottom: 12,
+                                     }}
+                                 >
+                                     Choose a new title for this thread.
+                                 </Text>
+
+                                 <TextInput
+                                     value={renameTitleDraft}
+                                     onChangeText={setRenameTitleDraft}
+                                     placeholder="Enter chat title"
+                                     placeholderTextColor={theme.colors.textSecondary}
+                                     autoFocus
+                                     returnKeyType="done"
+                                     onSubmitEditing={handleRenameSubmit}
+                                     style={{
+                                         borderColor: theme.colors.border,
+                                         borderWidth: 1,
+                                         borderRadius: 12,
+                                         paddingHorizontal: 12,
+                                         paddingVertical: isIos ? 10 : 8,
+                                         color: theme.colors.text,
+                                         backgroundColor: theme.colors.background,
+                                     }}
+                                     maxLength={120}
+                                 />
+
+                                 <View
+                                     style={{
+                                         flexDirection: "row",
+                                         justifyContent: "flex-end",
+                                         marginTop: 14,
+                                     }}
+                                 >
+                                     <Pressable
+                                         onPress={handleCloseRenameModal}
+                                         style={{
+                                             borderColor: theme.colors.border,
+                                             borderWidth: 1,
+                                             borderRadius: 10,
+                                             paddingHorizontal: 12,
+                                             paddingVertical: 8,
+                                         }}
+                                     >
+                                         <Text style={{ color: theme.colors.text }}>Cancel</Text>
+                                     </Pressable>
+
+                                     <Pressable
+                                         onPress={handleRenameSubmit}
+                                         style={{
+                                             marginLeft: 10,
+                                             borderColor: theme.colors.accent,
+                                             backgroundColor: theme.colors.accent,
+                                             borderWidth: 1,
+                                             borderRadius: 10,
+                                             paddingHorizontal: 12,
+                                             paddingVertical: 8,
+                                         }}
+                                     >
+                                         <Text style={{ color: theme.colors.surface }}>Save</Text>
+                                     </Pressable>
+                                 </View>
+                             </View>
+                         </View>
+                     </KeyboardAvoidingView>
+                 </Modal>
+             </View>
+         </>
+     );
 }

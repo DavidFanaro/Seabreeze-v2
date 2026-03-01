@@ -90,6 +90,7 @@ describe("ChatContextMenu", () => {
   const mockSetSelectedProvider = jest.fn();
   const mockSetSelectedModel = jest.fn();
   const mockOnReset = jest.fn();
+  const mockOnRename = jest.fn();
   const mockSetThinkingEnabled = jest.fn();
   const mockSetThinkingLevel = jest.fn();
 
@@ -147,6 +148,11 @@ describe("ChatContextMenu", () => {
       expect(screen.getByTestId("button-Reset Chat")).toBeTruthy();
     });
 
+    it("should render the rename button", () => {
+      render(<ChatContextMenu onReset={mockOnReset} />);
+      expect(screen.getByTestId("button-Rename Chat")).toBeTruthy();
+    });
+
     it("should render the context menu trigger with ellipsis icon", () => {
       render(<ChatContextMenu onReset={mockOnReset} />);
       expect(screen.getByTestId("symbol-ellipsis.circle")).toBeTruthy();
@@ -178,6 +184,26 @@ describe("ChatContextMenu", () => {
       fireEvent.press(resetButton);
 
       expect(mockTriggerPress).toHaveBeenCalledWith("medium");
+    });
+  });
+
+  describe("Rename Functionality", () => {
+    it("should call onRename when rename button is pressed", () => {
+      render(<ChatContextMenu onReset={mockOnReset} onRename={mockOnRename} />);
+
+      const renameButton = screen.getByTestId("button-Rename Chat");
+      fireEvent.press(renameButton);
+
+      expect(mockOnRename).toHaveBeenCalledTimes(1);
+    });
+
+    it("should trigger light intensity haptic feedback on rename", () => {
+      render(<ChatContextMenu onReset={mockOnReset} onRename={mockOnRename} />);
+
+      const renameButton = screen.getByTestId("button-Rename Chat");
+      fireEvent.press(renameButton);
+
+      expect(mockTriggerPress).toHaveBeenCalledWith("light");
     });
   });
 

@@ -115,9 +115,12 @@ export function useTitleGeneration(
      */
     const generateTitle = useCallback(async (): Promise<string> => {
         const generationVersion = titleVersionRef.current;
+        const initialUserRequest = messages.find(
+            (message) => message.role === "user" && message.content.trim().length > 0,
+        )?.content.trim() ?? "";
 
-        // Guard clause: No messages to analyze
-        if (messages.length === 0) return "";
+        // Guard clause: No initial user request to analyze
+        if (!initialUserRequest) return "";
         
         // Guard clause: No AI model available
         if (!model) {
@@ -126,6 +129,7 @@ export function useTitleGeneration(
 
         const operation = startPersistenceOperation("title_generation", {
             messageCount: messages.length,
+            hasInitialUserRequest: true,
         });
 
         try {
@@ -134,7 +138,7 @@ export function useTitleGeneration(
                 // Construct prompt with conversation context
                 const result = await generateText({
                     model: model,
-                    prompt: `Generate a 2-4 word title for this conversation based on messages. Return only the title, nothing else.\n\nMessages:\n${messages.map((m) => `${m.role}: ${m.content}`).join("\n")}`,
+                    prompt: `Generate a 2-4 word title for this conversation based only on the initial user request. Return only the title, nothing else.\n\nInitial request:\n${initialUserRequest}`,
                 });
                 
                 // Clean up generated text by trimming whitespace

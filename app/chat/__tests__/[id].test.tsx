@@ -9,6 +9,65 @@ import React from 'react';
 import { Platform } from 'react-native';
 import Chat from '../[id]';
 
+const mockTriggerSave = jest.fn();
+const mockClearOverride = jest.fn();
+const mockSyncFromDatabase = jest.fn();
+const mockSetText = jest.fn();
+const mockSendMessage = jest.fn();
+const mockReset = jest.fn();
+const mockSetMessages = jest.fn();
+const mockSetThinkingOutput = jest.fn();
+const mockGenerateTitle = jest.fn();
+const mockSetTitle = jest.fn();
+const mockRetryLastMessage = jest.fn();
+const mockCancel = jest.fn();
+
+const mockUseChatReturn = {
+  text: 'Test message',
+  setText: mockSetText,
+  messages: [
+    { role: 'user', content: 'Hello' },
+    { role: 'assistant', content: 'Hi there' },
+  ],
+  sendMessage: mockSendMessage,
+  reset: mockReset,
+  isThinking: false,
+  isStreaming: false,
+  streamState: 'idle',
+  setMessages: mockSetMessages,
+  thinkingOutput: [],
+  setThinkingOutput: mockSetThinkingOutput,
+  generateTitle: mockGenerateTitle,
+  setTitle: mockSetTitle,
+  title: 'Test Chat',
+  currentProvider: 'apple' as const,
+  currentModel: 'gpt-4',
+  retryLastMessage: mockRetryLastMessage,
+  canRetry: false,
+  errorMessage: null,
+  cancel: mockCancel,
+};
+
+const mockDb = {
+  select: jest.fn(() => ({
+    from: jest.fn(() => ({
+      where: jest.fn(() => ({
+        get: jest.fn(() => null),
+      })),
+    })),
+  })),
+  insert: jest.fn(() => ({
+    values: jest.fn(() => ({
+      returning: jest.fn(() => [{ id: 1 }]),
+    })),
+  })),
+  update: jest.fn(() => ({
+    set: jest.fn(() => ({
+      where: jest.fn(() => Promise.resolve()),
+    })),
+  })),
+};
+
 // Mock expo-router
 jest.mock('expo-router', () => ({
   Stack: {
@@ -17,67 +76,39 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({
     id: 'new',
   }),
-  useFocusEffect: jest.fn((callback: any) => {
-    callback();
+  useFocusEffect: jest.fn(),
+}));
+
+// Mock message persistence hook to avoid integration side effects in UI tests
+jest.mock('@/hooks/useMessagePersistence', () => ({
+  useMessagePersistence: () => ({
+    saveStatus: 'idle',
+    hasSaveError: false,
+    userFriendlyError: null,
+    triggerSave: mockTriggerSave,
+    saveAttempts: 0,
+    lastSavedChatId: null,
   }),
 }));
 
 // Mock database hook
 jest.mock('@/hooks/useDatabase', () => ({
   __esModule: true,
-  default: () => ({
-    select: jest.fn(() => ({
-      from: jest.fn(() => ({
-        where: jest.fn(() => ({
-          get: jest.fn(() => null),
-        })),
-      })),
-    })),
-    insert: jest.fn(() => ({
-      values: jest.fn(() => ({
-        returning: jest.fn(() => [{ id: 1 }]),
-      })),
-    })),
-    update: jest.fn(() => ({
-      set: jest.fn(() => ({
-        where: jest.fn(() => Promise.resolve()),
-      })),
-    })),
-  }),
+  default: () => mockDb,
 }));
 
 // Mock chat state hook
 jest.mock('@/hooks/useChatState', () => ({
   useChatState: () => ({
-    clearOverride: jest.fn(),
-    syncFromDatabase: jest.fn(),
+    clearOverride: mockClearOverride,
+    syncFromDatabase: mockSyncFromDatabase,
   }),
 }));
 
 // Mock useChat hook
 jest.mock('@/hooks/chat/useChat', () => ({
   __esModule: true,
-  default: () => ({
-    text: 'Test message',
-    setText: jest.fn(),
-    messages: [
-      { role: 'user', content: 'Hello' },
-      { role: 'assistant', content: 'Hi there' },
-    ],
-    sendMessage: jest.fn(),
-    reset: jest.fn(),
-    isStreaming: false,
-    setMessages: jest.fn(),
-    thinkingOutput: [],
-    setThinkingOutput: jest.fn(),
-    generateTitle: jest.fn(),
-    setTitle: jest.fn(),
-    title: 'Test Chat',
-    currentProvider: 'apple' as const,
-    currentModel: 'gpt-4',
-    retryLastMessage: jest.fn(),
-    canRetry: false,
-  }),
+  default: () => mockUseChatReturn,
 }));
 
 // Mock theme components
@@ -86,13 +117,18 @@ jest.mock('@/components', () => ({
     theme: {
       colors: {
         background: '#000000',
+        surface: '#111111',
+        border: '#222222',
         text: '#ffffff',
+        textSecondary: '#cccccc',
+        accent: '#4f9cf7',
       },
     },
   }),
   MessageList: () => null,
   MessageInput: () => null,
   ChatContextMenu: () => null,
+  RetrievalRecoveryView: () => null,
   RetryBanner: () => null,
 }));
 
@@ -107,12 +143,26 @@ jest.mock('react-native-keyboard-controller', () => {
     KeyboardStickyView: jest.fn(({ children }: any) =>
       React.createElement(React.Fragment, null, children)
     ),
+    useReanimatedKeyboardAnimation: jest.fn(() => ({
+      progress: { value: 0 },
+    })),
   };
 });
 
 // Mock react-native-safe-area-context
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: any) => children,
+  useSafeAreaInsets: jest.fn(() => ({
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  })),
+}));
+
+// Mock SaveErrorBanner to avoid ThemeProvider dependency in screen tests
+jest.mock('@/components/chat/SaveErrorBanner', () => ({
+  SaveErrorBanner: () => null,
 }));
 
 // Mock drizzle utilities
