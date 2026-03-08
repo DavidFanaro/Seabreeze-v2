@@ -431,6 +431,28 @@ const getErrorMessageText = (error: unknown): string => {
     return String(error);
 };
 
+const STREAM_UI_CHUNK_SIZE = 16;
+
+const splitTextForUiChunks = (
+    textDelta: string,
+    chunkSize: number = STREAM_UI_CHUNK_SIZE,
+): string[] => {
+    if (!textDelta) {
+        return [];
+    }
+
+    if (chunkSize <= 0 || textDelta.length <= chunkSize) {
+        return [textDelta];
+    }
+
+    const chunks: string[] = [];
+    for (let index = 0; index < textDelta.length; index += chunkSize) {
+        chunks.push(textDelta.slice(index, index + chunkSize));
+    }
+
+    return chunks;
+};
+
 export function useChatStreaming() {
     /**
      * Handles streaming errors by determining if fallback should be attempted
@@ -601,6 +623,23 @@ export function useChatStreaming() {
                 onStreamCompleted?.();
             };
 
+            const applyTextDeltaToUi = (textDelta: string): void => {
+                const uiChunks = splitTextForUiChunks(textDelta);
+
+                for (const uiChunk of uiChunks) {
+                    if (abortSignal?.aborted) {
+                        return;
+                    }
+
+                    accumulated += uiChunk;
+                    updateAssistantMessage(accumulated);
+
+                    if (canCommit()) {
+                        onChunk?.(uiChunk, accumulated);
+                    }
+                }
+            };
+
             const canModelThink = currentModel.provider === "ollama"
                 || isThinkingCapableModel(
                     currentModel.provider,
@@ -730,12 +769,7 @@ export function useChatStreaming() {
                     const textDelta = getOpenRouterChunkTextDelta(parsedPayload);
                     if (textDelta) {
                         onChunkReceived?.();
-                        accumulated += textDelta;
-                        updateAssistantMessage(accumulated);
-
-                        if (canCommit()) {
-                            onChunk?.(textDelta, accumulated);
-                        }
+                        applyTextDeltaToUi(textDelta);
                     }
 
                     if (getOpenRouterFinishReason(parsedPayload)) {
@@ -855,12 +889,7 @@ export function useChatStreaming() {
                             }
 
                             onChunkReceived?.();
-                            accumulated += textDelta;
-                            updateAssistantMessage(accumulated);
-
-                            if (canCommit()) {
-                                onChunk?.(textDelta, accumulated);
-                            }
+                            applyTextDeltaToUi(textDelta);
                         }
                     }
 
@@ -880,13 +909,7 @@ export function useChatStreaming() {
                     }
 
                     onChunkReceived?.();
-
-                    accumulated += chunk;
-                    updateAssistantMessage(accumulated);
-
-                    if (canCommit()) {
-                        onChunk?.(chunk, accumulated);
-                    }
+                    applyTextDeltaToUi(chunk);
                 }
 
                 signalCompletion();

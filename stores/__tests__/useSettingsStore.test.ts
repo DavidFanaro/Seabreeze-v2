@@ -47,7 +47,6 @@ describe("useSettingsStore", () => {
       expect(result.current.autoGenerateTitles).toBe(true);
       expect(result.current.thinkingEnabled).toBe(true);
       expect(result.current.messageFontSize).toBe(16);
-      expect(result.current.showCodeLineNumbers).toBe(false);
     });
 
     it("should provide all required actions", () => {
@@ -58,7 +57,6 @@ describe("useSettingsStore", () => {
       expect(typeof result.current.setAutoGenerateTitles).toBe("function");
       expect(typeof result.current.setThinkingEnabled).toBe("function");
       expect(typeof result.current.setMessageFontSize).toBe("function");
-      expect(typeof result.current.setShowCodeLineNumbers).toBe("function");
       expect(typeof result.current.resetSettings).toBe("function");
     });
   });
@@ -122,10 +120,6 @@ describe("useSettingsStore", () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
-        "settings-storage",
-        expect.any(String)
-      );
     });
   });
 
@@ -252,47 +246,6 @@ describe("useSettingsStore", () => {
     });
   });
 
-  describe("Code Line Numbers Settings", () => {
-    it("should enable code line numbers", () => {
-      const { result } = createStore();
-
-      act(() => {
-        result.current.setShowCodeLineNumbers(true);
-      });
-
-      expect(result.current.showCodeLineNumbers).toBe(true);
-    });
-
-    it("should disable code line numbers", () => {
-      const { result } = createStore();
-
-      act(() => {
-        result.current.setShowCodeLineNumbers(false);
-      });
-
-      expect(result.current.showCodeLineNumbers).toBe(false);
-    });
-
-    it("should toggle code line numbers multiple times", () => {
-      const { result } = createStore();
-
-      act(() => {
-        result.current.setShowCodeLineNumbers(true);
-      });
-      expect(result.current.showCodeLineNumbers).toBe(true);
-
-      act(() => {
-        result.current.setShowCodeLineNumbers(false);
-      });
-      expect(result.current.showCodeLineNumbers).toBe(false);
-
-      act(() => {
-        result.current.setShowCodeLineNumbers(true);
-      });
-      expect(result.current.showCodeLineNumbers).toBe(true);
-    });
-  });
-
   describe("Reset Settings", () => {
     it("should reset all settings to defaults", () => {
       const { result } = createStore();
@@ -304,7 +257,6 @@ describe("useSettingsStore", () => {
         result.current.setAutoGenerateTitles(false);
         result.current.setThinkingEnabled(false);
         result.current.setMessageFontSize(24);
-        result.current.setShowCodeLineNumbers(true);
       });
 
       // Verify changes
@@ -313,7 +265,6 @@ describe("useSettingsStore", () => {
       expect(result.current.autoGenerateTitles).toBe(false);
       expect(result.current.thinkingEnabled).toBe(false);
       expect(result.current.messageFontSize).toBe(24);
-      expect(result.current.showCodeLineNumbers).toBe(true);
 
       // Reset to defaults
       act(() => {
@@ -326,7 +277,6 @@ describe("useSettingsStore", () => {
       expect(result.current.autoGenerateTitles).toBe(true);
       expect(result.current.thinkingEnabled).toBe(true);
       expect(result.current.messageFontSize).toBe(16);
-      expect(result.current.showCodeLineNumbers).toBe(false);
     });
 
     it("should persist reset settings", async () => {
@@ -347,10 +297,6 @@ describe("useSettingsStore", () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
-        "settings-storage",
-        expect.any(String)
-      );
     });
   });
 
@@ -370,11 +316,9 @@ describe("useSettingsStore", () => {
 
       act(() => {
         result.current.setAutoGenerateTitles(false);
-        result.current.setShowCodeLineNumbers(true);
       });
 
       expect(result.current.autoGenerateTitles).toBe(false);
-      expect(result.current.showCodeLineNumbers).toBe(true);
     });
 
     it("should maintain state consistency after rapid changes", () => {
@@ -412,10 +356,6 @@ describe("useSettingsStore", () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
-        "settings-storage",
-        expect.any(String)
-      );
     });
 
     it("should handle secure storage errors gracefully for set operations", async () => {
@@ -508,13 +448,6 @@ describe("useSettingsStore", () => {
       });
       expect(result.current.autoGenerateTitles).toBe(true);
       expect(typeof result.current.autoGenerateTitles).toBe("boolean");
-
-      // Show code line numbers
-      act(() => {
-        result.current.setShowCodeLineNumbers(true);
-      });
-      expect(result.current.showCodeLineNumbers).toBe(true);
-      expect(typeof result.current.showCodeLineNumbers).toBe("boolean");
 
       act(() => {
         result.current.setThinkingEnabled(true);

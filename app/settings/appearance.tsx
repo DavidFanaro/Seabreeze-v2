@@ -1,7 +1,7 @@
 /**
  * @file app/settings/appearance.tsx
  * @purpose Provides UI for managing application appearance settings
- * including theme selection and chat display preferences.
+ * including theme selection preferences.
  */
 
 import { router, Stack } from "expo-router";
@@ -11,13 +11,11 @@ import {
   Text,
   SafeAreaView,
   ScrollView,
-  Switch,
   StyleSheet,
 } from "react-native";
 import { Suspense } from "react";
 import { SymbolView } from "expo-symbols";
 import { IconButton, useTheme } from "@/components";
-import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { ThemeMode } from "@/components/ui/ThemeProvider";
 
 // ── Static palette previews ─────────────────────────────────────────────────
@@ -41,13 +39,6 @@ const THEME_PALETTE: Record<ThemeMode, readonly [string, string, string]> = {
 
 export default function AppearanceSettings() {
   const { theme, themeMode, setTheme } = useTheme();
-
-  const showCodeLineNumbers = useSettingsStore(
-    (state) => state.showCodeLineNumbers,
-  );
-  const setShowCodeLineNumbers = useSettingsStore(
-    (state) => state.setShowCodeLineNumbers,
-  );
 
   const themeOptions: { id: ThemeMode; name: string }[] = [
     { id: "light",                name: "Light" },
@@ -167,49 +158,6 @@ export default function AppearanceSettings() {
                   </Pressable>
                 );
               })}
-            </View>
-
-            {/* ── CHAT DISPLAY ──────────────────────────────────── */}
-            <Text
-              className="text-[11px] font-semibold uppercase tracking-widest px-1 mb-2"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Chat Display
-            </Text>
-
-            <View
-              className="rounded-xl overflow-hidden"
-              style={{ backgroundColor: theme.colors.surface }}
-            >
-              <View className="flex-row items-center justify-between px-4 py-3.5">
-                <View className="flex-1 mr-3">
-                  <Text
-                    className="text-[16px] font-semibold"
-                    style={{ color: theme.colors.text }}
-                  >
-                    Show Code Line Numbers
-                  </Text>
-                  <Text
-                    className="text-[13px] mt-0.5"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    Display line numbers in code blocks
-                  </Text>
-                </View>
-                <Switch
-                  value={showCodeLineNumbers}
-                  onValueChange={setShowCodeLineNumbers}
-                  trackColor={{
-                    false: theme.colors.border,
-                    true: theme.colors.accent,
-                  }}
-                  thumbColor={
-                    showCodeLineNumbers
-                      ? theme.colors.accent
-                      : theme.colors.textSecondary
-                  }
-                />
-              </View>
             </View>
 
             <View className="h-4" />

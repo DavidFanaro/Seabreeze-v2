@@ -14,7 +14,6 @@ import { useTheme } from "@/components/ui/ThemeProvider";
 import { parseMessageContent } from "@/lib/chat-content-parts";
 import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
 import { isImageMediaType, isVideoMediaType } from "@/lib/chat-attachments";
-import { useSettingsStore } from "@/stores/useSettingsStore";
 
 /**
  * Props interface for MessageBubble component
@@ -70,7 +69,7 @@ const withAlpha = (color: string, alpha: number): string => {
  * Features:
  * - User messages are right-aligned with background color
  * - AI messages are left-aligned with transparent background
- * - Markdown content rendering with optional line numbers
+ * - Markdown content rendering with theme-aware styling
  * - Streaming state indication for in-progress messages
  * - Theme-aware styling with responsive width constraints
  */
@@ -80,11 +79,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
     // Retrieve theme colors and spacing values for consistent styling across the app
     const { theme } = useTheme();
     
-    // Fetch user preference for displaying line numbers in code blocks
-    const showCodeLineNumbers = useSettingsStore(
-      (state) => state.showCodeLineNumbers,
-    );
-
     const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
     const [hasAutoExpandedThinking, setHasAutoExpandedThinking] = useState(false);
     const parsedContent = parseMessageContent(content);
@@ -106,7 +100,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
       : (hasStructuredMedia ? "" : normalizeMessageContentForRender(content));
     const normalizedThinkingOutput = thinkingOutput?.trim() ?? "";
     const hasThinkingOutput = !isUser && normalizedThinkingOutput.length > 0;
-    const shouldDeferThinkingMarkdown = isStreaming && normalizedContent.includes("```");
     const isAssistantError = !isUser && isError;
     const errorColor = theme.colors.error ?? "#dc2626";
     const errorBackgroundColor = withAlpha(errorColor, 0.14);
@@ -175,26 +168,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
                 }}
                 testID="thinking-output-content"
               >
-                {shouldDeferThinkingMarkdown ? (
-                  <Text
-                    style={{
-                      color: theme.colors.textSecondary ?? theme.colors.text,
-                      fontSize: 12,
-                      fontFamily: "Menlo",
-                    }}
-                    testID="thinking-output-content-plain"
-                  >
-                    {normalizedThinkingOutput}
-                  </Text>
-                ) : (
-                  <CustomMarkdown
-                    content={normalizedThinkingOutput}
-                    isStreaming={isStreaming}
-                    showLineNumbers={showCodeLineNumbers}
-                    showCopyAll={false}
-                    isUser={false}
-                  />
-                )}
+                <CustomMarkdown
+                  content={normalizedThinkingOutput}
+                  isStreaming={isStreaming}
+                  isUser={false}
+                  animationSurfaceColor={theme.colors.glass ?? theme.colors.surface}
+                />
               </View>
             )}
           </View>
@@ -223,9 +202,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
             <CustomMarkdown
               content={normalizedContent}
               isStreaming={isStreaming}
-              showLineNumbers={showCodeLineNumbers}
-              showCopyAll={!isStreaming && !isUser}
               isUser={isUser}
+              animationSurfaceColor={isUser
+                ? theme.colors.surface
+                : (isAssistantError ? errorBackgroundColor : theme.colors.background)}
             />
           ) : null}
 

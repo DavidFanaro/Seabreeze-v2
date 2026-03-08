@@ -259,6 +259,46 @@ describe('useChatStreaming', () => {
       expect(setMessagesMock).toHaveBeenCalledTimes(3);
     });
 
+    it('splits large text deltas into smaller UI chunks', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const mockOnChunk = jest.fn();
+      const longDelta = 'abcdefghijklmnopqrstuvwxyz123456';
+
+      const mockFullStream = {
+        [Symbol.asyncIterator]: async function* () {
+          yield { type: 'text-delta', text: longDelta };
+          yield { type: 'finish' };
+        },
+      };
+
+      mockStreamText.mockReturnValue({
+        fullStream: mockFullStream,
+      } as any);
+
+      const streamingResult = await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            onChunk: mockOnChunk,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef,
+        );
+      });
+
+      const firstUiChunk = longDelta.slice(0, 16);
+      const secondUiChunk = longDelta.slice(16);
+
+      expect(streamingResult.success).toBe(true);
+      expect(streamingResult.accumulated).toBe(longDelta);
+      expect(mockOnChunk).toHaveBeenCalledTimes(2);
+      expect(mockOnChunk).toHaveBeenNthCalledWith(1, firstUiChunk, firstUiChunk);
+      expect(mockOnChunk).toHaveBeenNthCalledWith(2, secondUiChunk, longDelta);
+      expect(setMessagesMock).toHaveBeenCalledTimes(2);
+    });
+
     it('preserves existing assistant annotations while streaming updates', async () => {
       const { result } = renderHook(() => useChatStreaming());
 

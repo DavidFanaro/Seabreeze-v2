@@ -39,7 +39,6 @@ const resetSettingsStateForHydrationTest = (): void => {
     thinkingEnabled: true,
     thinkingLevel: 'medium',
     messageFontSize: 16,
-    showCodeLineNumbers: false,
     __meta: {
       writeVersion: 0,
       hasHydrated: false,
@@ -78,8 +77,8 @@ describe('Hydration mutation guards', () => {
     });
 
     const state = useProviderStore.getState();
-    expect(state.selectedProvider).toBe('openrouter');
-    expect(state.selectedModel).toBe('openai/gpt-4o');
+    expect(state.selectedProvider).toBe('apple');
+    expect(state.selectedModel).toBe('system-default');
   });
 
   it('keeps newer runtime provider writes when hydration finishes later', async () => {

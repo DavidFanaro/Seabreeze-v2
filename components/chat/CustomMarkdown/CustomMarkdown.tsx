@@ -1,447 +1,277 @@
-/**
- * @file CustomMarkdown.tsx
- * @purpose Main markdown orchestrator component with streaming support
- */
-
-import React, { useMemo, useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, ViewStyle } from "react-native";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+    Animated,
+    Linking,
+    StyleSheet,
+    Text,
+    View,
+    type LayoutChangeEvent,
+    type ViewStyle,
+} from "react-native";
+import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
 import { createMarkdownStyles } from "./styles";
-import {
-    parseMarkdown,
-    type BlockToken,
-    type ParsedMarkdown,
-} from "./parsers";
-import { createStreamingBuffer, formatMarkdownForCopy } from "./utils";
-import {
-    MarkdownText,
-    MarkdownHeader,
-    MarkdownBlockquote,
-    CodeBlock,
-    ImageComponent,
-    TableComponent,
-    CopyButton,
-} from "./components";
 
 interface CustomMarkdownProps {
     content: unknown;
     isStreaming?: boolean;
-    showCopyAll?: boolean;
-    showLineNumbers?: boolean;
     style?: ViewStyle;
     isUser?: boolean;
+    animationSurfaceColor?: string;
 }
 
 interface MarkdownErrorBoundaryState {
     hasError: boolean;
-    error: Error | null;
 }
 
-interface MarkdownErrorBoundaryProps {
-    children: React.ReactNode;
-    fallback: React.ReactNode;
+interface RevealRegion {
+    top: number;
+    height: number;
 }
 
-const STREAM_RENDER_THROTTLE_MS = 150;
-
-/**
- * Error Boundary for Markdown rendering
- * Catches errors during markdown parsing/rendering and shows raw text fallback
- */
 class MarkdownErrorBoundary extends React.Component<
-    MarkdownErrorBoundaryProps,
+    {
+        children: React.ReactNode;
+        fallback: React.ReactNode;
+        resetKey: string;
+    },
     MarkdownErrorBoundaryState
 > {
-    constructor(props: MarkdownErrorBoundaryProps) {
+    constructor(props: { children: React.ReactNode; fallback: React.ReactNode; resetKey: string }) {
         super(props);
-        this.state = { hasError: false, error: null };
+        this.state = { hasError: false };
     }
 
-    static getDerivedStateFromError(error: Error): MarkdownErrorBoundaryState {
-        return { hasError: true, error };
+    static getDerivedStateFromError(): MarkdownErrorBoundaryState {
+        return { hasError: true };
     }
 
-    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-        // Log detailed error info for debugging
-        console.error("[CustomMarkdown] Rendering error:", {
-            error: error.message,
-            stack: error.stack,
-            componentStack: errorInfo.componentStack,
-            timestamp: new Date().toISOString(),
-        });
+    componentDidCatch(error: Error) {
+        console.error("CustomMarkdown renderer error:", error);
+    }
+
+    componentDidUpdate(
+        prevProps: Readonly<{ children: React.ReactNode; fallback: React.ReactNode; resetKey: string }>
+    ) {
+        if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+            this.setState({ hasError: false });
+        }
     }
 
     render() {
         if (this.state.hasError) {
             return this.props.fallback;
         }
+
         return this.props.children;
     }
 }
 
-/**
- * Raw text fallback component shown when markdown rendering fails
- */
-const MarkdownErrorFallback: React.FC<{ content: unknown; style?: ViewStyle; isUser?: boolean }> = ({
-    content,
-    style,
-    isUser = false,
-}) => {
-    const { theme } = useTheme();
-    const styles = useMemo(() => createMarkdownStyles(theme), [theme]);
-    const normalizedContent = normalizeMessageContentForRender(content);
-
-    return (
-        <View style={[styles.container, style]}>
-            <Text style={[styles.text, { fontFamily: "monospace" }]}>
-                {normalizedContent}
-            </Text>
-            {!isUser && (
-                <View
-                    style={{
-                        marginTop: 8,
-                        padding: 8,
-                        backgroundColor: theme.colors.error + "15",
-                        borderRadius: 4,
-                    }}
-                >
-                    <Text
-                        style={{
-                            color: theme.colors.error,
-                            fontSize: 12,
-                        }}
-                    >
-                        Note: Markdown rendering failed. Showing raw text.
-                    </Text>
-                </View>
-            )}
-        </View>
-    );
-};
+const APPEND_FADE_MS = 100;
+const APPEND_REVEAL_START_OPACITY = 0.58;
+const HEIGHT_EPSILON = 0.5;
 
 const CustomMarkdownInner: React.FC<CustomMarkdownProps> = ({
     content,
     isStreaming = false,
-    showCopyAll = true,
-    showLineNumbers = false,
     style,
     isUser = false,
+    animationSurfaceColor,
 }) => {
     const { theme } = useTheme();
-    const styles = useMemo(() => createMarkdownStyles(theme), [theme]);
-    const normalizedContent = useMemo(
-        () => normalizeMessageContentForRender(content),
-        [content]
-    );
+    const normalizedContent = content as string;
+    const markdownStyles = useMemo(() => createMarkdownStyles(theme), [theme]);
 
-    // Streaming buffer
-    const bufferRef = useRef(createStreamingBuffer({ bufferSize: 50 }));
-    const ingestedLengthRef = useRef(0);
-    const prevStreamingRef = useRef(isStreaming);
-    const prevContentRef = useRef(normalizedContent);
-    const pendingRenderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pendingRenderContentRef = useRef<string | null>(null);
-    const lastRenderUpdateAtRef = useRef(0);
-    const [renderedContent, setRenderedContent] = useState(normalizedContent);
-    const setRenderedContentIfChanged = useCallback((nextContent: string) => {
-        setRenderedContent((prevContent) => {
-            if (prevContent === nextContent) {
-                return prevContent;
-            }
-            return nextContent;
-        });
-    }, []);
+    const [revealRegion, setRevealRegion] = useState<RevealRegion | null>(null);
 
-    // Deterministic streaming state machine
-    useEffect(() => {
-        const wasStreaming = prevStreamingRef.current;
-        const isStreamStart = isStreaming && !wasStreaming;
-        const isStreamEnd = !isStreaming && wasStreaming;
-        const buffer = bufferRef.current;
+    const previousMarkdownRef = useRef(normalizedContent);
+    const measuredHeightRef = useRef(0);
+    const pendingRevealTopRef = useRef<number | null>(null);
+    const activeRevealTopRef = useRef<number | null>(null);
+    const revealOpacity = useRef(new Animated.Value(0)).current;
+    const animationVersionRef = useRef(0);
 
-        if (isStreaming) {
-            if (isStreamStart) {
-                buffer.reset();
-                ingestedLengthRef.current = 0;
-                setRenderedContentIfChanged("");
-            }
+    const revealOverlayColor = animationSurfaceColor
+        ?? (isUser ? theme.colors.surface : theme.colors.background);
 
-            const currentIngestedLength = ingestedLengthRef.current;
-            const previousContent = prevContentRef.current;
-            const hasRegression = normalizedContent.length < currentIngestedLength;
-            const hasPrefixMismatch =
-                currentIngestedLength > 0 &&
-                !normalizedContent.startsWith(previousContent.slice(0, currentIngestedLength));
+    const clearRevealAnimation = useCallback(() => {
+        animationVersionRef.current += 1;
+        pendingRevealTopRef.current = null;
+        activeRevealTopRef.current = null;
+        revealOpacity.stopAnimation();
+        revealOpacity.setValue(0);
+        setRevealRegion(null);
+    }, [revealOpacity]);
 
-            if (hasRegression || hasPrefixMismatch) {
-                buffer.reset();
-                ingestedLengthRef.current = 0;
-            }
+    useLayoutEffect(() => {
+        const previousMarkdown = previousMarkdownRef.current;
 
-            if (normalizedContent.length > ingestedLengthRef.current) {
-                const delta = normalizedContent.slice(ingestedLengthRef.current);
-                const result = buffer.push(delta);
-                ingestedLengthRef.current = normalizedContent.length;
-
-                if (result.shouldUpdate) {
-                    const now = Date.now();
-                    const elapsedSinceLastUpdate = now - lastRenderUpdateAtRef.current;
-
-                    if (elapsedSinceLastUpdate >= STREAM_RENDER_THROTTLE_MS) {
-                        if (pendingRenderTimeoutRef.current) {
-                            clearTimeout(pendingRenderTimeoutRef.current);
-                            pendingRenderTimeoutRef.current = null;
-                        }
-                        pendingRenderContentRef.current = null;
-                        lastRenderUpdateAtRef.current = now;
-                        setRenderedContentIfChanged(result.renderContent);
-                    } else {
-                        pendingRenderContentRef.current = result.renderContent;
-                        if (!pendingRenderTimeoutRef.current) {
-                            const waitMs = STREAM_RENDER_THROTTLE_MS - elapsedSinceLastUpdate;
-                            pendingRenderTimeoutRef.current = setTimeout(() => {
-                                pendingRenderTimeoutRef.current = null;
-                                const pendingContent = pendingRenderContentRef.current;
-                                pendingRenderContentRef.current = null;
-                                if (pendingContent !== null) {
-                                    lastRenderUpdateAtRef.current = Date.now();
-                                    setRenderedContentIfChanged(pendingContent);
-                                }
-                            }, waitMs);
-                        }
-                    }
-                }
-            }
-
-            prevStreamingRef.current = isStreaming;
-            prevContentRef.current = normalizedContent;
+        if (normalizedContent === previousMarkdown) {
             return;
         }
 
-        if (isStreamEnd) {
-            if (pendingRenderTimeoutRef.current) {
-                clearTimeout(pendingRenderTimeoutRef.current);
-                pendingRenderTimeoutRef.current = null;
-            }
-            pendingRenderContentRef.current = null;
-            const finalContent = buffer.complete() || normalizedContent;
-            lastRenderUpdateAtRef.current = Date.now();
-            setRenderedContentIfChanged(finalContent);
-            buffer.reset();
-            ingestedLengthRef.current = 0;
+        const isAppendOnlyUpdate =
+            isStreaming
+            && normalizedContent.startsWith(previousMarkdown)
+            && normalizedContent.length > previousMarkdown.length;
+
+        if (isAppendOnlyUpdate) {
+            pendingRevealTopRef.current = activeRevealTopRef.current
+                ?? pendingRevealTopRef.current
+                ?? measuredHeightRef.current;
         } else {
-            if (pendingRenderTimeoutRef.current) {
-                clearTimeout(pendingRenderTimeoutRef.current);
-                pendingRenderTimeoutRef.current = null;
-            }
-            pendingRenderContentRef.current = null;
-            buffer.reset();
-            ingestedLengthRef.current = 0;
-            lastRenderUpdateAtRef.current = Date.now();
-            setRenderedContentIfChanged(normalizedContent);
+            clearRevealAnimation();
         }
 
-        prevStreamingRef.current = isStreaming;
-        prevContentRef.current = normalizedContent;
-    }, [normalizedContent, isStreaming, setRenderedContentIfChanged]);
+        previousMarkdownRef.current = normalizedContent;
+    }, [clearRevealAnimation, isStreaming, normalizedContent]);
 
-    useEffect(() => {
-        return () => {
-            if (pendingRenderTimeoutRef.current) {
-                clearTimeout(pendingRenderTimeoutRef.current);
-                pendingRenderTimeoutRef.current = null;
+    useEffect(
+        () => () => {
+            clearRevealAnimation();
+        },
+        [clearRevealAnimation]
+    );
+
+    const handleLinkPress = useCallback(async ({ url }: { url: string }) => {
+        if (!url) {
+            return;
+        }
+
+        try {
+            const canOpenUrl = await Linking.canOpenURL(url);
+            if (canOpenUrl) {
+                await Linking.openURL(url);
             }
-            pendingRenderContentRef.current = null;
-        };
+        } catch (error) {
+            console.warn("Unable to open markdown link", error);
+        }
     }, []);
 
-    // Parse markdown
-    const parsed = useMemo((): ParsedMarkdown => {
-        return parseMarkdown(renderedContent);
-    }, [renderedContent]);
+    const handleLayout = useCallback((event: LayoutChangeEvent) => {
+        const nextHeight = event.nativeEvent.layout.height;
+        measuredHeightRef.current = nextHeight;
 
-    // Get plain text for copy all
-    const copyAllContent = useMemo(
-        () => formatMarkdownForCopy(normalizedContent),
-        [normalizedContent]
-    );
+        const revealTop = activeRevealTopRef.current ?? pendingRevealTopRef.current;
+        if (revealTop === null || nextHeight <= revealTop + HEIGHT_EPSILON) {
+            return;
+        }
 
-    // Render a single block
-    const renderBlock = useCallback(
-        (block: BlockToken, index: number): React.ReactNode => {
-            switch (block.type) {
-                case "header":
-                    return (
-                        <MarkdownHeader
-                            key={index}
-                            content={block.content}
-                            level={block.level || 1}
-                        />
-                    );
+        activeRevealTopRef.current = revealTop;
+        pendingRevealTopRef.current = null;
+        setRevealRegion({ top: revealTop, height: nextHeight - revealTop });
 
-                case "paragraph":
-                    return (
-                        <View key={index} style={styles.paragraph}>
-                            <MarkdownText content={block.content} />
-                        </View>
-                    );
+        const nextAnimationVersion = animationVersionRef.current + 1;
+        animationVersionRef.current = nextAnimationVersion;
 
-                case "codeBlock":
-                    return (
-                        <CodeBlock
-                            key={index}
-                            code={block.content}
-                            language={block.language}
-                            showLineNumbers={showLineNumbers}
-                            isComplete={block.isComplete !== false}
-                            isStreaming={isStreaming}
-                        />
-                    );
+        revealOpacity.stopAnimation();
+        revealOpacity.setValue(APPEND_REVEAL_START_OPACITY);
 
-                case "blockquote":
-                    return (
-                        <View key={index} style={styles.blockquote}>
-                            <View style={styles.blockquoteBorder} />
-                            <MarkdownBlockquote content={block.content} />
-                        </View>
-                    );
-
-                case "unorderedList":
-                    return (
-                        <View key={index} style={styles.listContainer}>
-                            {block.items?.map((item, itemIndex) => (
-                                <View key={itemIndex} style={styles.listItem}>
-                                    <Text style={styles.listBullet}>•</Text>
-                                    <MarkdownText
-                                        content={item.content}
-                                        style={styles.listContent}
-                                    />
-                                </View>
-                            ))}
-                        </View>
-                    );
-
-                case "orderedList":
-                    return (
-                        <View key={index} style={styles.listContainer}>
-                            {block.items?.map((item, itemIndex) => (
-                                <View key={itemIndex} style={styles.listItem}>
-                                    <Text style={styles.listNumber}>{itemIndex + 1}.</Text>
-                                    <MarkdownText
-                                        content={item.content}
-                                        style={styles.listContent}
-                                    />
-                                </View>
-                            ))}
-                        </View>
-                    );
-
-                case "taskList":
-                    return (
-                        <View key={index} style={styles.listContainer}>
-                            {block.items?.map((item, itemIndex) => (
-                                <View key={itemIndex} style={styles.taskListItem}>
-                                    <View
-                                        style={[
-                                            styles.taskCheckbox,
-                                            item.checked
-                                                ? styles.taskCheckboxChecked
-                                                : styles.taskCheckboxUnchecked,
-                                        ]}
-                                    >
-                                        {item.checked && (
-                                            <Text style={{ color: theme.colors.surface, fontSize: 12 }}>
-                                                ✓
-                                            </Text>
-                                        )}
-                                    </View>
-                                    <MarkdownText
-                                        content={item.content}
-                                        style={item.checked ? { ...styles.listContent, textDecorationLine: "line-through", opacity: 0.6 } : styles.listContent}
-                                    />
-                                </View>
-                            ))}
-                        </View>
-                    );
-
-                case "horizontalRule":
-                    return <View key={index} style={styles.horizontalRule} />;
-
-                case "table":
-                    if (block.headers && block.rows) {
-                        return (
-                            <TableComponent
-                                key={index}
-                                headers={block.headers}
-                                rows={block.rows}
-                            />
-                        );
-                    }
-                    return null;
-
-                case "image":
-                    if (block.images && block.images.length > 0) {
-                        return <ImageComponent key={index} images={block.images} />;
-                    }
-                    return null;
-
-                default:
-                    return (
-                        <View key={index} style={styles.paragraph}>
-                            <MarkdownText content={block.content} />
-                        </View>
-                    );
+        Animated.timing(revealOpacity, {
+            toValue: 0,
+            duration: APPEND_FADE_MS,
+            useNativeDriver: true,
+        }).start(({ finished }) => {
+            if (finished && animationVersionRef.current === nextAnimationVersion) {
+                activeRevealTopRef.current = null;
+                setRevealRegion(null);
             }
-        },
-        [isStreaming, styles, showLineNumbers, theme.colors.surface]
-    );
+        });
+    }, [revealOpacity]);
 
     return (
-        <View style={[styles.container, style]}>
-            {/* Render markdown blocks */}
-            {parsed.blocks.map(renderBlock)}
+        <View
+            testID="custom-markdown-container"
+            onLayout={handleLayout}
+            style={[styles.container, isUser ? styles.containerUser : null, style]}
+        >
+            <EnrichedMarkdownText
+                markdown={normalizedContent}
+                flavor="github"
+                markdownStyle={markdownStyles}
+                onLinkPress={handleLinkPress}
+                allowTrailingMargin={false}
+                containerStyle={isUser ? styles.markdownLayerUser : styles.markdownLayerAssistant}
+            />
 
-            {/* Copy all button - only show after streaming is complete */}
-            {showCopyAll && !isStreaming && normalizedContent.length > 0 && (
-                <View
-                    style={{
-                        alignItems: "flex-end",
-                        marginTop: 8,
-                    }}
-                >
-                    <CopyButton content={copyAllContent} size={16} />
-                </View>
-            )}
-
-            {/* Streaming indicator */}
-            {isStreaming && parsed.hasIncompleteBlock && (
-                <View style={{ marginTop: 8, opacity: 0.6 }}>
-                    <Text style={[styles.text, { fontStyle: "italic" }]}>
-                        ...
-                    </Text>
-                </View>
-            )}
+            {revealRegion ? (
+                <Animated.View
+                    pointerEvents="none"
+                    accessible={false}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    style={[
+                        styles.revealOverlay,
+                        {
+                            top: revealRegion.top,
+                            height: revealRegion.height,
+                            backgroundColor: revealOverlayColor,
+                            opacity: revealOpacity,
+                        },
+                    ]}
+                />
+            ) : null}
         </View>
     );
 };
 
-/**
- * Exported CustomMarkdown component wrapped with Error Boundary
- * Provides graceful degradation to raw text if markdown rendering fails
- */
+const MarkdownErrorFallback: React.FC<CustomMarkdownProps> = ({
+    content,
+    style,
+    isUser = false,
+}) => {
+    const { theme } = useTheme();
+    const normalizedContent = content as string;
+
+    return (
+        <View style={[styles.container, isUser ? styles.containerUser : null, style]}>
+            <Text selectable style={[styles.fallbackText, { color: theme.colors.text }]}>
+                {normalizedContent}
+            </Text>
+        </View>
+    );
+};
+
 export const CustomMarkdown: React.FC<CustomMarkdownProps> = (props) => {
+    const normalizedContent = useMemo(
+        () => normalizeMessageContentForRender(props.content),
+        [props.content]
+    );
+
     return (
         <MarkdownErrorBoundary
-            fallback={
-                <MarkdownErrorFallback
-                    content={props.content}
-                    style={props.style}
-                    isUser={props.isUser}
-                />
-            }
+            fallback={<MarkdownErrorFallback {...props} content={normalizedContent} />}
+            resetKey={normalizedContent}
         >
-            <CustomMarkdownInner {...props} />
+            <CustomMarkdownInner {...props} content={normalizedContent} />
         </MarkdownErrorBoundary>
     );
 };
+
+const styles = StyleSheet.create({
+    container: {
+        position: "relative",
+        overflow: "hidden",
+    },
+    containerUser: {
+        alignSelf: "flex-start",
+    },
+    markdownLayerAssistant: {
+        minWidth: "100%",
+    },
+    markdownLayerUser: {
+        alignSelf: "flex-start",
+    },
+    revealOverlay: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+    },
+    fallbackText: {
+        fontSize: 16,
+        lineHeight: 24,
+    },
+});
+
+export default CustomMarkdown;

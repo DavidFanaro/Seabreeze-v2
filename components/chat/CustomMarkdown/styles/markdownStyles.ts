@@ -1,442 +1,204 @@
-/**
- * @file markdownStyles.ts
- * @purpose Theme-aware styling system for custom markdown renderer
- */
-
-import { StyleSheet, TextStyle, ViewStyle } from "react-native";
+import type { MarkdownStyle } from "react-native-enriched-markdown";
 import type { Theme } from "@/components/ui/ThemeProvider";
-import { getSyntaxTheme } from "../utils/syntaxThemes";
 
-export interface MarkdownStyles {
-    // Container styles
-    container: ViewStyle;
-    copyAllButton: ViewStyle;
+const withAlpha = (color: string, alpha: number): string => {
+    const normalizedAlpha = Math.min(Math.max(alpha, 0), 1);
+    const trimmed = color.trim();
+    const hex = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
 
-    // Text styles
-    text: TextStyle;
-    bold: TextStyle;
-    italic: TextStyle;
-    strikethrough: TextStyle;
-    inlineCode: TextStyle;
+    if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+        const r = parseInt(hex[0] + hex[0], 16);
+        const g = parseInt(hex[1] + hex[1], 16);
+        const b = parseInt(hex[2] + hex[2], 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+    }
 
-    // Header styles
-    h1: TextStyle;
-    h2: TextStyle;
-    h3: TextStyle;
-    h4: TextStyle;
-    h5: TextStyle;
-    h6: TextStyle;
+    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+    }
 
-    // Block styles
-    paragraph: ViewStyle;
-    blockquote: ViewStyle;
-    blockquoteText: TextStyle;
-    blockquoteBorder: ViewStyle;
-    horizontalRule: ViewStyle;
+    const rgbMatch = trimmed.match(/^rgb\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\)$/i);
+    if (rgbMatch) {
+        const [, r, g, b] = rgbMatch;
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+    }
 
-    // Link styles
-    link: TextStyle;
-
-    // List styles
-    listContainer: ViewStyle;
-    listItem: ViewStyle;
-    listBullet: TextStyle;
-    listNumber: TextStyle;
-    listContent: TextStyle;
-    taskListItem: ViewStyle;
-    taskCheckbox: ViewStyle;
-    taskCheckboxChecked: ViewStyle;
-    taskCheckboxUnchecked: ViewStyle;
-
-    // Code block styles
-    codeBlockContainer: ViewStyle;
-    codeBlockHeader: ViewStyle;
-    codeBlockLanguage: TextStyle;
-    codeBlockContent: ViewStyle;
-    codeBlockText: TextStyle;
-    codeLineNumber: TextStyle;
-    codeLineNumberContainer: ViewStyle;
-    codeScrollView: ViewStyle;
-
-    // Table styles
-    tableContainer: ViewStyle;
-    tableRow: ViewStyle;
-    tableHeaderRow: ViewStyle;
-    tableCell: ViewStyle;
-    tableHeaderCell: ViewStyle;
-    tableCellText: TextStyle;
-    tableHeaderCellText: TextStyle;
-
-    // Image styles
-    imageContainer: ViewStyle;
-    image: ViewStyle;
-    imageCaption: TextStyle;
-    galleryContainer: ViewStyle;
-    galleryImage: ViewStyle;
-    galleryIndicator: ViewStyle;
-    galleryDot: ViewStyle;
-    galleryDotActive: ViewStyle;
-
-    // Copy button styles
-    copyButton: ViewStyle;
-    copyButtonPressed: ViewStyle;
-    copyButtonText: TextStyle;
-}
-
-export interface SyntaxTheme {
-    keyword: string;
-    string: string;
-    number: string;
-    comment: string;
-    function: string;
-    variable: string;
-    operator: string;
-    punctuation: string;
-    className: string;
-    property: string;
-    type: string;
-    constant: string;
-    boolean: string;
-    regex: string;
-    tag: string;
-    attribute: string;
-    default: string;
-}
-
-export const createSyntaxTheme = (theme: Theme, themeType: string): SyntaxTheme => {
-    return getSyntaxTheme(themeType);
+    return trimmed;
 };
 
-export const createMarkdownStyles = (theme: Theme): MarkdownStyles => {
-    const isDark = theme.isDark;
-    const codeBackground = theme.colors.surface;
-    const codeBorder = theme.colors.border;
+export const createMarkdownStyles = (theme: Theme): MarkdownStyle => {
+    const codeBlockBackground = theme.isDark
+        ? withAlpha(theme.colors.surface, 0.92)
+        : withAlpha(theme.colors.surface, 0.98);
 
-    return StyleSheet.create<MarkdownStyles>({
-        // Container styles
-        container: {
-            flex: 1,
-        },
-        copyAllButton: {
-            position: "absolute",
-            top: 8,
-            right: 8,
-            padding: 8,
-            borderRadius: theme.borderRadius.sm,
-            backgroundColor: theme.colors.surface,
-        },
+    const inlineCodeBackground = theme.isDark
+        ? withAlpha(theme.colors.surface, 0.78)
+        : withAlpha(theme.colors.surface, 0.72);
 
-        // Text styles
-        text: {
+    const tableEven = withAlpha(theme.colors.surface, theme.isDark ? 0.5 : 0.7);
+    const tableOdd = withAlpha(theme.colors.surface, theme.isDark ? 0.25 : 0.4);
+
+    return {
+        paragraph: {
+            color: theme.colors.text,
             fontSize: 16,
             lineHeight: 24,
-            color: theme.colors.text,
+            marginBottom: 12,
             fontFamily: "System",
         },
-        bold: {
+        h1: {
+            color: theme.colors.text,
+            fontSize: 28,
+            lineHeight: 36,
             fontWeight: "700",
+            marginTop: 20,
+            marginBottom: 14,
         },
-        italic: {
+        h2: {
+            color: theme.colors.text,
+            fontSize: 24,
+            lineHeight: 32,
+            fontWeight: "700",
+            marginTop: 16,
+            marginBottom: 12,
+        },
+        h3: {
+            color: theme.colors.text,
+            fontSize: 20,
+            lineHeight: 28,
+            fontWeight: "600",
+            marginTop: 14,
+            marginBottom: 10,
+        },
+        h4: {
+            color: theme.colors.text,
+            fontSize: 18,
+            lineHeight: 26,
+            fontWeight: "600",
+            marginTop: 12,
+            marginBottom: 8,
+        },
+        h5: {
+            color: theme.colors.text,
+            fontSize: 16,
+            lineHeight: 24,
+            fontWeight: "600",
+            marginTop: 10,
+            marginBottom: 6,
+        },
+        h6: {
+            color: theme.colors.textSecondary,
+            fontSize: 14,
+            lineHeight: 22,
+            fontWeight: "600",
+            marginTop: 8,
+            marginBottom: 6,
+        },
+        blockquote: {
+            color: theme.colors.textSecondary,
+            fontSize: 15,
+            lineHeight: 22,
+            marginTop: 10,
+            marginBottom: 12,
+            borderColor: theme.colors.accent,
+            borderWidth: 3,
+            gapWidth: 10,
+            backgroundColor: withAlpha(theme.colors.surface, theme.isDark ? 0.45 : 0.6),
+        },
+        list: {
+            color: theme.colors.text,
+            fontSize: 16,
+            lineHeight: 24,
+            marginBottom: 8,
+            bulletColor: theme.colors.accent,
+            markerColor: theme.colors.accent,
+            markerFontWeight: "600",
+            gapWidth: 8,
+            marginLeft: 2,
+        },
+        codeBlock: {
+            color: theme.colors.text,
+            fontSize: 13,
+            lineHeight: 20,
+            marginTop: 8,
+            marginBottom: 12,
+            fontFamily: "Menlo",
+            backgroundColor: codeBlockBackground,
+            borderColor: theme.colors.border,
+            borderRadius: theme.borderRadius.md,
+            borderWidth: 1,
+            padding: 12,
+        },
+        link: {
+            color: theme.colors.accent,
+            underline: true,
+        },
+        strong: {
+            color: theme.colors.text,
+            fontWeight: "bold",
+        },
+        em: {
+            color: theme.colors.text,
             fontStyle: "italic",
         },
         strikethrough: {
-            textDecorationLine: "line-through",
-            textDecorationStyle: "solid",
+            color: theme.colors.textSecondary,
         },
-        inlineCode: {
+        underline: {
+            color: theme.colors.accent,
+        },
+        code: {
+            color: theme.colors.accent,
+            fontSize: 14,
             fontFamily: "Menlo",
-            fontSize: 14,
-            backgroundColor: codeBackground,
-            color: isDark ? "#e06c75" : "#e45649",
-            paddingHorizontal: 6,
-            paddingVertical: 2,
-            borderRadius: 4,
-            overflow: "hidden",
-        },
-
-        // Header styles
-        h1: {
-            fontSize: 28,
-            fontWeight: "700",
-            color: theme.colors.text,
-            marginTop: 24,
-            marginBottom: 16,
-            lineHeight: 36,
-        },
-        h2: {
-            fontSize: 24,
-            fontWeight: "700",
-            color: theme.colors.text,
-            marginTop: 20,
-            marginBottom: 12,
-            lineHeight: 32,
-        },
-        h3: {
-            fontSize: 20,
-            fontWeight: "600",
-            color: theme.colors.text,
-            marginTop: 16,
-            marginBottom: 10,
-            lineHeight: 28,
-        },
-        h4: {
-            fontSize: 18,
-            fontWeight: "600",
-            color: theme.colors.text,
-            marginTop: 14,
-            marginBottom: 8,
-            lineHeight: 26,
-        },
-        h5: {
-            fontSize: 16,
-            fontWeight: "600",
-            color: theme.colors.text,
-            marginTop: 12,
-            marginBottom: 6,
-            lineHeight: 24,
-        },
-        h6: {
-            fontSize: 14,
-            fontWeight: "600",
-            color: theme.colors.textSecondary,
-            marginTop: 10,
-            marginBottom: 4,
-            lineHeight: 22,
-        },
-
-        // Block styles
-        paragraph: {
-            marginBottom: 12,
-        },
-        blockquote: {
-            flexDirection: "row",
-            marginVertical: 12,
-            paddingLeft: 12,
-        },
-        blockquoteText: {
-            fontSize: 16,
-            lineHeight: 24,
-            color: theme.colors.textSecondary,
-            fontStyle: "italic",
-            flex: 1,
-        },
-        blockquoteBorder: {
-            width: 4,
-            backgroundColor: theme.colors.accent,
-            borderRadius: 2,
-            marginRight: 12,
-        },
-        horizontalRule: {
-            height: 1,
-            backgroundColor: theme.colors.border,
-            marginVertical: 16,
-        },
-
-        // Link styles
-        link: {
-            color: theme.colors.accent,
-            textDecorationLine: "underline",
-        },
-
-        // List styles
-        listContainer: {
-            marginVertical: 8,
-        },
-        listItem: {
-            flexDirection: "row",
-            alignItems: "flex-start",
-            marginBottom: 6,
-            paddingLeft: 8,
-        },
-        listBullet: {
-            fontSize: 16,
-            lineHeight: 24,
-            color: theme.colors.accent,
-            marginRight: 8,
-            width: 16,
-        },
-        listNumber: {
-            fontSize: 16,
-            lineHeight: 24,
-            color: theme.colors.accent,
-            marginRight: 8,
-            minWidth: 20,
-        },
-        listContent: {
-            fontSize: 16,
-            lineHeight: 24,
-            color: theme.colors.text,
-            flex: 1,
-        },
-        taskListItem: {
-            flexDirection: "row",
-            alignItems: "flex-start",
-            marginBottom: 6,
-            paddingLeft: 8,
-        },
-        taskCheckbox: {
-            width: 18,
-            height: 18,
-            borderRadius: 4,
-            borderWidth: 2,
-            marginRight: 10,
-            marginTop: 3,
-            justifyContent: "center",
-            alignItems: "center",
-        },
-        taskCheckboxChecked: {
-            backgroundColor: theme.colors.accent,
-            borderColor: theme.colors.accent,
-        },
-        taskCheckboxUnchecked: {
-            backgroundColor: "transparent",
+            backgroundColor: inlineCodeBackground,
             borderColor: theme.colors.border,
-        },
-
-        // Code block styles
-        codeBlockContainer: {
-            marginVertical: 12,
-            borderRadius: theme.borderRadius.md,
-            backgroundColor: codeBackground,
-            borderWidth: 1,
-            borderColor: codeBorder,
-            overflow: "hidden",
-        },
-        codeBlockHeader: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            backgroundColor: theme.colors.surface,
-            borderBottomWidth: 1,
-            borderBottomColor: codeBorder,
-        },
-        codeBlockLanguage: {
-            fontSize: 12,
-            fontWeight: "600",
-            color: theme.colors.textSecondary,
-            textTransform: "uppercase",
-        },
-        codeBlockContent: {
-            padding: 12,
-        },
-        codeBlockText: {
-            fontFamily: "Menlo",
-            fontSize: 13,
-            lineHeight: 20,
-            color: theme.colors.text,
-        },
-        codeLineNumber: {
-            fontFamily: "Menlo",
-            fontSize: 13,
-            lineHeight: 20,
-            color: theme.colors.textSecondary,
-            textAlign: "right",
-            opacity: 0.5,
-        },
-        codeLineNumberContainer: {
-            paddingRight: 12,
-            marginRight: 12,
-            borderRightWidth: 1,
-            borderRightColor: codeBorder,
-        },
-        codeScrollView: {
-            flexDirection: "row",
-        },
-
-        // Table styles
-        tableContainer: {
-            marginVertical: 12,
-            borderRadius: theme.borderRadius.sm,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            overflow: "hidden",
-        },
-        tableRow: {
-            flexDirection: "row",
-            borderBottomWidth: 1,
-            borderBottomColor: theme.colors.border,
-        },
-        tableHeaderRow: {
-            flexDirection: "row",
-            backgroundColor: theme.colors.surface,
-            borderBottomWidth: 2,
-            borderBottomColor: theme.colors.border,
-        },
-        tableCell: {
-            flex: 1,
-            padding: 10,
-            borderRightWidth: 1,
-            borderRightColor: theme.colors.border,
-        },
-        tableHeaderCell: {
-            flex: 1,
-            padding: 10,
-            borderRightWidth: 1,
-            borderRightColor: theme.colors.border,
-        },
-        tableCellText: {
-            fontSize: 14,
-            color: theme.colors.text,
-        },
-        tableHeaderCellText: {
-            fontSize: 14,
-            fontWeight: "600",
-            color: theme.colors.text,
-        },
-
-        // Image styles
-        imageContainer: {
-            marginVertical: 12,
-            borderRadius: theme.borderRadius.md,
-            overflow: "hidden",
         },
         image: {
-            width: "100%",
+            height: 220,
             borderRadius: theme.borderRadius.md,
-        },
-        imageCaption: {
-            fontSize: 12,
-            color: theme.colors.textSecondary,
-            textAlign: "center",
             marginTop: 8,
-            fontStyle: "italic",
+            marginBottom: 12,
         },
-        galleryContainer: {
-            marginVertical: 12,
+        inlineImage: {
+            size: 18,
         },
-        galleryImage: {
-            borderRadius: theme.borderRadius.md,
-        },
-        galleryIndicator: {
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
+        thematicBreak: {
+            color: theme.colors.border,
+            height: 1,
             marginTop: 12,
+            marginBottom: 12,
         },
-        galleryDot: {
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: theme.colors.border,
-            marginHorizontal: 4,
-        },
-        galleryDotActive: {
-            backgroundColor: theme.colors.accent,
-        },
-
-        // Copy button styles
-        copyButton: {
-            padding: 6,
+        table: {
+            color: theme.colors.text,
+            fontSize: 14,
+            lineHeight: 20,
+            fontFamily: "System",
+            fontWeight: "400",
+            marginTop: 8,
+            marginBottom: 12,
+            headerFontFamily: "System",
+            headerBackgroundColor: withAlpha(theme.colors.surface, theme.isDark ? 0.8 : 0.95),
+            headerTextColor: theme.colors.text,
+            rowEvenBackgroundColor: tableEven,
+            rowOddBackgroundColor: tableOdd,
+            borderColor: theme.colors.border,
+            borderWidth: 1,
             borderRadius: theme.borderRadius.sm,
+            cellPaddingHorizontal: 10,
+            cellPaddingVertical: 8,
         },
-        copyButtonPressed: {
-            backgroundColor: theme.colors.accent,
+        taskList: {
+            checkedColor: theme.colors.accent,
+            borderColor: theme.colors.border,
+            checkboxSize: 17,
+            checkboxBorderRadius: 4,
+            checkmarkColor: theme.colors.surface,
+            checkedTextColor: theme.colors.textSecondary,
+            checkedStrikethrough: true,
         },
-        copyButtonText: {
-            fontSize: 12,
-            color: theme.colors.textSecondary,
-        },
-    });
+    };
 };

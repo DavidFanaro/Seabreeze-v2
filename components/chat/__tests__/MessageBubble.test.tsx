@@ -25,6 +25,7 @@ jest.mock("@/components/ui/ThemeProvider", () => ({
     theme: {
       colors: {
         text: "#000000",
+        background: "#111111",
         surface: "#ffffff",
         textSecondary: "#666666",
         border: "#cccccc",
@@ -37,13 +38,6 @@ jest.mock("@/components/ui/ThemeProvider", () => ({
       },
     },
   })),
-}));
-
-// Mock useSettingsStore hook
-jest.mock("@/stores/useSettingsStore", () => ({
-  useSettingsStore: jest.fn((selector) =>
-    selector({ showCodeLineNumbers: true })
-  ),
 }));
 
 describe("MessageBubble Component", () => {
@@ -149,65 +143,6 @@ describe("MessageBubble Component", () => {
     expect(mockCustomMarkdown).toHaveBeenCalledWith(
       expect.objectContaining({
         isStreaming: true,
-      })
-    );
-  });
-
-  /**
-   * Test: Non-streaming message shows copy all button
-   */
-  it("shows copy all button for non-streaming AI messages", () => {
-    render(
-      <MessageBubble
-        content="Code to copy"
-        isUser={false}
-        isStreaming={false}
-      />
-    );
-
-    // showCopyAll should be true for non-streaming AI messages
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        showCopyAll: true,
-      })
-    );
-  });
-
-  /**
-   * Test: Streaming user message doesn't show copy button
-   */
-  it("does not show copy all button for user messages", () => {
-    render(
-      <MessageBubble
-        content="User code"
-        isUser={true}
-        isStreaming={false}
-      />
-    );
-
-    // showCopyAll should be false for user messages
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        showCopyAll: false,
-      })
-    );
-  });
-
-  /**
-   * Test: Code line numbers setting is respected
-   */
-  it("respects code line numbers setting from store", () => {
-    render(
-      <MessageBubble
-        content="Code block"
-        isUser={false}
-      />
-    );
-
-    // The mocked store returns showCodeLineNumbers: true
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        showLineNumbers: true,
       })
     );
   });
@@ -387,27 +322,6 @@ describe("MessageBubble Component", () => {
         content: "Test content",
         isUser: true,
         isStreaming: false,
-        showLineNumbers: true,
-        showCopyAll: false,
-      })
-    );
-  });
-
-  /**
-   * Test: Streaming state disables copy all button
-   */
-  it("disables copy all button when message is streaming", () => {
-    render(
-      <MessageBubble
-        content="Streaming AI response"
-        isUser={false}
-        isStreaming={true}
-      />
-    );
-
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        showCopyAll: false,
       })
     );
   });
@@ -461,8 +375,8 @@ describe("MessageBubble Component", () => {
     expect(getByTestId("thinking-output-content")).toBeDefined();
   });
 
-  it("renders thinking output as plain text while streaming code", () => {
-    const { getByTestId } = render(
+  it("renders thinking output with markdown while streaming code", () => {
+    render(
       <MessageBubble
         content={"```zig\nconst std = @import(\"std\");"}
         isUser={false}
@@ -471,12 +385,10 @@ describe("MessageBubble Component", () => {
       />
     );
 
-    expect(getByTestId("thinking-output-content-plain")).toBeDefined();
-
     const thinkingMarkdownCalls = mockCustomMarkdown.mock.calls.filter(
       ([props]) => props?.content === "Live reasoning details"
     );
-    expect(thinkingMarkdownCalls).toHaveLength(0);
+    expect(thinkingMarkdownCalls).toHaveLength(1);
   });
 
   /**

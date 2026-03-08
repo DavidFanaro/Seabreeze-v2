@@ -140,13 +140,6 @@ interface SettingsState {
    */
   messageFontSize: number;
   
-  /**
-   * Controls display of line numbers in code blocks
-   * 
-   * When enabled, adds line numbers to code snippets for better reference
-   * and debugging convenience.
-   */
-  showCodeLineNumbers: boolean;
   __meta: HydrationMetaState;
 }
 
@@ -215,13 +208,6 @@ interface SettingsActions {
   setMessageFontSize: (size: number) => void;
   
   /**
-   * Enables or disables code line numbers
-   * 
-   * @param enabled - Whether line numbers should be shown in code blocks
-   */
-  setShowCodeLineNumbers: (enabled: boolean) => void;
-  
-  /**
    * Resets all settings to their default values
    * 
    * This action restores the initial app configuration and persists the change.
@@ -270,11 +256,6 @@ const DEFAULT_SETTINGS: Omit<SettingsState, "__meta"> = {
    */
   messageFontSize: 16,
   
-  /**
-   * Line numbers disabled by default to reduce visual clutter
-   * in casual code viewing scenarios.
-   */
-  showCodeLineNumbers: false,
 };
 
 /**
@@ -339,12 +320,6 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
             messageFontSize: size,
           }),
         ),
-      setShowCodeLineNumbers: (enabled) =>
-        set((state) =>
-          applyRuntimeWriteVersion(state, {
-            showCodeLineNumbers: enabled,
-          }),
-        ),
       resetSettings: () =>
         set((state) =>
           applyRuntimeWriteVersion(state, {
@@ -373,7 +348,6 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
         thinkingEnabled: state.thinkingEnabled,
         thinkingLevel: state.thinkingLevel,
         messageFontSize: state.messageFontSize,
-        showCodeLineNumbers: state.showCodeLineNumbers,
         __meta: {
           writeVersion: state.__meta.writeVersion,
         },
@@ -435,7 +409,6 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
  * **User Experience Controls**:
  * - Haptic feedback for tactile interaction confirmation
  * - Configurable message font size for accessibility
- * - Code line numbers toggle for developer convenience
  * - Auto-generated chat titles for better organization
  * 
  * **Data Persistence**:
