@@ -1,7 +1,8 @@
-import { router, Stack } from "expo-router";
-import { View, Text, SafeAreaView, Pressable, ScrollView, StyleSheet } from "react-native";
-import { Suspense } from "react";
-import { IconButton, useTheme } from "@/components";
+import { router } from "expo-router";
+import { View, Text, Pressable, StyleSheet } from "react-native";
+
+import { SettingsScreen } from "@/components/settings/SettingsScreen";
+import { useTheme } from "@/components/ui/ThemeProvider";
 import { ProviderIcon } from "@/components/ui/ProviderIcons";
 import { isProviderConfigured, useProviderStore } from "@/stores";
 import { SymbolView } from "expo-symbols";
@@ -97,124 +98,84 @@ export default function SettingsIndex() {
   ];
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Stack.Screen
-        options={{
-          headerTitle: "Settings",
-          headerTransparent: true,
-          headerTintColor: theme.colors.text,
-          headerLeft: () => (
-            <IconButton
-              icon="xmark"
-              onPress={() => router.dismiss()}
-              size={24}
-              style={{ marginLeft: 6 }}
-            />
-          ),
-        }}
-      />
+    <SettingsScreen title="Settings" closeButtonPosition="left">
+      <Text
+        className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-widest"
+        style={{ color: theme.colors.textSecondary }}
+      >
+        General
+      </Text>
 
-      <SafeAreaView className="flex-1">
-        <Suspense fallback={<Text>Loading</Text>}>
-          <ScrollView className="flex-1" contentContainerClassName="flex-grow pt-5 px-4">
-
-            {/* ── APPEARANCE ──────────────────────────────────── */}
-            <Text
-              className="text-[11px] font-semibold uppercase tracking-widest px-1 mb-2"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              General
-            </Text>
-
+      <View
+        className="mb-6 overflow-hidden rounded-xl"
+        style={{ backgroundColor: theme.colors.surface }}
+      >
+        <Pressable
+          onPress={navigateToAppearance}
+          className="flex-row items-center justify-between px-4 py-3.5"
+          style={({ pressed }) => ({
+            backgroundColor: pressed ? theme.colors.border : theme.colors.surface,
+          })}
+        >
+          <View className="flex-1 flex-row items-center">
             <View
-              className="rounded-xl overflow-hidden mb-6"
-              style={{ backgroundColor: theme.colors.surface }}
+              className="mr-3 h-[40px] w-[40px] items-center justify-center rounded-xl"
+              style={{ backgroundColor: theme.colors.background }}
             >
-              <Pressable
-                onPress={navigateToAppearance}
-                className="flex-row items-center justify-between py-3.5 px-4"
-                style={({ pressed }) => ({
-                  backgroundColor: pressed ? theme.colors.border : theme.colors.surface,
-                })}
-              >
-                <View className="flex-row items-center flex-1">
-                  <View
-                    className="w-[40px] h-[40px] rounded-xl justify-center items-center mr-3"
-                    style={{ backgroundColor: theme.colors.background }}
-                  >
-                    <SymbolView name="paintbrush" size={22} tintColor={theme.colors.accent} />
-                  </View>
-                  <View className="flex-1">
-                    <Text
-                      className="text-[16px] font-semibold mb-0.5"
-                      style={{ color: theme.colors.text }}
-                    >
-                      Appearance
-                    </Text>
-                    <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
-                      Theme and display settings
-                    </Text>
-                  </View>
-                </View>
-                <View className="ml-2">
-                  <SymbolView name="chevron.right" size={18} tintColor={theme.colors.textSecondary} />
-                </View>
-              </Pressable>
+              <SymbolView name="paintbrush" size={22} tintColor={theme.colors.accent} />
             </View>
-
-            {/* ── PROVIDERS ───────────────────────────────────── */}
-            <Text
-              className="text-[11px] font-semibold uppercase tracking-widest px-1 mb-2"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Providers
-            </Text>
-
-            <View
-              className="rounded-xl overflow-hidden mb-6"
-              style={{ backgroundColor: theme.colors.surface }}
-            >
-              {providers.map((provider, index) => (
-                <ProviderListItem
-                  key={provider.id}
-                  providerId={provider.id}
-                  name={provider.name}
-                  description={provider.description}
-                  isConfigured={isProviderConfigured(provider.id)}
-                  isLast={index === providers.length - 1}
-                  selectedModel={
-                    provider.id === selectedProvider ? selectedModel ?? undefined : undefined
-                  }
-                  onPress={() => navigateToProvider(provider.id)}
-                />
-              ))}
-            </View>
-
-            {/* ── ABOUT ───────────────────────────────────────── */}
-            <View
-              className="p-4 rounded-xl"
-              style={{ backgroundColor: theme.colors.surface }}
-            >
-              <Text
-                className="text-[15px] font-semibold mb-1.5"
-                style={{ color: theme.colors.text }}
-              >
-                About
+            <View className="flex-1">
+              <Text className="mb-0.5 text-[16px] font-semibold" style={{ color: theme.colors.text }}>
+                Appearance
               </Text>
-              <Text
-                className="text-[13px] leading-[19px]"
-                style={{ color: theme.colors.textSecondary }}
-              >
-                Seabreeze v1.0.0{"\n"}
-                A modern AI chat interface powered by React Native and Expo.{"\n\n"}
-                Built with ❤️ for iOS, Android, and Web.
+              <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
+                Theme and display settings
               </Text>
             </View>
+          </View>
+          <View className="ml-2">
+            <SymbolView name="chevron.right" size={18} tintColor={theme.colors.textSecondary} />
+          </View>
+        </Pressable>
+      </View>
 
-            <View className="h-4" />
-          </ScrollView>
-        </Suspense>
-      </SafeAreaView>
-    </View>
+      <Text
+        className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-widest"
+        style={{ color: theme.colors.textSecondary }}
+      >
+        Providers
+      </Text>
+
+      <View
+        className="mb-6 overflow-hidden rounded-xl"
+        style={{ backgroundColor: theme.colors.surface }}
+      >
+        {providers.map((provider, index) => (
+          <ProviderListItem
+            key={provider.id}
+            providerId={provider.id}
+            name={provider.name}
+            description={provider.description}
+            isConfigured={isProviderConfigured(provider.id)}
+            isLast={index === providers.length - 1}
+            selectedModel={provider.id === selectedProvider ? selectedModel ?? undefined : undefined}
+            onPress={() => navigateToProvider(provider.id)}
+          />
+        ))}
+      </View>
+
+      <View className="rounded-xl p-4" style={{ backgroundColor: theme.colors.surface }}>
+        <Text className="mb-1.5 text-[15px] font-semibold" style={{ color: theme.colors.text }}>
+          About
+        </Text>
+        <Text className="text-[13px] leading-[19px]" style={{ color: theme.colors.textSecondary }}>
+          Seabreeze v1.0.0{"\n"}
+          A modern AI chat interface powered by React Native and Expo.{"\n\n"}
+          Built with ❤️ for iOS, Android, and Web.
+        </Text>
+      </View>
+
+      <View className="h-4" />
+    </SettingsScreen>
   );
 }

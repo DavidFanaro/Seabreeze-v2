@@ -47,7 +47,6 @@ export const PROVIDER_ICONS: Record<ProviderId, React.FC<ProviderIconProps>> = {
   // OpenRouter: Brand PNG asset tinted with theme color for consistency
   openrouter: ({ size = 24, color }) => (
     <Image
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       source={require("../../assets/provider logos/openrouter.png")}
       style={{ width: size, height: size, tintColor: color }}
       resizeMode="contain"
@@ -57,7 +56,6 @@ export const PROVIDER_ICONS: Record<ProviderId, React.FC<ProviderIconProps>> = {
   // Ollama: Brand PNG asset tinted with theme color for consistency
   ollama: ({ size = 24, color }) => (
     <Image
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       source={require("../../assets/provider logos/ollama.png")}
       style={{ width: size, height: size, tintColor: color }}
       resizeMode="contain"

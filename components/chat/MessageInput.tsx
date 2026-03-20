@@ -5,6 +5,7 @@ import {
     TextInput,
     TouchableOpacity,
     ViewStyle,
+    type LayoutChangeEvent,
     type NativeSyntheticEvent,
     type TextInputSubmitEditingEventData,
 } from "react-native";
@@ -40,6 +41,7 @@ interface MessageInputProps {
     disabled?: boolean;
     isStreaming?: boolean;
     onCancel?: () => void;
+    onLayout?: (event: LayoutChangeEvent) => void;
     style?: ViewStyle;
 }
 
@@ -67,6 +69,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     disabled = false,
     isStreaming = false,
     onCancel,
+    onLayout,
     style,
 }) => {
     // ============================================================================
@@ -146,6 +149,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     return (
         <View
             testID="message-input-wrapper"
+            onLayout={onLayout}
             className="w-full px-4 my-2"
         >
             {attachments.length > 0 ? (

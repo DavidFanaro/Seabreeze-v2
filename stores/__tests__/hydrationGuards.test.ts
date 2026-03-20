@@ -34,11 +34,8 @@ const resetProviderStateForHydrationTest = (): void => {
 const resetSettingsStateForHydrationTest = (): void => {
   useSettingsStore.setState({
     theme: 'dark',
-    hapticEnabled: true,
-    autoGenerateTitles: true,
     thinkingEnabled: true,
     thinkingLevel: 'medium',
-    messageFontSize: 16,
     __meta: {
       writeVersion: 0,
       hasHydrated: false,
@@ -125,7 +122,7 @@ describe('Hydration mutation guards', () => {
       if (key === 'settings-storage') {
         return toPersistedValue({
           theme: 'light',
-          messageFontSize: 14,
+          thinkingLevel: 'low',
           __meta: {
             writeVersion: 0,
           },
@@ -139,7 +136,7 @@ describe('Hydration mutation guards', () => {
       useProviderStore.getState().setSelectedProvider('openrouter');
       useProviderStore.getState().setSelectedModel('anthropic/claude-sonnet-4-20250514');
       useSettingsStore.getState().setTheme('darcula');
-      useSettingsStore.getState().setMessageFontSize(20);
+      useSettingsStore.getState().setThinkingLevel('high');
     });
 
     await act(async () => {
@@ -155,6 +152,6 @@ describe('Hydration mutation guards', () => {
     expect(providerState.selectedProvider).toBe('openrouter');
     expect(providerState.selectedModel).toBe('anthropic/claude-sonnet-4-20250514');
     expect(settingsState.theme).toBe('darcula');
-    expect(settingsState.messageFontSize).toBe(20);
+    expect(settingsState.thinkingLevel).toBe('high');
   });
 });

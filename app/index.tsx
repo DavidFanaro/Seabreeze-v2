@@ -6,7 +6,9 @@ import { useIsFocused } from "@react-navigation/native";
 import useDatabase from "@/hooks/useDatabase";
 import { chat } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { IconButton, ChatListItem, useTheme } from "@/components";
+import { ChatListItem } from "@/components/chat/ChatListItem";
+import { IconButton } from "@/components/ui/IconButton";
+import { useTheme } from "@/components/ui/ThemeProvider";
 import { normalizeTitleForPersistence } from "@/lib/chat-title";
 import {
   acquireChatDeleteLock,

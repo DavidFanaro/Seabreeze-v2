@@ -5,7 +5,7 @@
 import { describe, it, expect, jest, beforeEach, afterAll } from '@jest/globals';
 import { render, fireEvent, screen } from '@testing-library/react-native';
 import React from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert } from 'react-native';
 
 import { ModelListManager } from '../ModelListManager';
 import { ThemeProvider } from '@/components/ui/ThemeProvider';
@@ -34,8 +34,8 @@ jest.mock('@/components/ui/ThemeProvider', () => ({
 
 // Mock ModelRow component
 jest.mock('../ModelRow', () => {
-    const React = require('react');
-    const { Pressable, Text, View } = require('react-native');
+    const React = jest.requireActual<typeof import('react')>('react');
+    const { Pressable, Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
 
     return {
         ModelRow: ({ model, isSelected, isCustom, isEditMode, onSelect, onEdit, onDelete, disabled }: any) => {
@@ -72,8 +72,8 @@ jest.mock('expo-haptics', () => ({
 
 // Mock expo-symbols
 jest.mock('expo-symbols', () => {
-    const React = require('react');
-    const { Text } = require('react-native');
+    const React = jest.requireActual<typeof import('react')>('react');
+    const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
 
     return {
         SymbolView: ({ name, size, tintColor }: any) => (

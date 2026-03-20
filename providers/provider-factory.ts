@@ -282,7 +282,7 @@ export async function testProviderConnectionReal(
                 if (credentials?.apiKey) {
                     const { createOpenRouter } = await import("@openrouter/ai-sdk-provider");
                     const provider = createOpenRouter({ apiKey: credentials.apiKey });
-                    model = provider("openai/gpt-4o-mini");
+                    model = provider("openai/gpt-4o-mini") as unknown as LanguageModel;
                 } else {
                     model = getOpenRouterModel("openai/gpt-4o-mini");
                 }

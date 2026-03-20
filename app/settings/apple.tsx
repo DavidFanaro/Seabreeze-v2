@@ -3,11 +3,11 @@
  * @purpose Informational screen for Apple Intelligence provider.
  */
 
-import { router, Stack } from "expo-router";
 import * as React from "react";
-import { View, Text, SafeAreaView, ScrollView, StyleSheet } from "react-native";
-import { Suspense } from "react";
-import { useTheme, IconButton } from "@/components";
+import { View, Text, StyleSheet } from "react-native";
+
+import { SettingsScreen } from "@/components/settings/SettingsScreen";
+import { useTheme } from "@/components/ui/ThemeProvider";
 
 const FEATURES = [
   "Writing Tools: Rewriting, summarizing, and composing text",
@@ -58,103 +58,71 @@ export default function AppleSettings() {
   const { theme } = useTheme();
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Stack.Screen
-        options={{
-          headerTitle: "Apple Intelligence",
-          headerTransparent: true,
-          headerTintColor: theme.colors.text,
-          headerRight: () => (
-            <IconButton
-              icon="xmark"
-              onPress={() => router.dismiss()}
-              size={24}
-              style={{ marginLeft: 6 }}
-            />
-          ),
-        }}
-      />
-      <SafeAreaView className="flex-1">
-        <Suspense fallback={<Text>Loading</Text>}>
-          <ScrollView
-            className="flex-1"
-            contentContainerClassName="flex-grow pt-5 px-4"
+    <SettingsScreen title="Apple Intelligence">
+      <View
+        className="overflow-hidden rounded-xl"
+        style={{ backgroundColor: theme.colors.surface }}
+      >
+        <View className="px-4 pb-4 pt-4">
+          <Text
+            className="mb-2 text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: theme.colors.textSecondary }}
           >
-            {/* Single card with hairline dividers between sections */}
-            <View
-              className="rounded-xl overflow-hidden"
-              style={{ backgroundColor: theme.colors.surface }}
-            >
-              {/* ── About ──────────────────────────────────────── */}
-              <View className="px-4 pt-4 pb-4">
-                <Text
-                  className="text-[11px] font-semibold uppercase tracking-widest mb-2"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  About
-                </Text>
-                <Text
-                  className="text-[14px] leading-[21px]"
-                  style={{ color: theme.colors.text }}
-                >
-                  Apple Intelligence provides on-device AI capabilities powered
-                  by Apple Silicon. It includes writing tools, image recognition,
-                  and natural language processing that runs locally on your device
-                  for privacy and performance.
-                </Text>
-              </View>
+            About
+          </Text>
+          <Text className="text-[14px] leading-[21px]" style={{ color: theme.colors.text }}>
+            Apple Intelligence provides on-device AI capabilities powered by Apple Silicon. It
+            includes writing tools, image recognition, and natural language processing that runs
+            locally on your device for privacy and performance.
+          </Text>
+        </View>
 
-              <View
-                style={{
-                  height: StyleSheet.hairlineWidth,
-                  backgroundColor: theme.colors.border,
-                  marginHorizontal: 16,
-                }}
-              />
+        <View
+          style={{
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: theme.colors.border,
+            marginHorizontal: 16,
+          }}
+        />
 
-              {/* ── Features ───────────────────────────────────── */}
-              <View className="px-4 pt-4 pb-4">
-                <Text
-                  className="text-[11px] font-semibold uppercase tracking-widest mb-3"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Features
-                </Text>
-                <InfoList
-                  items={FEATURES}
-                  accentColor={theme.colors.accent}
-                  textColor={theme.colors.text}
-                />
-              </View>
+        <View className="px-4 pb-4 pt-4">
+          <Text
+            className="mb-3 text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            Features
+          </Text>
+          <InfoList
+            items={FEATURES}
+            accentColor={theme.colors.accent}
+            textColor={theme.colors.text}
+          />
+        </View>
 
-              <View
-                style={{
-                  height: StyleSheet.hairlineWidth,
-                  backgroundColor: theme.colors.border,
-                  marginHorizontal: 16,
-                }}
-              />
+        <View
+          style={{
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: theme.colors.border,
+            marginHorizontal: 16,
+          }}
+        />
 
-              {/* ── Requirements ───────────────────────────────── */}
-              <View className="px-4 pt-4 pb-4">
-                <Text
-                  className="text-[11px] font-semibold uppercase tracking-widest mb-3"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Requirements
-                </Text>
-                <InfoList
-                  items={REQUIREMENTS}
-                  accentColor={theme.colors.accent}
-                  textColor={theme.colors.text}
-                />
-              </View>
-            </View>
+        <View className="px-4 pb-4 pt-4">
+          <Text
+            className="mb-3 text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            Requirements
+          </Text>
+          <InfoList
+            items={REQUIREMENTS}
+            accentColor={theme.colors.accent}
+            textColor={theme.colors.text}
+          />
+        </View>
+      </View>
 
-            <View className="h-4" />
-          </ScrollView>
-        </Suspense>
-      </SafeAreaView>
-    </View>
+      <View className="h-4" />
+    </SettingsScreen>
   );
 }

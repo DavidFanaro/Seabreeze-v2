@@ -171,10 +171,6 @@ export function coerceMessageContentToString(content: unknown): string {
   return "";
 }
 
-export function normalizeMessageContentForRender(content: unknown): string {
-  return coerceMessageContentToString(content);
-}
-
 /**
  * Normalize persisted message arrays while preserving valid roles.
  */

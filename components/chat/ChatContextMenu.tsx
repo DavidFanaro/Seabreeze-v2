@@ -21,6 +21,7 @@ import {
   isThinkingCapableModel,
 } from "@/types/provider.types";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
+import { getVisibleModelNames } from "@/lib/model-utils";
 
 /**
  * Properties for the ChatContextMenu component
@@ -52,23 +53,6 @@ const getDefaultModelsForProvider = (providerId: ProviderId): string[] => {
     default:
       return [];
   }
-};
-
-const normalizeUniqueModels = (models: string[]): string[] => {
-  const normalizedModels: string[] = [];
-  const seenModels = new Set<string>();
-
-  for (const model of models) {
-    const normalizedModel = model.trim();
-    if (!normalizedModel || seenModels.has(normalizedModel)) {
-      continue;
-    }
-
-    seenModels.add(normalizedModel);
-    normalizedModels.push(normalizedModel);
-  }
-
-  return normalizedModels;
 };
 
 /**
@@ -168,12 +152,11 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
       const baseModels = providerId === "ollama" ? available : defaultModels;
 
       // Filter out hidden models and append custom models
-      const visibleDefaults = baseModels.filter((m) => !hidden.includes(m));
-      const visibleCustomModels = custom.filter((m) => !hidden.includes(m));
-      return normalizeUniqueModels([
-        ...visibleDefaults,
-        ...visibleCustomModels,
-      ]);
+      return getVisibleModelNames({
+        baseModels,
+        customModels: custom,
+        hiddenModels: hidden,
+      });
     };
   }, [customModels, hiddenModels, availableModels]);
 

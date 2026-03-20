@@ -27,6 +27,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { ProviderId } from "@/types/provider.types";
+import { getVisibleModelNames, normalizeUniqueModelNames } from "@/lib/model-utils";
 import { safeSecureStore } from "@/lib/safe-secure-store";
 import {
   applyRuntimeWriteVersion,
@@ -182,23 +183,6 @@ const DEFAULT_HIDDEN_MODELS: Record<ProviderId, string[]> = {
   ollama: [], // All default Ollama models shown initially
 };
 
-const normalizeModelNames = (models: string[]): string[] => {
-  const normalizedModels: string[] = [];
-  const seenModels = new Set<string>();
-
-  for (const model of models) {
-    const normalizedModel = model.trim();
-    if (!normalizedModel || seenModels.has(normalizedModel)) {
-      continue;
-    }
-
-    seenModels.add(normalizedModel);
-    normalizedModels.push(normalizedModel);
-  }
-
-  return normalizedModels;
-};
-
 const getVisibleModelsForProvider = (
   provider: ProviderId,
   availableModels: Record<ProviderId, string[]>,
@@ -211,12 +195,11 @@ const getVisibleModelsForProvider = (
       ? availableModels[provider] || []
       : DEFAULT_MODELS[provider];
 
-  const visibleBaseModels = baseModels.filter((model) => !hidden.includes(model));
-  const visibleCustomModels = (customModels[provider] || []).filter(
-    (model) => !hidden.includes(model),
-  );
-
-  return normalizeModelNames([...visibleBaseModels, ...visibleCustomModels]);
+  return getVisibleModelNames({
+    baseModels,
+    customModels: customModels[provider] || [],
+    hiddenModels: hidden,
+  });
 };
 
 // ============================================================================
@@ -296,7 +279,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
        */
       setAvailableModels: (provider, models) =>
         set((state) => {
-          const normalizedAvailableModels = normalizeModelNames(models);
+          const normalizedAvailableModels = normalizeUniqueModelNames(models);
           const nextAvailableModels = {
             ...state.availableModels,
             [provider]: normalizedAvailableModels,
@@ -309,12 +292,12 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
           }
 
           const availableModelSet = new Set(normalizedAvailableModels);
-          const providerCustomModels = normalizeModelNames(
+          const providerCustomModels = normalizeUniqueModelNames(
             (state.customModels[provider] || []).filter(
               (model) => !availableModelSet.has(model),
             ),
           );
-          const providerHiddenModels = normalizeModelNames(
+          const providerHiddenModels = normalizeUniqueModelNames(
             (state.hiddenModels[provider] || []).filter(
               (model) => !availableModelSet.has(model),
             ),

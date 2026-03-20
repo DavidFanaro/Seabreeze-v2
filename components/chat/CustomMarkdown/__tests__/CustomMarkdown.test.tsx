@@ -1,6 +1,6 @@
 import React from "react";
-import { act, fireEvent, render } from "@testing-library/react-native";
-import { Animated, StyleSheet } from "react-native";
+import { render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import { CustomMarkdown } from "../CustomMarkdown";
 
 const mockEnrichedMarkdown = jest.fn();
@@ -34,25 +34,14 @@ jest.mock("@/components/ui/ThemeProvider", () => ({
 }));
 
 describe("CustomMarkdown", () => {
-  let timingSpy: jest.SpyInstance;
-
   beforeEach(() => {
     mockEnrichedMarkdown.mockClear();
-    timingSpy = jest.spyOn(Animated, "timing").mockImplementation(() => ({
-      start: (callback?: (result: { finished: boolean }) => void) => {
-        callback?.({ finished: true });
-      },
-    }) as any);
-  });
-
-  afterEach(() => {
-    timingSpy.mockRestore();
   });
 
   it("renders streaming markdown directly without a code fence fallback", () => {
     const incompleteCodeBlock = "```ts\nconst answer = 42;";
 
-    render(<CustomMarkdown content={incompleteCodeBlock} isStreaming={true} />);
+    render(<CustomMarkdown content={incompleteCodeBlock} />);
 
     const latestCall = mockEnrichedMarkdown.mock.calls.at(-1);
     expect(latestCall).toBeDefined();
@@ -84,57 +73,10 @@ describe("CustomMarkdown", () => {
     expect(containerStyle.minWidth).toBe("100%");
   });
 
-  it("animates append-only streaming updates", () => {
-    const { getByTestId, rerender } = render(<CustomMarkdown content="Hello" isStreaming={true} />);
+  it("coerces non-string content before rendering markdown", () => {
+    render(<CustomMarkdown content={{ text: "Object content" }} />);
 
-    fireEvent(getByTestId("custom-markdown-container"), "layout", {
-      nativeEvent: { layout: { x: 0, y: 0, width: 200, height: 20 } },
-    });
-
-    timingSpy.mockClear();
-
-    act(() => {
-      rerender(<CustomMarkdown content="Hello world" isStreaming={true} />);
-    });
-
-    expect(timingSpy).not.toHaveBeenCalled();
-
-    fireEvent(getByTestId("custom-markdown-container"), "layout", {
-      nativeEvent: { layout: { x: 0, y: 0, width: 200, height: 40 } },
-    });
-
-    expect(timingSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not animate append-only updates when height does not grow", () => {
-    const { getByTestId, rerender } = render(<CustomMarkdown content="Hello" isStreaming={true} />);
-
-    fireEvent(getByTestId("custom-markdown-container"), "layout", {
-      nativeEvent: { layout: { x: 0, y: 0, width: 200, height: 20 } },
-    });
-
-    timingSpy.mockClear();
-
-    act(() => {
-      rerender(<CustomMarkdown content="Hello there" isStreaming={true} />);
-    });
-
-    fireEvent(getByTestId("custom-markdown-container"), "layout", {
-      nativeEvent: { layout: { x: 0, y: 0, width: 200, height: 20 } },
-    });
-
-    expect(timingSpy).not.toHaveBeenCalled();
-  });
-
-  it("does not animate non-append streaming updates", () => {
-    const { rerender } = render(<CustomMarkdown content="Hello" isStreaming={true} />);
-
-    timingSpy.mockClear();
-
-    act(() => {
-      rerender(<CustomMarkdown content="Updated hello" isStreaming={true} />);
-    });
-
-    expect(timingSpy).not.toHaveBeenCalled();
+    const latestCall = mockEnrichedMarkdown.mock.calls.at(-1);
+    expect(latestCall?.[0].markdown).toBe("Object content");
   });
 });

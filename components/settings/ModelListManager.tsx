@@ -14,25 +14,9 @@ import {
 import { SymbolView } from "expo-symbols";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { ProviderId } from "@/types/provider.types";
+import { getVisibleModelNames } from "@/lib/model-utils";
 import { useProviderStore } from "@/stores";
 import { ModelRow } from "./ModelRow";
-
-function normalizeUniqueModels(models: string[]): string[] {
-    const normalizedModels: string[] = [];
-    const seenModels = new Set<string>();
-
-    for (const model of models) {
-        const normalizedModel = model.trim();
-        if (!normalizedModel || seenModels.has(normalizedModel)) {
-            continue;
-        }
-
-        seenModels.add(normalizedModel);
-        normalizedModels.push(normalizedModel);
-    }
-
-    return normalizedModels;
-}
 
 interface ModelListManagerProps {
     providerId: ProviderId;
@@ -92,17 +76,27 @@ export function ModelListManager({
             : Boolean(dynamicModels?.length);
         const sourceModels = shouldUseDynamicModels ? (dynamicModels ?? []) : predefinedModels;
 
-        return normalizeUniqueModels(sourceModels.filter((m) => !providerHiddenModels.includes(m)));
+        return getVisibleModelNames({
+            baseModels: sourceModels,
+            hiddenModels: providerHiddenModels,
+        });
     }, [providerId, dynamicModels, predefinedModels, providerHiddenModels]);
 
     const visibleCustomModels = useMemo(
-        () => normalizeUniqueModels(providerCustomModels.filter((m) => !providerHiddenModels.includes(m))),
+        () => getVisibleModelNames({
+            baseModels: [],
+            customModels: providerCustomModels,
+            hiddenModels: providerHiddenModels,
+        }),
         [providerCustomModels, providerHiddenModels],
     );
 
     // All models: Combine provider base models with custom user-added models
     const allModels = useMemo(
-        () => normalizeUniqueModels([...baseModels, ...visibleCustomModels]),
+        () => getVisibleModelNames({
+            baseModels,
+            customModels: visibleCustomModels,
+        }),
         [baseModels, visibleCustomModels]
     );
 

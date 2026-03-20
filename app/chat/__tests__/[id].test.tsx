@@ -111,8 +111,7 @@ jest.mock('@/hooks/chat/useChat', () => ({
   default: () => mockUseChatReturn,
 }));
 
-// Mock theme components
-jest.mock('@/components', () => ({
+jest.mock('@/components/ui/ThemeProvider', () => ({
   useTheme: () => ({
     theme: {
       colors: {
@@ -125,10 +124,25 @@ jest.mock('@/components', () => ({
       },
     },
   }),
+}));
+
+jest.mock('@/components/chat/MessageList', () => ({
   MessageList: () => null,
+}));
+
+jest.mock('@/components/chat/MessageInput', () => ({
   MessageInput: () => null,
+}));
+
+jest.mock('@/components/chat/ChatContextMenu', () => ({
   ChatContextMenu: () => null,
+}));
+
+jest.mock('@/components/chat/RetrievalRecoveryView', () => ({
   RetrievalRecoveryView: () => null,
+}));
+
+jest.mock('@/components/chat/RetryBanner', () => ({
   RetryBanner: () => null,
 }));
 
@@ -144,6 +158,7 @@ jest.mock('react-native-keyboard-controller', () => {
       React.createElement(React.Fragment, null, children)
     ),
     useReanimatedKeyboardAnimation: jest.fn(() => ({
+      height: { value: 0 },
       progress: { value: 0 },
     })),
   };

@@ -35,6 +35,7 @@ describe("MessageInput", () => {
   const mockOnAddAttachment = jest.fn();
   const mockOnRemoveAttachment = jest.fn();
   const mockOnCancel = jest.fn();
+  const mockOnLayout = jest.fn();
 
   const attachments: ChatAttachment[] = [
     {
@@ -52,6 +53,7 @@ describe("MessageInput", () => {
     mockOnAddAttachment.mockClear();
     mockOnRemoveAttachment.mockClear();
     mockOnCancel.mockClear();
+    mockOnLayout.mockClear();
   });
 
   it("renders input, add button, and send button", () => {
@@ -199,5 +201,24 @@ describe("MessageInput", () => {
 
     fireEvent.press(getByTestId("message-input-send"));
     expect(mockOnSend).not.toHaveBeenCalled();
+  });
+
+  it("forwards wrapper layout changes", () => {
+    const { getByTestId } = render(
+      <MessageInput
+        value=""
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        onLayout={mockOnLayout}
+      />,
+    );
+
+    fireEvent(getByTestId("message-input-wrapper"), "layout", {
+      nativeEvent: {
+        layout: { x: 0, y: 0, width: 320, height: 84 },
+      },
+    });
+
+    expect(mockOnLayout).toHaveBeenCalledTimes(1);
   });
 });

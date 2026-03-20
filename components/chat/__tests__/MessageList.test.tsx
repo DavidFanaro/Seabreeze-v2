@@ -386,6 +386,22 @@ describe("MessageList Component", () => {
     expect(root).toBeDefined();
   });
 
+  it("keeps the base bottom padding when inset updates are external", () => {
+    render(
+      <MessageList
+        messages={mockMessages}
+        isStreaming={false}
+        bottomInset={96}
+      />
+    );
+
+    expect(latestFlashListProps.contentContainerStyle[0]).toMatchObject({
+      paddingTop: 125,
+      paddingBottom: 8,
+    });
+    expect(latestFlashListProps.style).toBeUndefined();
+  });
+
   /**
    * Test: Custom style prop is applied to container
    */
@@ -418,6 +434,22 @@ describe("MessageList Component", () => {
     );
 
     expect(true).toBe(true);
+  });
+
+  it("scrolls to the new bottom when bottom inset grows", () => {
+    const { rerender } = render(
+      <MessageList messages={mockMessages} isStreaming={false} bottomInset={0} />
+    );
+
+    mockScrollToEnd.mockClear();
+
+    act(() => {
+      rerender(
+        <MessageList messages={mockMessages} isStreaming={false} bottomInset={96} />
+      );
+    });
+
+    expect(mockScrollToEnd).toHaveBeenCalledWith({ animated: false });
   });
 
   /**

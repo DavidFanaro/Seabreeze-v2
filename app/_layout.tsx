@@ -2,7 +2,6 @@
 import "@/lib/polyfills";
 import "@/global.css";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   DarkTheme,
   DefaultTheme,
@@ -19,10 +18,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { HeroUINativeProvider } from "heroui-native";
 
 import migrations from "../drizzle/migrations";
-import { ThemeProvider, useTheme } from "@/components";
-import { HeroUIThemeProvider } from "@/components/ui/HeroUIThemeProvider";
+import { ThemeProvider, useTheme } from "@/components/ui/ThemeProvider";
 import useDatabase, { dbname } from "@/hooks/useDatabase";
-const queryClient = new QueryClient();
 
 export const unstable_settings = {
   initialRouteName: "index",
@@ -58,64 +55,51 @@ function NavigationContent() {
 
   return (
     <KeyboardProvider>
-      {/* ThemeContext: Supplies navigation theme to React Navigation components */}
       <ThemeContext value={navigationTheme}>
-        {/* QueryClientProvider: React Query cache provider for API state management */}
-        <QueryClientProvider client={queryClient}>
-          {/* Stack Navigator: Root navigation stack containing all app screens */}
-          <Stack>
-            {/* Home Screen: Main chat interface (freezeOnBlur preserves state when switching apps) */}
-            <Stack.Screen
-              name="index"
-              options={{
-                freezeOnBlur: true,
-              }}
-            />
-            {/* Settings Section: Provider configuration and general settings screens (card presentation for modal appearance) */}
-            {/* Settings - Main: Primary settings interface hub */}
-            <Stack.Screen
-              name="settings/index"
-              options={{
-                presentation: "card",
-              }}
-            />
-            {/* Settings - OpenAI: OpenAI provider API key and model configuration */}
-            <Stack.Screen
-              name="settings/openai"
-              options={{
-                presentation: "card",
-              }}
-            />
-            {/* Settings - OpenRouter: OpenRouter provider API key and model configuration */}
-            <Stack.Screen
-              name="settings/openrouter"
-              options={{
-                presentation: "card",
-              }}
-            />
-            {/* Settings - Ollama: Ollama local provider connection and model settings */}
-            <Stack.Screen
-              name="settings/ollama"
-              options={{
-                presentation: "card",
-              }}
-            />
-            {/* Settings - Apple: Apple Intelligence provider configuration and permissions */}
-            <Stack.Screen
-              name="settings/apple"
-              options={{
-                presentation: "card",
-              }}
-            />
-            {/* Settings - Appearance: Theme and visual preferences (light/dark mode, accent colors) */}
-            <Stack.Screen
-              name="settings/appearance"
-              options={{
-                presentation: "card",
-              }}
-            />
-          </Stack>
-        </QueryClientProvider>
+        <Stack>
+          <Stack.Screen
+            name="index"
+            options={{
+              freezeOnBlur: true,
+            }}
+          />
+          <Stack.Screen
+            name="settings/index"
+            options={{
+              presentation: "card",
+            }}
+          />
+          <Stack.Screen
+            name="settings/openai"
+            options={{
+              presentation: "card",
+            }}
+          />
+          <Stack.Screen
+            name="settings/openrouter"
+            options={{
+              presentation: "card",
+            }}
+          />
+          <Stack.Screen
+            name="settings/ollama"
+            options={{
+              presentation: "card",
+            }}
+          />
+          <Stack.Screen
+            name="settings/apple"
+            options={{
+              presentation: "card",
+            }}
+          />
+          <Stack.Screen
+            name="settings/appearance"
+            options={{
+              presentation: "card",
+            }}
+          />
+        </Stack>
       </ThemeContext>
     </KeyboardProvider>
   );
@@ -127,11 +111,9 @@ function DatabaseGate() {
 
   useDrizzleStudio(db.$client);
 
-  // Error state: Display migration error message if database migrations fail
   if (error) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
-        {/* Error message label: Shows detailed migration error information to user */}
         <Text style={{ color: "#ff6b6b", fontSize: 16, textAlign: "center", padding: 20 }}>
           Migration error: {error.message}
         </Text>
@@ -151,29 +133,19 @@ function DatabaseGate() {
 }
 
 export default function RootLayout() {
-  // Main layout UI hierarchy with nested providers and theme configuration
   return (
-    // GestureHandlerRootView: Root container for gesture handling (flex: 1 makes it fill available space)
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* HeroUI Native provider: Configures HeroUI component library and styling (devInfo disabled for production) */}
       <HeroUINativeProvider config={{ devInfo: { stylingPrinciples: false } }}>
-        {/* ThemeProvider: Application-wide theme context with default dark theme */}
         <ThemeProvider defaultTheme="dark">
-          {/* HeroUIThemeProvider: Integrates HeroUI components with custom theme */}
-          <HeroUIThemeProvider>
-            {/* Suspense boundary: Loading fallback while database provider initializes */}
-            <Suspense fallback={<Text>Loading</Text>}>
-              {/* SQLiteProvider: Database connection provider with change listener enabled for reactive updates */}
-              <SQLiteProvider
-                databaseName={dbname}
-                useSuspense={true}
-                options={{ enableChangeListener: true }}
-              >
-                {/* DatabaseGate: Runs migrations before rendering navigation content */}
-                <DatabaseGate />
-              </SQLiteProvider>
-            </Suspense>
-          </HeroUIThemeProvider>
+          <Suspense fallback={<Text>Loading</Text>}>
+            <SQLiteProvider
+              databaseName={dbname}
+              useSuspense={true}
+              options={{ enableChangeListener: true }}
+            >
+              <DatabaseGate />
+            </SQLiteProvider>
+          </Suspense>
         </ThemeProvider>
       </HeroUINativeProvider>
     </GestureHandlerRootView>

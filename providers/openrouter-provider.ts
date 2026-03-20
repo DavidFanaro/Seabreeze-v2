@@ -58,7 +58,7 @@ export function getOpenRouterModel(modelId: string = "openai/gpt-4o"): LanguageM
             apiKey,
             fetch: expoFetch as unknown as typeof globalThis.fetch,
         });
-        return provider(modelId);
+        return provider(modelId) as unknown as LanguageModel;
     } catch (error) {
         return null;
     }

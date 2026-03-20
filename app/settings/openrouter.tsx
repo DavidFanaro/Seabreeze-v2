@@ -3,18 +3,14 @@
  * @purpose OpenRouter provider configuration — API key, model selection, connection test.
  */
 
-import { router, Stack } from "expo-router";
-import * as React from "react";
-import { View, Text, SafeAreaView, ScrollView } from "react-native";
-import { Suspense, useState, useEffect } from "react";
-import { IconButton, SettingInput, SaveButton, ModelListManager, useTheme } from "@/components";
-import { SymbolView } from "expo-symbols";
+import { useEffect, useState } from "react";
+
+import { ProviderSettingsScreen } from "@/components/settings/ProviderSettingsScreen";
 import { useProviderStore, useAuthStore } from "@/stores";
 import { testProviderConnection } from "@/providers/provider-factory";
 import { OPENROUTER_MODELS } from "@/types/provider.types";
 
 export default function OpenRouterSettings() {
-  const { theme } = useTheme();
   const { selectedModel, setSelectedModel } = useProviderStore();
   const { openrouterApiKey, setOpenRouterApiKey } = useAuthStore();
 
@@ -47,86 +43,25 @@ export default function OpenRouterSettings() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Stack.Screen
-        options={{
-          headerTitle: "OpenRouter",
-          headerTransparent: true,
-          headerTintColor: theme.colors.text,
-          headerRight: () => (
-            <IconButton
-              icon="xmark"
-              onPress={() => router.dismiss()}
-              size={24}
-              style={{ marginLeft: 6 }}
-            />
-          ),
-        }}
-      />
-      <SafeAreaView className="flex-1">
-        <Suspense fallback={<Text>Loading</Text>}>
-          <ScrollView
-            className="flex-1"
-            contentContainerClassName="flex-grow pt-5 gap-5"
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* API Key */}
-            <SettingInput
-              label="API Key"
-              value={apiKey}
-              onChangeText={setApiKeyState}
-              secureTextEntry={true}
-              placeholder="sk-or-..."
-            />
-
-            {/* Model selection */}
-            <View className="mt-4">
-              <ModelListManager
-                providerId="openrouter"
-                predefinedModels={OPENROUTER_MODELS}
-                selectedModel={selectedModel}
-                onModelSelect={setSelectedModel}
-              />
-            </View>
-
-            {/* Push bottom section down */}
-            <View className="flex-1 min-h-2" />
-
-            {/* Test result — shown just above Save button for context */}
-            {testResult && (
-              <View
-                className="flex-row items-center mx-4 p-3 rounded-xl"
-                style={{ backgroundColor: theme.colors.surface }}
-              >
-                <SymbolView
-                  name={testResult.success ? "checkmark.circle" : "xmark.circle"}
-                  size={20}
-                  tintColor={testResult.success ? theme.colors.accent : theme.colors.error}
-                />
-                <Text
-                  className="text-[14px] ml-2 flex-1"
-                  style={{
-                    color: testResult.success ? theme.colors.accent : theme.colors.error,
-                  }}
-                >
-                  {testResult.message}
-                </Text>
-              </View>
-            )}
-
-            {/* Save button */}
-            <View className="px-4">
-              <SaveButton
-                onPress={handleSave}
-                loading={isSaving || isTesting}
-                title="Save Settings"
-              />
-            </View>
-
-            <View className="h-2" />
-          </ScrollView>
-        </Suspense>
-      </SafeAreaView>
-    </View>
+    <ProviderSettingsScreen
+      title="OpenRouter"
+      providerId="openrouter"
+      inputLabel="API Key"
+      inputValue={apiKey}
+      onChangeText={setApiKeyState}
+      inputPlaceholder="sk-or-..."
+      inputSecureTextEntry
+      predefinedModels={OPENROUTER_MODELS}
+      selectedModel={selectedModel}
+      onModelSelect={setSelectedModel}
+      status={testResult}
+      actions={[
+        {
+          title: "Save Settings",
+          onPress: handleSave,
+          loading: isSaving || isTesting,
+        },
+      ]}
+    />
   );
 }

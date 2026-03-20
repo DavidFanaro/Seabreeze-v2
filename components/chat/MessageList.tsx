@@ -46,6 +46,7 @@ interface MessageListProps {
     thinkingOutput?: string[];
     isStreaming?: boolean;
     isThinking?: boolean;
+    bottomInset?: number;
 }
 
 const NEAR_BOTTOM_THRESHOLD_PX = 100;
@@ -70,6 +71,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     thinkingOutput = [],
     isStreaming = false,
     isThinking = false,
+    bottomInset = 0,
 }) => {
     // ============================================================================
     // STATE & REFS SECTION
@@ -254,6 +256,14 @@ export const MessageList: React.FC<MessageListProps> = ({
             }
         };
     }, []);
+
+    useEffect(() => {
+        if (bottomInset <= 0) {
+            return;
+        }
+
+        scrollToBottom(false, false, true);
+    }, [bottomInset, scrollToBottom]);
 
     // ============================================================================
     // KEY EXTRACTOR SECTION

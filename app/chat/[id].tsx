@@ -13,13 +13,18 @@ import { eq } from "drizzle-orm";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { ActionSheetIOS, Alert, Linking, Modal, Platform, Pressable, Text, TextInput, View, unstable_batchedUpdates } from "react-native";
+import { ActionSheetIOS, Alert, Keyboard, Linking, Modal, Platform, Pressable, Text, TextInput, View, type LayoutChangeEvent, unstable_batchedUpdates } from "react-native";
 import { KeyboardAvoidingView, KeyboardStickyView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated";
 import { ModelMessage } from "ai";
-import { MessageList, MessageInput, useTheme, ChatContextMenu, RetrievalRecoveryView, RetryBanner } from "@/components";
+import { ChatContextMenu } from "@/components/chat/ChatContextMenu";
+import { MessageInput } from "@/components/chat/MessageInput";
+import { MessageList } from "@/components/chat/MessageList";
+import { RetrievalRecoveryView } from "@/components/chat/RetrievalRecoveryView";
+import { RetryBanner } from "@/components/chat/RetryBanner";
 import { SaveErrorBanner } from "@/components/chat/SaveErrorBanner";
+import { useTheme } from "@/components/ui/ThemeProvider";
 import {
     asDataUri,
     isModelSupportedImageType,
@@ -67,6 +72,8 @@ export default function Chat() {
     const [hydrationError, setHydrationError] = useState<string | null>(null);
     const [hydrationAttempt, setHydrationAttempt] = useState(0);
     const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+    const [composerHeight, setComposerHeight] = useState(0);
+    const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
     const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
     const [renameTitleDraft, setRenameTitleDraft] = useState("");
     const hydrationGuardRef = useRef(createSequenceGuard("chat-hydration"));
@@ -111,6 +118,23 @@ export default function Chat() {
     });
 
     const isInputLocked = streamState === "streaming" || streamState === "completing";
+    const messageListBottomInset = isIos && isKeyboardVisible ? composerHeight : 0;
+
+    useEffect(() => {
+        const showSubscription = Keyboard.addListener(
+            isIos ? "keyboardWillShow" : "keyboardDidShow",
+            () => setIsKeyboardVisible(true)
+        );
+        const hideSubscription = Keyboard.addListener(
+            isIos ? "keyboardWillHide" : "keyboardDidHide",
+            () => setIsKeyboardVisible(false)
+        );
+
+        return () => {
+            showSubscription.remove();
+            hideSubscription.remove();
+        };
+    }, [isIos]);
 
     const initialUserRequest = useMemo(() => {
         for (const message of messages) {
@@ -236,6 +260,13 @@ export default function Chat() {
 
     const handleRemoveAttachment = useCallback((attachmentId: string) => {
         setPendingAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
+    }, []);
+
+    const handleComposerLayout = useCallback((event: LayoutChangeEvent) => {
+        const nextComposerHeight = Math.ceil(event.nativeEvent.layout.height);
+        setComposerHeight((currentHeight) => (
+            currentHeight === nextComposerHeight ? currentHeight : nextComposerHeight
+        ));
     }, []);
 
     const processSelectedAssets = useCallback((assets: ImagePicker.ImagePickerAsset[]) => {
@@ -813,12 +844,13 @@ export default function Chat() {
                      {/* MESSAGE LIST SECTION */}
                      {/* Displays all messages in the conversation, auto-scrolls during stream */}
                      {/* ================================================================== */}
-                      <MessageList
-                        messages={messages}
-                        thinkingOutput={thinkingOutput}
-                        isThinking={isThinking}
-                        isStreaming={isStreaming}
-                      />
+                       <MessageList
+                         messages={messages}
+                         thinkingOutput={thinkingOutput}
+                         isThinking={isThinking}
+                         isStreaming={isStreaming}
+                         bottomInset={messageListBottomInset}
+                       />
 
                       <RetrievalRecoveryView
                           visible={!!hydrationError}
@@ -847,7 +879,11 @@ export default function Chat() {
                          onRetry={triggerSave}
                          attempts={saveStatus === "retrying" ? saveAttempts : undefined}
                      />
-                </KeyboardAvoidingView>
+
+                     {messageListBottomInset > 0 ? (
+                         <View style={{ height: messageListBottomInset }} />
+                     ) : null}
+                 </KeyboardAvoidingView>
                 
                 {/* ================================================================== */}
                 {/* INPUT SECTION */}
@@ -857,12 +893,13 @@ export default function Chat() {
                     <KeyboardStickyView>
                         <Animated.View style={animatedBottomStyle}>
                             <MessageInput
-                                value={text}
-                                onChangeText={setText}
-                                onSend={sendChatMessages}
-                                attachments={pendingAttachments}
-                                onAddAttachment={handleAddAttachment}
-                                onRemoveAttachment={handleRemoveAttachment}
+                                 value={text}
+                                 onChangeText={setText}
+                                 onSend={sendChatMessages}
+                                 onLayout={handleComposerLayout}
+                                 attachments={pendingAttachments}
+                                 onAddAttachment={handleAddAttachment}
+                                 onRemoveAttachment={handleRemoveAttachment}
                                 disabled={isInputLocked}
                                 isStreaming={isStreaming}
                                 onCancel={cancel}
@@ -871,13 +908,14 @@ export default function Chat() {
                     </KeyboardStickyView>
                  ) : (
                      <Animated.View style={animatedBottomStyle}>
-                         <MessageInput
-                            value={text}
-                            onChangeText={setText}
-                            onSend={sendChatMessages}
-                            attachments={pendingAttachments}
-                            onAddAttachment={handleAddAttachment}
-                            onRemoveAttachment={handleRemoveAttachment}
+                          <MessageInput
+                             value={text}
+                             onChangeText={setText}
+                             onSend={sendChatMessages}
+                             onLayout={handleComposerLayout}
+                             attachments={pendingAttachments}
+                             onAddAttachment={handleAddAttachment}
+                             onRemoveAttachment={handleRemoveAttachment}
                             disabled={isInputLocked}
                             isStreaming={isStreaming}
                             onCancel={cancel}

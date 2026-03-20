@@ -31,6 +31,7 @@ import { createOllama } from "ollama-ai-provider-v2";
 import { LanguageModel } from "ai";
 import { getProviderAuth } from "@/stores";
 import { fetch as expoFetch } from "expo/fetch";
+import { normalizeUniqueModelNames } from "@/lib/model-utils";
 
 // ============================================================================
 // URL NORMALIZATION UTILITIES
@@ -81,27 +82,6 @@ function extractModelName(entry: unknown): string | null {
     }
 
     return null;
-}
-
-function normalizeModelNames(modelNames: unknown[]): string[] {
-    const normalizedModels: string[] = [];
-    const seenModels = new Set<string>();
-
-    for (const modelName of modelNames) {
-        if (typeof modelName !== "string") {
-            continue;
-        }
-
-        const normalizedModelName = modelName.trim();
-        if (!normalizedModelName || seenModels.has(normalizedModelName)) {
-            continue;
-        }
-
-        seenModels.add(normalizedModelName);
-        normalizedModels.push(normalizedModelName);
-    }
-
-    return normalizedModels;
 }
 
 // ============================================================================
@@ -298,7 +278,7 @@ export async function fetchOllamaModels(baseUrl: string): Promise<string[]> {
                 modelEntries = (data as { models: unknown[] }).models;
             }
 
-            return normalizeModelNames(
+            return normalizeUniqueModelNames(
                 modelEntries.map((modelEntry) => extractModelName(modelEntry)),
             );
         } finally {

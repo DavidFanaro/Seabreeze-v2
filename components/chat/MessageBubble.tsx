@@ -9,11 +9,11 @@ import { Pressable, Text, View, ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import type { ModelMessage } from "ai";
 
-import { CustomMarkdown } from "./CustomMarkdown";
+import { CustomMarkdown } from "./CustomMarkdown/CustomMarkdown";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { parseMessageContent } from "@/lib/chat-content-parts";
-import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
 import { isImageMediaType, isVideoMediaType } from "@/lib/chat-attachments";
+import { withAlpha } from "@/lib/color-utils";
 
 /**
  * Props interface for MessageBubble component
@@ -31,34 +31,6 @@ interface MessageBubbleProps {
   isError?: boolean;
   style?: ViewStyle;
 }
-
-const withAlpha = (color: string, alpha: number): string => {
-  const normalizedAlpha = Math.min(Math.max(alpha, 0), 1);
-  const trimmed = color.trim();
-  const hex = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
-
-  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
-    const r = parseInt(hex[0] + hex[0], 16);
-    const g = parseInt(hex[1] + hex[1], 16);
-    const b = parseInt(hex[2] + hex[2], 16);
-    return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-  }
-
-  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-  }
-
-  const rgbMatch = trimmed.match(/^rgb\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\)$/i);
-  if (rgbMatch) {
-    const [, r, g, b] = rgbMatch;
-    return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-  }
-
-  return `rgba(220, 38, 38, ${normalizedAlpha})`;
-};
 
 /**
  * MessageBubble component
@@ -95,14 +67,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
       (filePart) => !isImageMediaType(filePart.mediaType),
     );
     const hasStructuredMedia = mediaImageParts.length > 0 || fileParts.length > 0;
-    const normalizedContent = parsedContent.text.length > 0
-      ? parsedContent.text
-      : (hasStructuredMedia ? "" : normalizeMessageContentForRender(content));
+    const normalizedContent = parsedContent.text;
     const normalizedThinkingOutput = thinkingOutput?.trim() ?? "";
     const hasThinkingOutput = !isUser && normalizedThinkingOutput.length > 0;
     const isAssistantError = !isUser && isError;
     const errorColor = theme.colors.error ?? "#dc2626";
-    const errorBackgroundColor = withAlpha(errorColor, 0.14);
+    const errorBackgroundColor = withAlpha(errorColor, 0.14, "rgba(220, 38, 38, 0.14)");
 
     const toggleThinkingOutput = useCallback(() => {
       setIsThinkingExpanded((prev) => !prev);
@@ -170,9 +140,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
               >
                 <CustomMarkdown
                   content={normalizedThinkingOutput}
-                  isStreaming={isStreaming}
                   isUser={false}
-                  animationSurfaceColor={theme.colors.glass ?? theme.colors.surface}
                 />
               </View>
             )}
@@ -201,11 +169,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
           {normalizedContent.length > 0 || !hasStructuredMedia ? (
             <CustomMarkdown
               content={normalizedContent}
-              isStreaming={isStreaming}
               isUser={isUser}
-              animationSurfaceColor={isUser
-                ? theme.colors.surface
-                : (isAssistantError ? errorBackgroundColor : theme.colors.background)}
             />
           ) : null}
 

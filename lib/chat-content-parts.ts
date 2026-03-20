@@ -1,4 +1,5 @@
 import { isImageMediaType, isVideoMediaType } from "@/lib/chat-attachments";
+import { coerceMessageContentToString } from "@/lib/chat-message-normalization";
 
 interface PartRecord extends Record<string, unknown> {
   type?: unknown;
@@ -61,9 +62,15 @@ export const parseMessageContent = (content: unknown): ParsedMessageContent => {
     };
   }
 
-  if (!Array.isArray(content)) {
+  const parts = Array.isArray(content)
+    ? content
+    : content && typeof content === "object" && Array.isArray((content as { parts?: unknown }).parts)
+      ? (content as { parts: unknown[] }).parts
+      : null;
+
+  if (!parts) {
     return {
-      text: "",
+      text: coerceMessageContentToString(content),
       images: [],
       files: [],
     };
@@ -73,7 +80,7 @@ export const parseMessageContent = (content: unknown): ParsedMessageContent => {
   const images: ParsedImagePart[] = [];
   const files: ParsedFilePart[] = [];
 
-  content.forEach((part) => {
+  parts.forEach((part) => {
     if (!part || typeof part !== "object") {
       return;
     }

@@ -10,7 +10,7 @@ import { MessageBubble } from "../MessageBubble";
 
 // Mock CustomMarkdown component
 const mockCustomMarkdown = jest.fn();
-jest.mock("../CustomMarkdown", () => {
+jest.mock("../CustomMarkdown/CustomMarkdown", () => {
   return {
     CustomMarkdown: function MockCustomMarkdown(props: any) {
       mockCustomMarkdown(props);
@@ -127,10 +127,7 @@ describe("MessageBubble Component", () => {
     expect(bubbleStyle.borderWidth).toBe(1);
   });
 
-  /**
-   * Test: Streaming state is passed to CustomMarkdown
-   */
-  it("passes streaming state to CustomMarkdown component", () => {
+  it("keeps rendering markdown while the message is streaming", () => {
     render(
       <MessageBubble
         content="Streaming content"
@@ -142,7 +139,7 @@ describe("MessageBubble Component", () => {
     // Verify streaming state is passed correctly
     expect(mockCustomMarkdown).toHaveBeenCalledWith(
       expect.objectContaining({
-        isStreaming: true,
+        content: "Streaming content",
       })
     );
   });
@@ -321,7 +318,6 @@ describe("MessageBubble Component", () => {
       expect.objectContaining({
         content: "Test content",
         isUser: true,
-        isStreaming: false,
       })
     );
   });
@@ -482,7 +478,7 @@ describe("MessageBubble Component", () => {
     );
     expect(mockCustomMarkdown).toHaveBeenNthCalledWith(
       4,
-      expect.objectContaining({ content: "Second AI response", isUser: false, isStreaming: true })
+      expect.objectContaining({ content: "Second AI response", isUser: false })
     );
   });
 });

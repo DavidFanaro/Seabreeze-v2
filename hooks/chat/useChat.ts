@@ -64,7 +64,7 @@ import {
     createSequenceGuard,
 } from "@/lib/concurrency";
 import { isDataUri, isLocalAssetUri, isVideoMediaType } from "@/lib/chat-attachments";
-import { normalizeMessageContentForRender } from "@/lib/chat-message-normalization";
+import { coerceMessageContentToString } from "@/lib/chat-message-normalization";
 import { getErrorFixes } from "@/lib/error-messages";
 import {
     createErrorAnnotation,
@@ -540,7 +540,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     const { title, setTitle, generateTitle } = useTitleGeneration(
         messages.map(m => ({
             role: m.role,
-            content: normalizeMessageContentForRender(m.content),
+            content: coerceMessageContentToString(m.content),
         })),
         model,
         enableRetry,

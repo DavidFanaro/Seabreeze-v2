@@ -6,7 +6,6 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { render, fireEvent, screen } from '@testing-library/react-native';
 import React from 'react';
 import * as Haptics from 'expo-haptics';
-import { Text } from 'react-native';
 
 import { ModelRow } from '../ModelRow';
 import type { Theme } from '@/components/ui/ThemeProvider';
@@ -25,9 +24,12 @@ jest.mock('expo-haptics', () => ({
 
 // Mock expo-symbols - return proper React element with Text wrapper
 jest.mock('expo-symbols', () => {
+    const mockReact = jest.requireActual<typeof import('react')>('react');
+    const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
+
     return {
         SymbolView: ({ name, size, tintColor }: any) =>
-            React.createElement(Text, {}, `SymbolView-${name}-${size}-${tintColor}`),
+            mockReact.createElement(Text, {}, `SymbolView-${name}-${size}-${tintColor}`),
     };
 });
 
@@ -71,7 +73,7 @@ jest.mock('@/components/ui/ThemeProvider', () => ({
     __esModule: true,
     ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
     Theme: {},
-    useTheme: () => ({ theme: mockTheme, themeType: 'light' as const, themeMode: 'light' as const, setThemeType: jest.fn() }),
+    useTheme: () => ({ theme: mockTheme, themeType: 'light' as const, themeMode: 'light' as const }),
 }));
 
 // Helper component to wrap with ThemeProvider
