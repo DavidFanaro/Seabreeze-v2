@@ -29,10 +29,30 @@ jest.mock("expo-symbols", () => ({
   SymbolView: jest.fn(() => null),
 }));
 
+jest.mock("react-native-reanimated", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  return {
+    __esModule: true,
+    default: {
+      View: React.forwardRef((props: any, ref: any) =>
+        React.createElement(View, { ...props, ref }),
+      ),
+    },
+    FadeIn: { duration: () => ({ springify: () => ({}) }) },
+    FadeOut: { duration: () => ({}) },
+    useSharedValue: (v: number) => ({ value: v }),
+    useAnimatedStyle: () => ({}),
+    withTiming: (v: number) => v,
+    Easing: { out: () => ({}), ease: {} },
+  };
+});
+
 describe("MessageInput", () => {
   const mockOnChangeText = jest.fn();
   const mockOnSend = jest.fn();
-  const mockOnAddAttachment = jest.fn();
+  const mockOnTakePhoto = jest.fn();
+  const mockOnChooseFromLibrary = jest.fn();
   const mockOnRemoveAttachment = jest.fn();
   const mockOnCancel = jest.fn();
   const mockOnLayout = jest.fn();
@@ -50,7 +70,8 @@ describe("MessageInput", () => {
   beforeEach(() => {
     mockOnChangeText.mockClear();
     mockOnSend.mockClear();
-    mockOnAddAttachment.mockClear();
+    mockOnTakePhoto.mockClear();
+    mockOnChooseFromLibrary.mockClear();
     mockOnRemoveAttachment.mockClear();
     mockOnCancel.mockClear();
     mockOnLayout.mockClear();
@@ -135,18 +156,62 @@ describe("MessageInput", () => {
     expect(mockOnSend).toHaveBeenCalledWith("Submitted");
   });
 
-  it("calls onAddAttachment from plus button", () => {
+  it("opens popover on plus button press and calls onTakePhoto", () => {
+    const { getByTestId, queryByTestId } = render(
+      <MessageInput
+        value=""
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        onTakePhoto={mockOnTakePhoto}
+        onChooseFromLibrary={mockOnChooseFromLibrary}
+      />,
+    );
+
+    // Popover is hidden initially
+    expect(queryByTestId("media-menu-popover")).toBeNull();
+
+    // Press "+" to open popover
+    fireEvent.press(getByTestId("message-input-add"));
+    expect(getByTestId("media-menu-popover")).toBeTruthy();
+
+    // Press "Take Photo"
+    fireEvent.press(getByTestId("media-menu-take-photo"));
+    expect(mockOnTakePhoto).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens popover and calls onChooseFromLibrary", () => {
     const { getByTestId } = render(
       <MessageInput
         value=""
         onChangeText={mockOnChangeText}
         onSend={mockOnSend}
-        onAddAttachment={mockOnAddAttachment}
+        onTakePhoto={mockOnTakePhoto}
+        onChooseFromLibrary={mockOnChooseFromLibrary}
       />,
     );
 
     fireEvent.press(getByTestId("message-input-add"));
-    expect(mockOnAddAttachment).toHaveBeenCalledTimes(1);
+    fireEvent.press(getByTestId("media-menu-choose-library"));
+    expect(mockOnChooseFromLibrary).toHaveBeenCalledTimes(1);
+  });
+
+  it("toggles popover closed on second plus button press", () => {
+    const { getByTestId, queryByTestId } = render(
+      <MessageInput
+        value=""
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        onTakePhoto={mockOnTakePhoto}
+      />,
+    );
+
+    // Open
+    fireEvent.press(getByTestId("message-input-add"));
+    expect(getByTestId("media-menu-popover")).toBeTruthy();
+
+    // Close
+    fireEvent.press(getByTestId("message-input-add"));
+    expect(queryByTestId("media-menu-popover")).toBeNull();
   });
 
   it("renders attachment chips and removes an attachment", () => {
@@ -191,7 +256,7 @@ describe("MessageInput", () => {
         value="Text"
         onChangeText={mockOnChangeText}
         onSend={mockOnSend}
-        onAddAttachment={mockOnAddAttachment}
+        onTakePhoto={mockOnTakePhoto}
         disabled={true}
       />,
     );

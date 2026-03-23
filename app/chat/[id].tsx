@@ -14,7 +14,7 @@ import { eq } from "drizzle-orm";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { ActionSheetIOS, Alert, Keyboard, Linking, Modal, Platform, Pressable, Text, TextInput, View, type LayoutChangeEvent, unstable_batchedUpdates } from "react-native";
+import { Alert, Keyboard, Linking, Modal, Platform, Pressable, Text, TextInput, View, type LayoutChangeEvent, unstable_batchedUpdates } from "react-native";
 import { KeyboardAvoidingView, KeyboardStickyView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated";
@@ -500,11 +500,8 @@ export default function Chat() {
         processSelectedAssets(result.assets);
     }, [ensureCameraPermission, launchLibraryPicker, mapCameraLaunchError, openAppSettings, processSelectedAssets]);
 
-    const handleAddAttachment = useCallback(async () => {
-        if (isInputLocked) {
-            return;
-        }
-
+    const handleTakePhoto = useCallback(async () => {
+        if (isInputLocked) return;
         if (pendingAttachments.length >= MAX_CHAT_ATTACHMENTS) {
             Alert.alert(
                 "Attachment limit reached",
@@ -512,48 +509,22 @@ export default function Chat() {
             );
             return;
         }
-
         const remainingSlots = MAX_CHAT_ATTACHMENTS - pendingAttachments.length;
-        if (Platform.OS === "ios") {
-            ActionSheetIOS.showActionSheetWithOptions(
-                {
-                    options: ["Take Photo", "Choose from Library", "Cancel"],
-                    cancelButtonIndex: 2,
-                },
-                (buttonIndex) => {
-                    if (buttonIndex === 0) {
-                        void launchCameraPicker(remainingSlots);
-                    } else if (buttonIndex === 1) {
-                        void launchLibraryPicker(remainingSlots);
-                    }
-                },
+        await launchCameraPicker(remainingSlots);
+    }, [isInputLocked, launchCameraPicker, pendingAttachments.length]);
+
+    const handleChooseFromLibrary = useCallback(async () => {
+        if (isInputLocked) return;
+        if (pendingAttachments.length >= MAX_CHAT_ATTACHMENTS) {
+            Alert.alert(
+                "Attachment limit reached",
+                `You can attach up to ${MAX_CHAT_ATTACHMENTS} items per message.`,
             );
             return;
         }
-
-        Alert.alert(
-            "Add attachment",
-            "Choose how you want to add media.",
-            [
-                {
-                    text: "Take Photo",
-                    onPress: () => {
-                        void launchCameraPicker(remainingSlots);
-                    },
-                },
-                {
-                    text: "Choose from Library",
-                    onPress: () => {
-                        void launchLibraryPicker(remainingSlots);
-                    },
-                },
-                {
-                    text: "Cancel",
-                    style: "cancel",
-                },
-            ],
-        );
-    }, [isInputLocked, launchCameraPicker, launchLibraryPicker, pendingAttachments.length]);
+        const remainingSlots = MAX_CHAT_ATTACHMENTS - pendingAttachments.length;
+        await launchLibraryPicker(remainingSlots);
+    }, [isInputLocked, launchLibraryPicker, pendingAttachments.length]);
 
     const retryHydration = useCallback(() => {
         if (isInitializing) {
@@ -905,7 +876,8 @@ export default function Chat() {
                                  onSend={sendChatMessages}
                                  onLayout={handleComposerLayout}
                                  attachments={pendingAttachments}
-                                 onAddAttachment={handleAddAttachment}
+                                 onTakePhoto={handleTakePhoto}
+                                 onChooseFromLibrary={handleChooseFromLibrary}
                                  onRemoveAttachment={handleRemoveAttachment}
                                 disabled={isInputLocked}
                                 isStreaming={isStreaming}
@@ -921,7 +893,8 @@ export default function Chat() {
                              onSend={sendChatMessages}
                              onLayout={handleComposerLayout}
                              attachments={pendingAttachments}
-                             onAddAttachment={handleAddAttachment}
+                             onTakePhoto={handleTakePhoto}
+                             onChooseFromLibrary={handleChooseFromLibrary}
                              onRemoveAttachment={handleRemoveAttachment}
                             disabled={isInputLocked}
                             isStreaming={isStreaming}

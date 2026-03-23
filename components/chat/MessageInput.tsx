@@ -1,14 +1,23 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
     Text,
     View,
     TextInput,
     TouchableOpacity,
+    Keyboard,
     ViewStyle,
     type LayoutChangeEvent,
     type NativeSyntheticEvent,
     type TextInputSubmitEditingEventData,
 } from "react-native";
+import Animated, {
+    FadeIn,
+    FadeOut,
+    useSharedValue,
+    useAnimatedStyle,
+    withTiming,
+    Easing,
+} from "react-native-reanimated";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { SymbolView } from "expo-symbols";
 import useHapticFeedback from "@/hooks/useHapticFeedback";
@@ -35,7 +44,8 @@ interface MessageInputProps {
     onChangeText: (text: string) => void;
     onSend: (input?: ChatSendInput) => void;
     attachments?: ChatAttachment[];
-    onAddAttachment?: () => void;
+    onTakePhoto?: () => void;
+    onChooseFromLibrary?: () => void;
     onRemoveAttachment?: (attachmentId: string) => void;
     placeholder?: string;
     disabled?: boolean;
@@ -55,7 +65,8 @@ interface MessageInputProps {
  * - Theme-aware styling using the app's color scheme
  * - Multi-line text support with maximum height constraint (120px)
  * - Send button that's conditionally enabled/disabled based on input content
- * - Haptic feedback on send action
+ * - Animated media picker popover that emerges from the add button
+ * - Haptic feedback on interactions
  * - Accessibility support through native TextInput and TouchableOpacity
  */
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -63,7 +74,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     onChangeText,
     onSend,
     attachments = [],
-    onAddAttachment,
+    onTakePhoto,
+    onChooseFromLibrary,
     onRemoveAttachment,
     placeholder = "Message...",
     disabled = false,
@@ -73,30 +85,44 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     style,
 }) => {
     // ============================================================================
-    // SECTION: Hooks
+    // SECTION: Hooks & State
     // ============================================================================
-    // Access theme colors and styling for consistent UI appearance
     const { theme } = useTheme();
-    // Hook for triggering haptic feedback when user interacts with the send button
     const { triggerPress } = useHapticFeedback();
-    // Determine if the send button should be enabled:
-    // - Only enabled if input has non-whitespace text AND component is not disabled
     const canSend = (value.trim().length > 0 || attachments.length > 0) && !disabled;
+
+    // Media menu popover state
+    const [showMediaMenu, setShowMediaMenu] = useState(false);
+    const hasMediaCallbacks = !!(onTakePhoto || onChooseFromLibrary);
+
+    // Animated rotation for the "+" icon (rotates 45deg to become "x" when open)
+    const menuRotation = useSharedValue(0);
+
+    useEffect(() => {
+        menuRotation.value = withTiming(showMediaMenu ? 1 : 0, {
+            duration: 150,
+            easing: Easing.out(Easing.ease),
+        });
+    }, [showMediaMenu, menuRotation]);
+
+    // Close the popover when the input becomes disabled
+    useEffect(() => {
+        if (disabled) {
+            setShowMediaMenu(false);
+        }
+    }, [disabled]);
+
+    const iconAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ rotate: `${menuRotation.value * 45}deg` }],
+    }));
 
     // ============================================================================
     // SECTION: Event Handlers
     // ============================================================================
-    /**
-     * Handler for the send button press event.
-     *
-     * Behavior:
-     * - Validates that the button can be pressed (non-empty input and not disabled)
-     * - Triggers a light haptic feedback for user confirmation
-     * - Invokes the parent component's onSend callback to handle the message
-     */
     const handleSend = () => {
         if (canSend) {
             triggerPress("light");
+            setShowMediaMenu(false);
             onSend({
                 text: value,
                 attachments,
@@ -104,10 +130,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         }
     };
 
-    /**
-     * Handler for the stop button press during streaming.
-     * Triggers haptic feedback and invokes the cancel callback.
-     */
     const handleCancel = () => {
         triggerPress("light");
         onCancel?.();
@@ -123,6 +145,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         }
 
         triggerPress("light");
+        setShowMediaMenu(false);
         if (attachments.length > 0) {
             onSend({
                 text: submittedText,
@@ -134,11 +157,26 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         onSend(submittedText);
     };
 
-    const handleAddAttachment = () => {
-        if (!disabled) {
+    const toggleMediaMenu = () => {
+        if (!disabled && hasMediaCallbacks) {
             triggerPress("light");
-            onAddAttachment?.();
+            if (!showMediaMenu) {
+                Keyboard.dismiss();
+            }
+            setShowMediaMenu((prev) => !prev);
         }
+    };
+
+    const handleTakePhotoPress = () => {
+        triggerPress("light");
+        setShowMediaMenu(false);
+        onTakePhoto?.();
+    };
+
+    const handleChooseFromLibraryPress = () => {
+        triggerPress("light");
+        setShowMediaMenu(false);
+        onChooseFromLibrary?.();
     };
 
     const handleRemoveAttachment = (attachmentId: string) => {
@@ -146,12 +184,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         onRemoveAttachment?.(attachmentId);
     };
 
+    // ============================================================================
+    // SECTION: Render
+    // ============================================================================
     return (
         <View
             testID="message-input-wrapper"
             onLayout={onLayout}
             className="w-full px-4 my-2"
         >
+            {/* Attachment chips */}
             {attachments.length > 0 ? (
                 <View testID="message-input-attachments" className="flex-row flex-wrap mb-2">
                     {attachments.map((attachment) => (
@@ -195,27 +237,111 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 </View>
             ) : null}
 
+            {/* Input row */}
             <View className="flex-row items-end w-full">
-                <TouchableOpacity
-                    testID="message-input-add"
-                    onPress={handleAddAttachment}
-                    disabled={disabled || !onAddAttachment}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Add attachment"
-                    accessibilityHint="Add photos or videos"
-                    accessibilityState={{ disabled: disabled || !onAddAttachment }}
-                    className="w-11 h-11 rounded-full justify-center items-center mr-2"
-                    style={{ backgroundColor: theme.colors.surface }}
-                >
-                    <SymbolView
-                        name="plus"
-                        size={18}
-                        tintColor={theme.colors.text}
-                    />
-                </TouchableOpacity>
+                {/* "+" / "x" button with popover */}
+                <View className="mr-2" style={{ overflow: "visible", zIndex: 10 }}>
+                    <TouchableOpacity
+                        testID="message-input-add"
+                        onPress={toggleMediaMenu}
+                        disabled={disabled || !hasMediaCallbacks}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={showMediaMenu ? "Close attachment menu" : "Add attachment"}
+                        accessibilityHint="Add photos or videos"
+                        accessibilityState={{ disabled: disabled || !hasMediaCallbacks }}
+                        className="w-11 h-11 rounded-full justify-center items-center"
+                        style={{ backgroundColor: theme.colors.surface }}
+                    >
+                        <Animated.View style={iconAnimatedStyle}>
+                            <SymbolView
+                                name="plus"
+                                size={18}
+                                tintColor={theme.colors.text}
+                            />
+                        </Animated.View>
+                    </TouchableOpacity>
 
+                    {/* Media picker popover */}
+                    {showMediaMenu && hasMediaCallbacks ? (
+                        <Animated.View
+                            testID="media-menu-popover"
+                            entering={FadeIn.duration(150)}
+                            exiting={FadeOut.duration(100)}
+                            style={{
+                                position: "absolute",
+                                bottom: 52,
+                                left: 0,
+                                minWidth: 220,
+                                backgroundColor: theme.colors.surface,
+                                borderRadius: 14,
+                                borderWidth: 1,
+                                borderColor: theme.colors.border ?? theme.colors.surface,
+                                paddingVertical: 4,
+                                shadowColor: "#000",
+                                shadowOffset: { width: 0, height: -4 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 12,
+                                elevation: 8,
+                            }}
+                        >
+                            {onTakePhoto ? (
+                                <TouchableOpacity
+                                    testID="media-menu-take-photo"
+                                    onPress={handleTakePhotoPress}
+                                    activeOpacity={0.6}
+                                    className="flex-row items-center px-4 py-3"
+                                >
+                                    <SymbolView
+                                        name="camera"
+                                        size={20}
+                                        tintColor={theme.colors.text}
+                                    />
+                                    <Text
+                                        className="ml-3 text-base font-medium"
+                                        style={{ color: theme.colors.text }}
+                                    >
+                                        Take Photo
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : null}
+
+                            {onTakePhoto && onChooseFromLibrary ? (
+                                <View
+                                    style={{
+                                        height: 1,
+                                        backgroundColor: theme.colors.border ?? theme.colors.surface,
+                                        marginHorizontal: 16,
+                                    }}
+                                />
+                            ) : null}
+
+                            {onChooseFromLibrary ? (
+                                <TouchableOpacity
+                                    testID="media-menu-choose-library"
+                                    onPress={handleChooseFromLibraryPress}
+                                    activeOpacity={0.6}
+                                    className="flex-row items-center px-4 py-3"
+                                >
+                                    <SymbolView
+                                        name="photo.on.rectangle"
+                                        size={20}
+                                        tintColor={theme.colors.text}
+                                    />
+                                    <Text
+                                        className="ml-3 text-base font-medium"
+                                        style={{ color: theme.colors.text }}
+                                    >
+                                        Choose from Library
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : null}
+                        </Animated.View>
+                    ) : null}
+                </View>
+
+                {/* Text input */}
                 <View
                     testID="message-input-field"
                     className="flex-1 pl-4 pr-2 py-1 rounded-xl min-h-12"
@@ -233,10 +359,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                         returnKeyType="send"
                         enablesReturnKeyAutomatically
                         onSubmitEditing={handleSubmitEditing}
+                        onFocus={() => setShowMediaMenu(false)}
                         multiline
                     />
                 </View>
 
+                {/* Send / Stop button */}
                 {isStreaming ? (
                     <TouchableOpacity
                         testID="message-input-stop"
