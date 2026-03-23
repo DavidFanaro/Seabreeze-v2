@@ -401,10 +401,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
           {/* ========== Content Rendering Section ========== */}
           {/* CustomMarkdown component handles rendering markdown content with syntax highlighting */}
           {normalizedContent.length > 0 || !hasStructuredMedia ? (
-            <CustomMarkdown
-              content={normalizedContent}
-              isUser={isUser}
-            />
+            isUser ? (
+              <Text
+                selectable
+                style={{
+                  color: theme.colors.text,
+                  fontSize: 16,
+                  lineHeight: 24,
+                }}
+              >
+                {normalizedContent}
+              </Text>
+            ) : (
+              <CustomMarkdown
+                content={normalizedContent}
+                isUser={isUser}
+              />
+            )
           ) : null}
 
           {mediaImageParts.length > 0 ? (
