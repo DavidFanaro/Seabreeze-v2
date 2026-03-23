@@ -101,8 +101,8 @@
 
 // Core React hooks for memoization
 import { useCallback } from "react";
-// AI SDK for streaming text generation and type definitions
-import { streamText, type ModelMessage } from "ai";
+// AI SDK for text generation and type definitions
+import { generateText, stepCountIs, streamText, type ModelMessage, type Tool } from "ai";
 import { fetch as expoFetch } from "expo/fetch";
 // Provider type definitions for the fallback system
 import { isThinkingCapableModel, type ProviderId } from "@/types/provider.types";
@@ -149,6 +149,10 @@ export interface StreamingOptions {
     onStreamCompleted?: () => void;
     /** Control reasoning effort for supported providers */
     thinkingLevel?: ThinkingLevel;
+    /** Optional system prompt for the generation */
+    systemPrompt?: string;
+    /** Optional tool set exposed to the model */
+    tools?: Record<string, Tool<any, any>>;
     /** Callback fired when an error occurs during streaming */
     onError?: (error: unknown) => void;
     /** Callback fired when falling back to another provider */
@@ -552,6 +556,8 @@ export function useChatStreaming() {
             onDoneSignalReceived,
             onStreamCompleted,
             thinkingLevel,
+            systemPrompt,
+            tools,
             onError,
             onFallback,
             onProviderChange,
@@ -835,12 +841,54 @@ export function useChatStreaming() {
                 return;
             }
 
+            const hasTools = Boolean(tools && Object.keys(tools).length > 0);
+            const shouldUseAppleToolGeneration = currentModel.provider === "apple" && hasTools;
+
+            if (shouldUseAppleToolGeneration) {
+                const generated = await generateText({
+                    model: currentModel.model!,
+                    messages,
+                    system: systemPrompt,
+                    tools,
+                    providerOptions,
+                    abortSignal,
+                });
+
+                if (abortSignal?.aborted) {
+                    return;
+                }
+
+                if (thinkingChunkHandler && generated.reasoningText) {
+                    onChunkReceived?.();
+                    reasoningAccumulated += generated.reasoningText;
+                    if (canCommit()) {
+                        thinkingChunkHandler(generated.reasoningText, reasoningAccumulated);
+                    }
+                }
+
+                if (generated.text) {
+                    onChunkReceived?.();
+                    accumulated = generated.text;
+                    updateAssistantMessage(accumulated);
+
+                    if (canCommit()) {
+                        onChunk?.(generated.text, accumulated);
+                    }
+                }
+
+                signalCompletion();
+                return;
+            }
+
             // Initialize the streaming text generation.
             // Forward the abort signal so lifecycle timeouts and user
             // cancellations terminate provider I/O immediately.
             const result = streamText({
                 model: currentModel.model!,
                 messages: messages,
+                system: systemPrompt,
+                tools,
+                stopWhen: tools ? stepCountIs(4) : undefined,
                 providerOptions,
                 abortSignal,
             });
@@ -853,9 +901,26 @@ export function useChatStreaming() {
                             return;
                         }
 
-                        if (part.type === "finish" || part.type === "finish-step") {
+                        if (part.type === "finish") {
                             signalCompletion();
                             break;
+                        }
+
+                        if (part.type === "finish-step") {
+                            onChunkReceived?.();
+                            continue;
+                        }
+
+                        if (
+                            part.type === "tool-call"
+                            || part.type === "tool-input-start"
+                            || part.type === "tool-input-delta"
+                            || part.type === "tool-input-end"
+                            || part.type === "tool-result"
+                            || part.type === "source"
+                        ) {
+                            onChunkReceived?.();
+                            continue;
                         }
 
                         if (part.type === "reasoning-delta") {

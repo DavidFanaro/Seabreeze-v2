@@ -40,6 +40,7 @@ interface SettingsState {
   theme: ThemeMode;
   thinkingEnabled: boolean;
   thinkingLevel: ThinkingLevel;
+  webSearchEnabled: boolean;
   __meta: HydrationMetaState;
 }
 
@@ -47,6 +48,7 @@ interface SettingsActions {
   setTheme: (theme: ThemeMode) => void;
   setThinkingEnabled: (enabled: boolean) => void;
   setThinkingLevel: (level: ThinkingLevel) => void;
+  setWebSearchEnabled: (enabled: boolean) => void;
   resetSettings: () => void;
 }
 
@@ -54,6 +56,7 @@ const DEFAULT_SETTINGS: Omit<SettingsState, "__meta"> = {
   theme: "dark",
   thinkingEnabled: true,
   thinkingLevel: "medium",
+  webSearchEnabled: false,
 };
 
 export const useSettingsStore = create<SettingsState & SettingsActions>()(
@@ -79,6 +82,12 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
             thinkingLevel,
           }),
         ),
+      setWebSearchEnabled: (webSearchEnabled) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            webSearchEnabled,
+          }),
+        ),
       resetSettings: () =>
         set((state) =>
           applyRuntimeWriteVersion(state, {
@@ -97,6 +106,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
         theme: state.theme,
         thinkingEnabled: state.thinkingEnabled,
         thinkingLevel: state.thinkingLevel,
+        webSearchEnabled: state.webSearchEnabled,
         __meta: {
           writeVersion: state.__meta.writeVersion,
         },

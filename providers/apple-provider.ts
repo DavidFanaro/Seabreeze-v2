@@ -1,4 +1,5 @@
-import { apple } from "@react-native-ai/apple";
+import { apple, createAppleProvider } from "@react-native-ai/apple";
+import type { Tool } from "ai";
 import { isAppleIntelligenceCompatible } from "@/lib/deviceCapabilities";
 
 /**
@@ -7,6 +8,7 @@ import { isAppleIntelligenceCompatible } from "@/lib/deviceCapabilities";
  * which provides the interface for interacting with Apple's on-device AI capabilities.
  */
 export type AppleLanguageModel = ReturnType<typeof apple>;
+type AppleToolSet = Record<string, Tool<any, any>>;
 
 // ==============================================================================
 // APPLE INTELLIGENCE PROVIDER
@@ -54,7 +56,12 @@ export type AppleLanguageModel = ReturnType<typeof apple>;
  * });
  * ```
  */
-export function createAppleModel(): AppleLanguageModel {
+export function createAppleModel(availableTools?: AppleToolSet): AppleLanguageModel {
+    if (availableTools && Object.keys(availableTools).length > 0) {
+        const provider = createAppleProvider({ availableTools });
+        return provider();
+    }
+
     return apple();
 }
 

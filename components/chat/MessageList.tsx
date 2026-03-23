@@ -19,6 +19,8 @@ import { ModelMessage } from "ai";
 import { MessageBubble } from "./MessageBubble";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { getErrorAnnotation } from "@/lib/chat-error-annotations";
+import { getWebSearchAnnotation } from "@/lib/chat-web-search-annotations";
+import type { ChatActiveWebSearchState } from "@/types/chat.types";
 
 const serializeMessageContent = (content: ModelMessage["content"] | undefined): string => {
     if (typeof content === "string") {
@@ -44,6 +46,7 @@ interface MessageListProps {
     style?: ViewStyle;
     contentContainerStyle?: ViewStyle;
     thinkingOutput?: string[];
+    activeWebSearchState?: ChatActiveWebSearchState | null;
     isStreaming?: boolean;
     isThinking?: boolean;
     bottomInset?: number;
@@ -69,6 +72,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     style,
     contentContainerStyle,
     thinkingOutput = [],
+    activeWebSearchState = null,
     isStreaming = false,
     isThinking = false,
     bottomInset = 0,
@@ -114,6 +118,11 @@ export const MessageList: React.FC<MessageListProps> = ({
         const isStreamingThisMessage = isLastMessage && item.role === "assistant" && isStreaming;
         const messageThinkingOutput = thinkingOutput[index] ?? "";
         const isError = item.role === "assistant" && getErrorAnnotation(item) !== null;
+        const webSearchAnnotation = item.role === "assistant"
+            ? (activeWebSearchState?.messageIndex === index
+                ? activeWebSearchState.annotation
+                : getWebSearchAnnotation(item))
+            : null;
 
         return (
             <MessageBubble
@@ -121,10 +130,11 @@ export const MessageList: React.FC<MessageListProps> = ({
                 isUser={item.role === "user"}
                 isStreaming={isStreamingThisMessage}
                 thinkingOutput={messageThinkingOutput}
+                webSearch={webSearchAnnotation}
                 isError={isError}
             />
         );
-    }, [messages.length, isStreaming, thinkingOutput]);
+    }, [activeWebSearchState, messages.length, isStreaming, thinkingOutput]);
 
     const scrollToBottom = useCallback((force = false, animated = true, bypassThrottle = false) => {
         if (!force && !shouldAutoFollowRef.current) {

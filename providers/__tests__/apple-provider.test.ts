@@ -18,6 +18,11 @@ jest.mock('@react-native-ai/apple', () => ({
         doGenerate: jest.fn(),
         doStream: jest.fn(),
     })),
+    createAppleProvider: jest.fn(() => jest.fn(() => ({
+        provider: 'apple',
+        doGenerate: jest.fn(),
+        doStream: jest.fn(),
+    }))),
 }));
 
 describe('Apple Provider', () => {
@@ -30,6 +35,13 @@ describe('Apple Provider', () => {
             doGenerate: jest.fn(),
             doStream: jest.fn(),
         });
+
+        const { createAppleProvider } = require('@react-native-ai/apple');
+        createAppleProvider.mockReturnValue(jest.fn(() => ({
+            provider: 'apple',
+            doGenerate: jest.fn(),
+            doStream: jest.fn(),
+        })));
     });
 
     describe('createAppleModel', () => {
@@ -53,6 +65,22 @@ describe('Apple Provider', () => {
             
             const { apple } = require('@react-native-ai/apple');
             expect(apple).toHaveBeenCalledTimes(2);
+        });
+
+        it('should create a tool-aware Apple model when tools are provided', () => {
+            const mockTools = {
+                searchWeb: {
+                    inputSchema: {} as any,
+                    execute: jest.fn(),
+                },
+            };
+
+            const model = createAppleModel(mockTools as any);
+
+            expect(model).toBeDefined();
+            const { apple, createAppleProvider } = require('@react-native-ai/apple');
+            expect(createAppleProvider).toHaveBeenCalledWith({ availableTools: mockTools });
+            expect(apple).not.toHaveBeenCalled();
         });
     });
 

@@ -163,6 +163,32 @@ describe('useChat', () => {
       expect(result.current.isStreaming).toBe(false); // Streaming completes after act
     });
 
+    it('passes web search tools into streaming when enabled', async () => {
+      const { result } = renderHook(() => useChat({
+        enableWebSearch: true,
+        searxngUrl: 'https://search.example.com',
+      }));
+
+      act(() => {
+        result.current.setText('Latest news about Expo');
+      });
+
+      await act(async () => {
+        await result.current.sendMessage();
+      });
+
+      const [options] = mockExecuteStreaming.mock.calls[0] as [
+        {
+          systemPrompt?: string;
+          tools?: Record<string, unknown>;
+        },
+      ];
+
+      expect(options.systemPrompt).toContain('searchWeb');
+      expect(options.tools).toBeDefined();
+      expect(options.tools?.searchWeb).toBeDefined();
+    });
+
     it('marks stream lifecycle as completed when streaming succeeds', async () => {
       const { result } = renderHook(() => useChat({}));
 
@@ -517,6 +543,38 @@ describe('useChat', () => {
 
       expect(options.activeProvider).toBe('openrouter');
       expect(options.enableFallback).toBe(false);
+    });
+
+    it('does not attach web search tools to OpenRouter video sends', async () => {
+      const { result } = renderHook(() => useChat({
+        providerId: 'openrouter' as any,
+        modelId: 'google/gemini-2.5-flash',
+        enableWebSearch: true,
+        searxngUrl: 'https://search.example.com',
+      }));
+
+      await act(async () => {
+        await result.current.sendMessage({
+          text: 'Analyze this video',
+          attachments: [
+            {
+              id: 'video-1',
+              kind: 'video',
+              uri: 'data:video/mp4;base64,Zm9v',
+              mediaType: 'video/mp4',
+              fileName: 'clip.mp4',
+            },
+          ],
+        });
+      });
+
+      const [options] = mockExecuteStreaming.mock.calls[0] as [{
+        tools?: Record<string, unknown>;
+        systemPrompt?: string;
+      }];
+
+      expect(options.tools).toBeUndefined();
+      expect(options.systemPrompt).toBeUndefined();
     });
   });
 

@@ -99,6 +99,12 @@ function NavigationContent() {
               presentation: "card",
             }}
           />
+          <Stack.Screen
+            name="settings/search"
+            options={{
+              presentation: "card",
+            }}
+          />
         </Stack>
       </ThemeContext>
     </KeyboardProvider>

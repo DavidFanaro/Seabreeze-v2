@@ -20,6 +20,7 @@ interface AuthState {
   openaiApiKey: string | null;
   openrouterApiKey: string | null;
   ollamaUrl: string | null;
+  searxngUrl: string | null;
   __meta: HydrationMetaState;
 }
 
@@ -27,6 +28,7 @@ interface AuthActions {
   setOpenAIApiKey: (key: string | null) => void;
   setOpenRouterApiKey: (key: string | null) => void;
   setOllamaUrl: (url: string | null) => void;
+  setSearxngUrl: (url: string | null) => void;
   clearAllCredentials: () => void;
 }
 
@@ -58,6 +60,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       openaiApiKey: null,
       openrouterApiKey: null,
       ollamaUrl: null,
+      searxngUrl: null,
       __meta: INITIAL_HYDRATION_META,
       setOpenAIApiKey: (key) =>
         set((state) =>
@@ -77,12 +80,19 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             ollamaUrl: url,
           }),
         ),
+      setSearxngUrl: (url) =>
+        set((state) =>
+          applyRuntimeWriteVersion(state, {
+            searxngUrl: url,
+          }),
+        ),
       clearAllCredentials: () =>
         set((state) =>
           applyRuntimeWriteVersion(state, {
             openaiApiKey: null,
             openrouterApiKey: null,
             ollamaUrl: null,
+            searxngUrl: null,
           }),
         ),
     }),
@@ -98,6 +108,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         openaiApiKey: state.openaiApiKey,
         openrouterApiKey: state.openrouterApiKey,
         ollamaUrl: state.ollamaUrl,
+        searxngUrl: state.searxngUrl,
         __meta: {
           writeVersion: state.__meta.writeVersion,
         },
@@ -147,4 +158,13 @@ export function isProviderConfigured(provider: ProviderId): boolean {
     default:
       return false;
   }
+}
+
+export function getSearxngConfig(): {
+  url?: string;
+} {
+  const authStore = useAuthStore.getState();
+  return {
+    url: authStore.searxngUrl || undefined,
+  };
 }

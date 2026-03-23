@@ -93,6 +93,7 @@ describe("ChatContextMenu", () => {
   const mockOnRename = jest.fn();
   const mockSetThinkingEnabled = jest.fn();
   const mockSetThinkingLevel = jest.fn();
+  const mockSetWebSearchEnabled = jest.fn();
 
   const mockTheme = {
     colors: {
@@ -115,6 +116,8 @@ describe("ChatContextMenu", () => {
     setThinkingEnabled: mockSetThinkingEnabled,
     thinkingLevel: "medium",
     setThinkingLevel: mockSetThinkingLevel,
+    webSearchEnabled: false,
+    setWebSearchEnabled: mockSetWebSearchEnabled,
   };
 
   beforeEach(() => {
@@ -122,6 +125,7 @@ describe("ChatContextMenu", () => {
 
     mockSettingsStore.thinkingEnabled = true;
     mockSettingsStore.thinkingLevel = "medium";
+    mockSettingsStore.webSearchEnabled = false;
 
     (useHapticFeedback as jest.Mock).mockReturnValue({
       triggerPress: mockTriggerPress,
@@ -283,6 +287,22 @@ describe("ChatContextMenu", () => {
       render(<ChatContextMenu onReset={mockOnReset} />);
 
       expect(screen.queryByTestId("button-Ollama Thinking Model Managed")).toBeNull();
+    });
+  });
+
+  describe("Web Search Toggle", () => {
+    it("should render the web search toggle", () => {
+      render(<ChatContextMenu onReset={mockOnReset} />);
+      expect(screen.getByTestId("button-Web Search")).toBeTruthy();
+    });
+
+    it("should toggle web search when pressed", () => {
+      render(<ChatContextMenu onReset={mockOnReset} />);
+
+      fireEvent.press(screen.getByTestId("button-Web Search"));
+
+      expect(mockTriggerPress).toHaveBeenCalledWith("light");
+      expect(mockSetWebSearchEnabled).toHaveBeenCalledWith(true);
     });
   });
 

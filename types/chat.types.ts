@@ -36,6 +36,39 @@ export type ThinkingLevel = "low" | "medium" | "high";
 
 export type ChatErrorAnnotationSource = "streaming" | "attachment" | "compatibility";
 
+export type ChatWebSearchStatus = "searching" | "success" | "error";
+
+export interface ChatWebSearchSource {
+  title: string;
+  url: string;
+  snippet?: string;
+  engine?: string;
+  publishedDate?: string;
+}
+
+export interface ChatWebSearchQueryRun {
+  query: string;
+  provider: ProviderId;
+  status: ChatWebSearchStatus;
+  resultCount: number;
+  sources: ChatWebSearchSource[];
+  startedAt: number;
+  completedAt?: number;
+  error?: string;
+}
+
+export interface ChatWebSearchAnnotation {
+  type: "web-search";
+  status: ChatWebSearchStatus;
+  queries: ChatWebSearchQueryRun[];
+  totalSources: number;
+}
+
+export interface ChatActiveWebSearchState {
+  messageIndex: number;
+  annotation: ChatWebSearchAnnotation;
+}
+
 export interface ChatErrorAnnotation {
   type: "error";
   error: string;
@@ -44,7 +77,7 @@ export interface ChatErrorAnnotation {
   provider?: ProviderId;
 }
 
-export type ChatMessageAnnotation = ChatErrorAnnotation;
+export type ChatMessageAnnotation = ChatErrorAnnotation | ChatWebSearchAnnotation;
 
 export type AnnotatedModelMessage = ModelMessage & {
   annotations?: ChatMessageAnnotation[];
@@ -68,6 +101,10 @@ export interface UseChatOptions {
   enableThinking?: boolean;
   /** Control reasoning effort for supported providers */
   thinkingLevel?: ThinkingLevel;
+  /** Enable manual app-wide web search tool access */
+  enableWebSearch?: boolean;
+  /** SearXNG instance URL used for web search */
+  searxngUrl?: string | null;
   onError?: (error: unknown) => void;
   onComplete?: () => void;
   onFallback?: (from: ProviderId, to: ProviderId, reason: string) => void;

@@ -4,7 +4,7 @@ import { useChatStreaming } from '../useChatStreaming';
 import { classifyError, getNextFallbackProvider } from '@/providers/fallback-chain';
 import { executeWithRetry } from '@/hooks/useErrorRecovery';
 import { formatErrorForChat, getErrorFixes, getProviderErrorHint } from '@/lib/error-messages';
-import { streamText } from 'ai';
+import { generateText, streamText } from 'ai';
 import type { ModelMessage } from 'ai';
 import { fetch as expoFetch } from 'expo/fetch';
 import { getProviderAuth } from '@/stores';
@@ -29,6 +29,7 @@ describe('useChatStreaming', () => {
   const mockFormatErrorForChat = formatErrorForChat as jest.MockedFunction<typeof formatErrorForChat>;
   const mockGetErrorFixes = getErrorFixes as jest.MockedFunction<typeof getErrorFixes>;
   const mockGetProviderErrorHint = getProviderErrorHint as jest.MockedFunction<typeof getProviderErrorHint>;
+  const mockGenerateText = generateText as jest.MockedFunction<typeof generateText>;
   const mockStreamText = streamText as jest.MockedFunction<typeof streamText>;
   const mockExpoFetch = expoFetch as unknown as jest.MockedFunction<typeof expoFetch>;
   const mockGetProviderAuth = getProviderAuth as jest.MockedFunction<typeof getProviderAuth>;
@@ -87,6 +88,11 @@ describe('useChatStreaming', () => {
 
     mockStreamText.mockReturnValue({
       fullStream: mockFullStream,
+    } as any);
+
+    mockGenerateText.mockResolvedValue({
+      text: 'Apple final answer',
+      reasoningText: undefined,
     } as any);
   });
 
@@ -1131,15 +1137,18 @@ describe('useChatStreaming', () => {
       expect(streamingResult.wasCancelled).toBe(true);
     });
 
-    it('treats finish-step events as stream completion', async () => {
+    it('continues generation after finish-step events until final finish', async () => {
       const { result } = renderHook(() => useChatStreaming());
 
       const lifecycleEvents: string[] = [];
       const mockFullStream = {
         [Symbol.asyncIterator]: async function* () {
+          yield { type: 'tool-call', toolName: 'searchWeb' };
+          yield { type: 'tool-result', toolName: 'searchWeb', result: { sources: [] } };
           yield { type: 'text-delta', text: 'pong' };
           yield { type: 'finish-step' };
-          yield { type: 'text-delta', text: ' ignored' };
+          yield { type: 'text-delta', text: ' after search' };
+          yield { type: 'finish' };
         },
       };
 
@@ -1163,9 +1172,73 @@ describe('useChatStreaming', () => {
       });
 
       expect(streamingResult.success).toBe(true);
-      expect(streamingResult.accumulated).toBe('pong');
-      expect(lifecycleEvents).toEqual(['chunk', 'done', 'completed']);
+      expect(streamingResult.accumulated).toBe('pong after search');
+      expect(lifecycleEvents).toEqual(['chunk', 'chunk', 'chunk', 'chunk', 'chunk', 'done', 'completed']);
+      expect(setMessagesMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses generateText for Apple tool-enabled requests', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+      const mockOnChunk = jest.fn();
+
+      const streamingResult = await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            model: {
+              ...mockModel,
+              provider: 'apple' as ProviderId,
+            },
+            activeProvider: 'apple' as ProviderId,
+            effectiveProviderId: 'apple' as ProviderId,
+            tools: {
+              searchWeb: { inputSchema: {} as any, execute: jest.fn() } as any,
+            },
+            onChunk: mockOnChunk,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef,
+        );
+      });
+
+      expect(mockGenerateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: expect.any(Object),
+          messages: mockMessages,
+        }),
+      );
+      expect(mockStreamText).not.toHaveBeenCalled();
+      expect(streamingResult.success).toBe(true);
+      expect(streamingResult.accumulated).toBe('Apple final answer');
+      expect(mockOnChunk).toHaveBeenCalledWith('Apple final answer', 'Apple final answer');
       expect(setMessagesMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps Apple non-tool requests on streamText', async () => {
+      const { result } = renderHook(() => useChatStreaming());
+
+      await act(async () => {
+        return await result.current.executeStreaming(
+          {
+            ...defaultOptions,
+            model: {
+              ...mockModel,
+              provider: 'apple' as ProviderId,
+            },
+            activeProvider: 'apple' as ProviderId,
+            effectiveProviderId: 'apple' as ProviderId,
+          },
+          mockMessages,
+          setMessagesMock,
+          0,
+          failedProvidersRef,
+        );
+      });
+
+      expect(mockStreamText).toHaveBeenCalledTimes(1);
+      expect(mockGenerateText).not.toHaveBeenCalled();
     });
 
     it('ignores empty stream deltas for chunk-received lifecycle', async () => {

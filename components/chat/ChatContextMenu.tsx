@@ -112,6 +112,8 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
   );
   const thinkingLevel = useSettingsStore((state) => state.thinkingLevel);
   const setThinkingLevel = useSettingsStore((state) => state.setThinkingLevel);
+  const webSearchEnabled = useSettingsStore((state) => state.webSearchEnabled);
+  const setWebSearchEnabled = useSettingsStore((state) => state.setWebSearchEnabled);
 
   // ============================================================================
   // CONSTANTS
@@ -212,6 +214,11 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
     setThinkingLevel(level);
   };
 
+  const handleWebSearchToggle = () => {
+    triggerPress("light");
+    setWebSearchEnabled(!webSearchEnabled);
+  };
+
   // ============================================================================
   // HELPER FUNCTIONS
   // ============================================================================
@@ -269,6 +276,13 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
             onPress={handleThinkingToggle}
           >
             Thinking Output
+          </Button>
+
+          <Button
+            systemImage={webSearchEnabled ? "checkmark" : undefined}
+            onPress={handleWebSearchToggle}
+          >
+            Web Search
           </Button>
 
           {isThinkingLevelAvailable && (

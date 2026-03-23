@@ -2,6 +2,7 @@ import { chat } from "@/db/schema";
 import useChat from "@/hooks/chat/useChat";
 import useDatabase from "@/hooks/useDatabase";
 import { useChatState } from "@/hooks/useChatState";
+import { useAuthStore } from "@/stores";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useMessagePersistence } from "@/hooks/useMessagePersistence";
 import {
@@ -50,6 +51,8 @@ export default function Chat() {
     const { theme } = useTheme();
     const thinkingEnabled = useSettingsStore((state) => state.thinkingEnabled);
     const thinkingLevel = useSettingsStore((state) => state.thinkingLevel);
+    const webSearchEnabled = useSettingsStore((state) => state.webSearchEnabled);
+    const searxngUrl = useAuthStore((state) => state.searxngUrl);
     const params = useLocalSearchParams<{ id?: string | string[] }>();
     
     // Get chat ID from params (or "new" for new chats)
@@ -91,6 +94,7 @@ export default function Chat() {
         setText,
         messages,
         thinkingOutput,
+        activeWebSearchState,
         sendMessage,
         reset,
         isThinking,
@@ -111,6 +115,8 @@ export default function Chat() {
         chatId: chatIdParam,
         enableThinking: thinkingEnabled,
         thinkingLevel,
+        enableWebSearch: webSearchEnabled,
+        searxngUrl,
         onFallback: (from, to, reason) => {
         },
         onError: (error) => {
@@ -845,10 +851,11 @@ export default function Chat() {
                      {/* Displays all messages in the conversation, auto-scrolls during stream */}
                      {/* ================================================================== */}
                        <MessageList
-                         messages={messages}
-                         thinkingOutput={thinkingOutput}
-                         isThinking={isThinking}
-                         isStreaming={isStreaming}
+                          messages={messages}
+                          thinkingOutput={thinkingOutput}
+                          activeWebSearchState={activeWebSearchState}
+                          isThinking={isThinking}
+                          isStreaming={isStreaming}
                          bottomInset={messageListBottomInset}
                        />
 

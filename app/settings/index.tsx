@@ -4,7 +4,8 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import { SettingsScreen } from "@/components/settings/SettingsScreen";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { ProviderIcon } from "@/components/ui/ProviderIcons";
-import { isProviderConfigured, useProviderStore } from "@/stores";
+import { isProviderConfigured, useAuthStore, useProviderStore } from "@/stores";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import { SymbolView } from "expo-symbols";
 import type { ProviderId } from "@/types/provider.types";
 
@@ -81,6 +82,8 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
 export default function SettingsIndex() {
   const { theme } = useTheme();
   const { selectedProvider, selectedModel } = useProviderStore();
+  const webSearchEnabled = useSettingsStore((state) => state.webSearchEnabled);
+  const searxngUrl = useAuthStore((state) => state.searxngUrl);
 
   const navigateToProvider = (providerId: string) => {
     router.push(`/settings/${providerId}` as any);
@@ -88,6 +91,10 @@ export default function SettingsIndex() {
 
   const navigateToAppearance = () => {
     router.push("/settings/appearance" as any);
+  };
+
+  const navigateToSearch = () => {
+    router.push("/settings/search" as any);
   };
 
   const providers: { id: ProviderId; name: string; description: string }[] = [
@@ -130,6 +137,42 @@ export default function SettingsIndex() {
               </Text>
               <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
                 Theme and display settings
+              </Text>
+            </View>
+          </View>
+          <View className="ml-2">
+            <SymbolView name="chevron.right" size={18} tintColor={theme.colors.textSecondary} />
+          </View>
+        </Pressable>
+
+        <Pressable
+          onPress={navigateToSearch}
+          className="flex-row items-center justify-between px-4 py-3.5"
+          style={({ pressed }) => ({
+            backgroundColor: pressed ? theme.colors.border : theme.colors.surface,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: theme.colors.border,
+          })}
+        >
+          <View className="flex-1 flex-row items-center">
+            <View
+              className="mr-3 h-[40px] w-[40px] items-center justify-center rounded-xl"
+              style={{ backgroundColor: theme.colors.background }}
+            >
+              <SymbolView
+                name="magnifyingglass.circle"
+                size={22}
+                tintColor={webSearchEnabled ? theme.colors.accent : theme.colors.textSecondary}
+              />
+            </View>
+            <View className="flex-1">
+              <Text className="mb-0.5 text-[16px] font-semibold" style={{ color: theme.colors.text }}>
+                Web Search
+              </Text>
+              <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
+                {webSearchEnabled
+                  ? (searxngUrl ? "Enabled app-wide with your SearXNG instance" : "Enabled app-wide, but SearXNG is not configured yet")
+                  : "Configure SearXNG and app-wide search behavior"}
               </Text>
             </View>
           </View>

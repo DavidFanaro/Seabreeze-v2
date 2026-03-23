@@ -43,6 +43,7 @@ import type { LanguageModel, ModelMessage } from "ai";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { type ProviderId, isVideoCapableModel } from "@/types/provider.types";
+import { createAppleModel } from "@/providers/apple-provider";
 import { getProviderModel } from "@/providers/provider-factory";
 import { getCachedModel } from "@/providers/provider-cache";
 import { type FallbackResult } from "@/providers/fallback-chain";
@@ -53,6 +54,7 @@ import { useChatStreaming, type StreamingResult } from "./useChatStreaming";
 import { useStreamLifecycle } from "./useStreamLifecycle";
 import type {
     ChatAttachment,
+    ChatActiveWebSearchState,
     ChatSendInput,
     ChatSendPayload,
     UseChatOptions,
@@ -70,6 +72,11 @@ import {
     createErrorAnnotation,
     withErrorAnnotation,
 } from "@/lib/chat-error-annotations";
+import { withWebSearchAnnotation } from "@/lib/chat-web-search-annotations";
+import {
+    createSearxngToolRuntime,
+    WEB_SEARCH_SYSTEM_PROMPT,
+} from "@/lib/searxng-tool";
 
 type ChunkHandler = (chunk: string, accumulated: string) => void;
 
@@ -336,6 +343,8 @@ export interface UseChatReturn {
     thinkingOutput: string[];
     /** Function to update the thinking output array */
     setThinkingOutput: React.Dispatch<React.SetStateAction<string[]>>;
+    /** Active or most recent web-search state for the currently streaming assistant turn */
+    activeWebSearchState: ChatActiveWebSearchState | null;
     /** Whether the AI is currently streaming reasoning text */
     isThinking: boolean;
     /** Whether the AI is currently streaming a response */
@@ -402,6 +411,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         onThinkingChunk,                  // Callback for streaming thinking chunks
         enableThinking = true,            // Enable thinking output updates
         thinkingLevel,                    // Control reasoning effort when supported
+        enableWebSearch = false,          // Enable app-wide web search tools
+        searxngUrl = null,                // Configured SearXNG instance URL
         onError,                          // Error handling callback
         onComplete,                       // Completion callback
         onFallback,                       // Provider fallback notification
@@ -440,6 +451,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     const [thinkingOutput, setThinkingOutput] = useState<string[]>(
         () => initialMessages.map(() => "")
     );
+    const [activeWebSearchState, setActiveWebSearchState] = useState<ChatActiveWebSearchState | null>(null);
     const [isThinking, setIsThinking] = useState<boolean>(false);
     const [isStreaming, setIsStreaming] = useState<boolean>(false);  // Streaming status
     
@@ -661,6 +673,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         setText("");                              // Clear input field
         setMessages([]);                          // Clear message history
         setThinkingOutput([]);                    // Clear reasoning output
+        setActiveWebSearchState(null);            // Clear live web search state
         setIsThinking(false);                     // Clear thinking state
         setTitle("Chat");                         // Reset to default title
         setActiveProvider(effectiveProviderId);   // Reset to intended provider
@@ -674,6 +687,30 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         lastRetryableOperationRef.current = null;
         retryOperationRegistryRef.current.clear();
     }, [effectiveProviderId, effectiveModelId, setTitle]);
+
+    const commitWebSearchAnnotation = useCallback((
+        assistantIndex: number,
+        annotation: ChatActiveWebSearchState["annotation"] | null,
+    ) => {
+        if (!annotation) {
+            return;
+        }
+
+        setMessages((prev) => {
+            if (assistantIndex < 0 || assistantIndex >= prev.length) {
+                return prev;
+            }
+
+            const next = [...prev];
+            next[assistantIndex] = withWebSearchAnnotation(next[assistantIndex], annotation);
+            return next;
+        });
+
+        setActiveWebSearchState({
+            messageIndex: assistantIndex,
+            annotation,
+        });
+    }, []);
 
     /**
      * Cancel the current streaming operation
@@ -858,6 +895,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // ────────────────────────────────────────────────────────────────
             setIsStreaming(true);                    // Start streaming state
             setIsThinking(false);                    // Reset thinking state
+            setActiveWebSearchState(null);           // Reset live web search state
             canceledRef.current = false;            // Clear cancellation flag
             setCanRetry(false);                     // Disable retry until needed
             lastRetryableOperationRef.current = null;
@@ -902,6 +940,27 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 },
             ]);
             setThinkingOutput((prev) => [...prev, ""]);
+
+            const webSearchRuntime = enableWebSearch
+                && !requestIncludesVideo
+                && typeof searxngUrl === "string"
+                && searxngUrl.trim().length > 0
+                ? createSearxngToolRuntime({
+                    enabled: true,
+                    searxngUrl: searxngUrl.trim(),
+                    onAnnotationChange: (annotation) => {
+                        if (!annotation || !canMutateForCurrentSend()) {
+                            return;
+                        }
+
+                        markChunkReceived();
+                        setActiveWebSearchState({
+                            messageIndex: assistantIndex,
+                            annotation,
+                        });
+                    },
+                })
+                : null;
 
             let attemptProvider = activeProvider;
             let attemptModel = activeModel;
@@ -1003,9 +1062,14 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             // STREAMING EXECUTION
             // ────────────────────────────────────────────────────────────────
             while (true) {
+                const attemptTools = webSearchRuntime?.createTools(attemptProvider);
+                const attemptStreamingModel = attemptProvider === "apple" && attemptTools
+                    ? createAppleModel(attemptTools) as LanguageModel
+                    : attemptResolvedModel;
+
                 const streamingOptions = {
                     model: {
-                        model: attemptResolvedModel,
+                        model: attemptStreamingModel,
                         provider: attemptProvider,
                         modelId: attemptModel,
                         isOriginal: attemptProvider === effectiveProviderId && !isUsingFallback,
@@ -1017,6 +1081,8 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                     activeProvider: attemptProvider,
                     effectiveProviderId: attemptProvider,
                     thinkingLevel,
+                    systemPrompt: attemptTools ? WEB_SEARCH_SYSTEM_PROMPT : undefined,
+                    tools: attemptTools,
                     abortSignal,
                     onChunk,
                     onThinkingChunk: handleThinkingChunk,
@@ -1121,6 +1187,13 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
                 break;
             }
 
+            if (canMutateForCurrentSend()) {
+                commitWebSearchAnnotation(
+                    assistantIndex,
+                    webSearchRuntime?.getAnnotationSnapshot() ?? null,
+                );
+            }
+
             // ────────────────────────────────────────────────────────────────
             // COMPLETION
             // ────────────────────────────────────────────────────────────────
@@ -1157,10 +1230,13 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
             markCompleted,
             markError,
             enableThinking,
+            enableWebSearch,
             thinkingLevel,
+            searxngUrl,
             onThinkingChunk,
             resolveModelForSelection,
             prepareMessagesForProvider,
+            commitWebSearchAnnotation,
         ],
     );
 
@@ -1248,6 +1324,7 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         setMessages,                    // Update message history
         thinkingOutput,                 // Reasoning output
         setThinkingOutput,              // Update reasoning output
+        activeWebSearchState,           // Active or most recent web search state
         isThinking,                     // Thinking status
         isStreaming,                    // Streaming status
         streamState,                    // Stream lifecycle state (streaming | completing | completed | error)
