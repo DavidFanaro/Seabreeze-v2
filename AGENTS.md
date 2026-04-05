@@ -1,10 +1,8 @@
 ## Important Rules
-- IGNORE THE `docs` FOLDER!!!!!!!!!!!! As this is for user documentation only. Agents should ignore this because it can be out of date.
-- When using the in-app chat feature, use the Apple provider/model only unless explicitly instructed otherwise.
-- check if there is a currently opened dev server and ios simulator. if not then start one. BUT ONLY IF ONE IS NOT ALREADY RUNNING
-- If an iOS simulator is already running, do not start another one just because you think the app is misbehaving on that simulator. It's more likely an issue with the current dev server than the simulator. Restart the dev server or reload the app on that simulator. Do not change the simulator. 
-- when building any UI use the `frontend-design` skill and ask to use `agent-device` skill the verify your work
+- when building any UI use the `frontend-design` skill 
 - when interacting with ai sdk use the `ai-sdk` skill
+- When using the in-app chat feature, use the Apple provider/model only unless explicitly instructed otherwise.
+- check if there is a currently opened dev server if not then start one. BUT ONLY IF ONE IS NOT ALREADY RUNNING
 
 ## Important behaviors
 - Be very willing to do searches for documentation and web searches. You should not be holding back on searches whatsoever.
