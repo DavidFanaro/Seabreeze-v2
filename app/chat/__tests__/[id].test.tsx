@@ -21,6 +21,7 @@ const mockGenerateTitle = jest.fn();
 const mockSetTitle = jest.fn();
 const mockRetryLastMessage = jest.fn();
 const mockCancel = jest.fn();
+const mockRetryHydration = jest.fn();
 
 const mockUseChatReturn = {
   text: 'Test message',
@@ -102,6 +103,16 @@ jest.mock('@/hooks/useChatState', () => ({
   useChatState: () => ({
     clearOverride: mockClearOverride,
     syncFromDatabase: mockSyncFromDatabase,
+  }),
+}));
+
+jest.mock('@/hooks/chat/useChatHydration', () => ({
+  useChatHydration: () => ({
+    chatID: 0,
+    setChatID: jest.fn(),
+    isInitializing: false,
+    hydrationError: null,
+    retryHydration: mockRetryHydration,
   }),
 }));
 

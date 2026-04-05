@@ -18,6 +18,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { HeroUINativeProvider } from "heroui-native";
 
 import migrations from "../drizzle/migrations";
+import { AppQueryProvider } from "@/components/providers/AppQueryProvider";
 import { ThemeProvider, useTheme } from "@/components/ui/ThemeProvider";
 import useDatabase, { dbname } from "@/hooks/useDatabase";
 
@@ -143,15 +144,17 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <HeroUINativeProvider config={{ devInfo: { stylingPrinciples: false } }}>
         <ThemeProvider defaultTheme="dark">
-          <Suspense fallback={<Text>Loading</Text>}>
-            <SQLiteProvider
-              databaseName={dbname}
-              useSuspense={true}
-              options={{ enableChangeListener: true }}
-            >
-              <DatabaseGate />
-            </SQLiteProvider>
-          </Suspense>
+          <AppQueryProvider>
+            <Suspense fallback={<Text>Loading</Text>}>
+              <SQLiteProvider
+                databaseName={dbname}
+                useSuspense={true}
+                options={{ enableChangeListener: true }}
+              >
+                <DatabaseGate />
+              </SQLiteProvider>
+            </Suspense>
+          </AppQueryProvider>
         </ThemeProvider>
       </HeroUINativeProvider>
     </GestureHandlerRootView>

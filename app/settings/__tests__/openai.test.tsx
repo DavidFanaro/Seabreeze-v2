@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { fireEvent, waitFor } from "@testing-library/react-native";
 import React from "react";
 
 import OpenAISettings from "../openai";
+import { renderWithQueryClient } from "@/test/renderWithQueryClient";
 
 const mockSetSelectedModel = jest.fn();
 const mockSetOpenAIApiKey = jest.fn();
@@ -63,7 +64,7 @@ describe("OpenAISettings", () => {
   });
 
   it("passes the expected screen props to the shared provider settings screen", () => {
-    render(<OpenAISettings />);
+    renderWithQueryClient(<OpenAISettings />);
 
     expect(mockProviderSettingsScreen).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -77,7 +78,7 @@ describe("OpenAISettings", () => {
   });
 
   it("saves the API key and updates the success state", async () => {
-    const { getByTestId, getByText } = render(<OpenAISettings />);
+    const { getByTestId, getByText } = renderWithQueryClient(<OpenAISettings />);
 
     fireEvent.changeText(getByTestId("provider-input"), "sk-updated");
     fireEvent.press(getByTestId("action-Save Settings"));

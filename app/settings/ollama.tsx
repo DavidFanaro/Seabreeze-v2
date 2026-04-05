@@ -4,7 +4,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 
+import type { SettingsStatus } from "@/components/settings/SettingsStatusBanner";
 import { ProviderSettingsScreen } from "@/components/settings/ProviderSettingsScreen";
 import { useProviderStore, useAuthStore } from "@/stores";
 import { testProviderConnection } from "@/providers/provider-factory";
@@ -17,86 +19,91 @@ export default function OllamaSettings() {
   const { ollamaUrl, setOllamaUrl } = useAuthStore();
 
   const [baseUrl, setBaseUrlState] = useState(ollamaUrl || "http://localhost:11434");
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [status, setStatus] = useState<SettingsStatus | null>(null);
 
   useEffect(() => {
     setBaseUrlState(ollamaUrl || "http://localhost:11434");
   }, [ollamaUrl]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setTestResult(null);
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (): Promise<SettingsStatus> => {
+      setOllamaUrl(baseUrl);
 
-    await setOllamaUrl(baseUrl);
-
-    setIsTesting(true);
-    const success = await testProviderConnection("ollama", { url: baseUrl });
-    setTestResult({
-      success,
-      message: success
-        ? "Connected successfully!"
-        : "Connection failed. Check your URL and Ollama server.",
-    });
-
-    setIsTesting(false);
-    setIsSaving(false);
-  };
-
-  const handleFetchModels = async () => {
-    setIsLoadingModels(true);
-    setTestResult(null);
-
-    const trimmedBaseUrl = baseUrl.trim();
-    if (!trimmedBaseUrl) {
-      setTestResult({
+      const success = await testProviderConnection("ollama", { url: baseUrl });
+      return {
+        success,
+        message: success
+          ? "Connected successfully!"
+          : "Connection failed. Check your URL and Ollama server.",
+      };
+    },
+    onSuccess: (nextStatus) => {
+      setStatus(nextStatus);
+    },
+    onError: (error) => {
+      setStatus({
         success: false,
-        message: "Please enter an Ollama URL before loading models.",
+        message: error instanceof Error ? error.message : "Could not save Ollama settings.",
       });
-      setIsLoadingModels(false);
-      return;
-    }
+    },
+  });
 
-    try {
+  const loadModelsMutation = useMutation({
+    mutationFn: async (): Promise<SettingsStatus> => {
+      const trimmedBaseUrl = baseUrl.trim();
+      if (!trimmedBaseUrl) {
+        return {
+          success: false,
+          message: "Please enter an Ollama URL before loading models.",
+        };
+      }
+
       const existingModels = normalizeUniqueModelNames(availableModels.ollama ?? []);
       const existingModelSet = new Set(existingModels);
       const models = normalizeUniqueModelNames(await fetchOllamaModels(trimmedBaseUrl));
       const fetchedModelSet = new Set(models);
-      const addedModelCount = models.filter((m) => !existingModelSet.has(m)).length;
-      const removedModelCount = existingModels.filter((m) => !fetchedModelSet.has(m)).length;
+      const addedModelCount = models.filter((modelName) => !existingModelSet.has(modelName)).length;
+      const removedModelCount = existingModels.filter((modelName) => !fetchedModelSet.has(modelName)).length;
 
       setAvailableModels("ollama", models);
 
       if (models.length > 0) {
-        setTestResult({
+        return {
           success: true,
           message:
             addedModelCount === 0 && removedModelCount === 0
               ? `Models are up to date (${models.length} total).`
               : `Synced ${models.length} models (${addedModelCount} added, ${removedModelCount} removed).`,
-        });
-        return;
+        };
       }
 
       const connectionOk = await testProviderConnection("ollama", { url: trimmedBaseUrl });
-      setTestResult(
-        connectionOk
-          ? {
-              success: false,
-              message: "Connected, but no models were returned. Run 'ollama list' to verify.",
-            }
-          : {
-              success: false,
-              message: "Could not reach Ollama. Check your URL and server status.",
-            },
-      );
-    } catch {
-      setTestResult({ success: false, message: "Failed to load models." });
-    } finally {
-      setIsLoadingModels(false);
-    }
+      return connectionOk
+        ? {
+            success: false,
+            message: "Connected, but no models were returned. Run 'ollama list' to verify.",
+          }
+        : {
+            success: false,
+            message: "Could not reach Ollama. Check your URL and server status.",
+          };
+    },
+    onSuccess: (nextStatus) => {
+      setStatus(nextStatus);
+    },
+    onError: () => {
+      setStatus({ success: false, message: "Failed to load models." });
+    },
+  });
+
+  const handleSave = () => {
+    setStatus(null);
+    saveSettingsMutation.mutate();
+  };
+
+  const handleFetchModels = () => {
+    setStatus(null);
+    loadModelsMutation.mutate();
   };
 
   return (
@@ -112,17 +119,17 @@ export default function OllamaSettings() {
       dynamicModels={availableModels.ollama}
       selectedModel={selectedModel}
       onModelSelect={setSelectedModel}
-      status={testResult}
+      status={status}
       actions={[
         {
           title: "Save & Test",
           onPress: handleSave,
-          loading: isSaving || isTesting,
+          loading: saveSettingsMutation.isPending,
         },
         {
           title: "Load Models",
           onPress: handleFetchModels,
-          loading: isLoadingModels,
+          loading: loadModelsMutation.isPending,
         },
       ]}
     />

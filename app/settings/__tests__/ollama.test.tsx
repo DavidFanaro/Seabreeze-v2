@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { fireEvent, waitFor } from "@testing-library/react-native";
 import React from "react";
 
 import OllamaSettings from "../ollama";
+import { renderWithQueryClient } from "@/test/renderWithQueryClient";
 
 const mockSetSelectedModel = jest.fn();
 const mockSetAvailableModels = jest.fn();
@@ -72,7 +73,7 @@ describe("OllamaSettings", () => {
   });
 
   it("passes the expected screen props to the shared provider settings screen", () => {
-    render(<OllamaSettings />);
+    renderWithQueryClient(<OllamaSettings />);
 
     expect(mockProviderSettingsScreen).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -87,7 +88,7 @@ describe("OllamaSettings", () => {
   it("loads and normalizes models", async () => {
     (mockFetchOllamaModels as any).mockResolvedValue([" llama3.2 ", "mistral", "mistral", "", "   "] as any);
 
-    const { getByTestId, getByText } = render(<OllamaSettings />);
+    const { getByTestId, getByText } = renderWithQueryClient(<OllamaSettings />);
     fireEvent.press(getByTestId("action-Load Models"));
 
     await waitFor(() => {
@@ -98,7 +99,7 @@ describe("OllamaSettings", () => {
   });
 
   it("shows a validation message for an empty URL before loading models", async () => {
-    const { getByTestId, getByText } = render(<OllamaSettings />);
+    const { getByTestId, getByText } = renderWithQueryClient(<OllamaSettings />);
     fireEvent.changeText(getByTestId("provider-input"), "   ");
     fireEvent.press(getByTestId("action-Load Models"));
 
@@ -108,7 +109,7 @@ describe("OllamaSettings", () => {
   });
 
   it("renders the provider id through the shared provider settings screen", () => {
-    const { getByText } = render(<OllamaSettings />);
+    const { getByText } = renderWithQueryClient(<OllamaSettings />);
     expect(getByText("ollama")).toBeTruthy();
   });
 });

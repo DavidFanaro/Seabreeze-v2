@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Pressable, Text, View } from "react-native";
 import { SymbolView } from "expo-symbols";
 
@@ -24,8 +25,6 @@ export default function SearchSettings() {
   const [draftUrl, setDraftUrl] = useState(searxngUrl ?? "");
   const [draftEnabled, setDraftEnabled] = useState(webSearchEnabled);
   const [status, setStatus] = useState<SettingsStatus | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     setDraftUrl(searxngUrl ?? "");
@@ -53,43 +52,55 @@ export default function SearchSettings() {
     setDraftEnabled((current) => !current);
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setStatus(null);
-
-    try {
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (): Promise<SettingsStatus> => {
       const trimmedUrl = draftUrl.trim();
       const normalizedUrl = trimmedUrl ? normalizeSearxngUrl(trimmedUrl) : null;
 
       setSearxngUrl(normalizedUrl);
       setWebSearchEnabled(draftEnabled);
 
-      setStatus({
+      return {
         success: true,
         message: normalizedUrl
           ? "Web search settings saved."
           : "Web search preference saved. Add a SearXNG URL whenever you're ready.",
-      });
-    } catch (error) {
+      };
+    },
+    onSuccess: (nextStatus) => {
+      setStatus(nextStatus);
+    },
+    onError: (error) => {
       setStatus({
         success: false,
         message: error instanceof Error ? error.message : "Could not save search settings.",
       });
-    } finally {
-      setIsSaving(false);
-    }
+    },
+  });
+
+  const testConnectionMutation = useMutation({
+    mutationFn: async (): Promise<SettingsStatus> => {
+      return testSearxngConnection(draftUrl.trim());
+    },
+    onSuccess: (nextStatus) => {
+      setStatus(nextStatus);
+    },
+    onError: (error) => {
+      setStatus({
+        success: false,
+        message: error instanceof Error ? error.message : "Could not test search connection.",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    setStatus(null);
+    saveSettingsMutation.mutate();
   };
 
-  const handleTest = async () => {
-    setIsTesting(true);
+  const handleTest = () => {
     setStatus(null);
-
-    try {
-      const result = await testSearxngConnection(draftUrl.trim());
-      setStatus(result);
-    } finally {
-      setIsTesting(false);
-    }
+    testConnectionMutation.mutate();
   };
 
   return (
@@ -190,7 +201,7 @@ export default function SearchSettings() {
           <SaveButton
             title="Save Settings"
             onPress={handleSave}
-            loading={isSaving}
+            loading={saveSettingsMutation.isPending}
             testID="save-search-settings"
           />
         </View>
@@ -198,7 +209,7 @@ export default function SearchSettings() {
           <SaveButton
             title="Test Connection"
             onPress={handleTest}
-            loading={isTesting}
+            loading={testConnectionMutation.isPending}
             disabled={!hasUrl}
             testID="test-search-connection"
           />

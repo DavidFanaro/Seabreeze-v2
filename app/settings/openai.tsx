@@ -4,7 +4,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 
+import type { SettingsStatus } from "@/components/settings/SettingsStatusBanner";
 import { ProviderSettingsScreen } from "@/components/settings/ProviderSettingsScreen";
 import { OPENAI_MODELS } from "@/types/provider.types";
 import { useProviderStore, useAuthStore } from "@/stores";
@@ -15,31 +17,40 @@ export default function OpenAISettings() {
   const { openaiApiKey, setOpenAIApiKey } = useAuthStore();
 
   const [apiKey, setApiKeyState] = useState(openaiApiKey || "");
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [status, setStatus] = useState<SettingsStatus | null>(null);
 
   useEffect(() => {
     setApiKeyState(openaiApiKey || "");
   }, [openaiApiKey]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setTestResult(null);
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (): Promise<SettingsStatus | null> => {
+      setOpenAIApiKey(apiKey || null);
 
-    await setOpenAIApiKey(apiKey || null);
+      if (!apiKey) {
+        return null;
+      }
 
-    if (apiKey) {
-      setIsTesting(true);
       const success = await testProviderConnection("openai", { apiKey });
-      setTestResult({
+      return {
         success,
         message: success ? "Connected successfully!" : "Connection failed. Check your API key.",
+      };
+    },
+    onSuccess: (nextStatus) => {
+      setStatus(nextStatus);
+    },
+    onError: (error) => {
+      setStatus({
+        success: false,
+        message: error instanceof Error ? error.message : "Could not save OpenAI settings.",
       });
-      setIsTesting(false);
-    }
+    },
+  });
 
-    setIsSaving(false);
+  const handleSave = () => {
+    setStatus(null);
+    saveSettingsMutation.mutate();
   };
 
   return (
@@ -54,12 +65,12 @@ export default function OpenAISettings() {
       predefinedModels={OPENAI_MODELS}
       selectedModel={selectedModel}
       onModelSelect={setSelectedModel}
-      status={testResult}
+      status={status}
       actions={[
         {
           title: "Save Settings",
           onPress: handleSave,
-          loading: isSaving || isTesting,
+          loading: saveSettingsMutation.isPending,
         },
       ]}
     />

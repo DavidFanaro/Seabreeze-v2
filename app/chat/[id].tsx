@@ -1,24 +1,18 @@
-import { chat } from "@/db/schema";
+import { RenameChatModal } from "@/components/chat/RenameChatModal";
 import useChat from "@/hooks/chat/useChat";
+import { useChatHydration } from "@/hooks/chat/useChatHydration";
+import { useChatMediaPicker } from "@/hooks/chat/useChatMediaPicker";
 import useDatabase from "@/hooks/useDatabase";
 import { useChatState } from "@/hooks/useChatState";
 import { useAuthStore } from "@/stores";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useMessagePersistence } from "@/hooks/useMessagePersistence";
-import {
-    isChatDeleteLocked,
-    runChatOperation,
-} from "@/lib/chat-persistence-coordinator";
-import { normalizePersistedMessages } from "@/lib/chat-message-normalization";
-import { eq } from "drizzle-orm";
-import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { Alert, Keyboard, Linking, Modal, Platform, Pressable, Text, TextInput, View, type LayoutChangeEvent, unstable_batchedUpdates } from "react-native";
+import { Alert, Keyboard, Platform, View, type LayoutChangeEvent } from "react-native";
 import { KeyboardAvoidingView, KeyboardStickyView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, interpolate } from "react-native-reanimated";
-import { ModelMessage } from "ai";
 import { ChatContextMenu } from "@/components/chat/ChatContextMenu";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { MessageList } from "@/components/chat/MessageList";
@@ -26,23 +20,10 @@ import { RetrievalRecoveryView } from "@/components/chat/RetrievalRecoveryView";
 import { RetryBanner } from "@/components/chat/RetryBanner";
 import { SaveErrorBanner } from "@/components/chat/SaveErrorBanner";
 import { useTheme } from "@/components/ui/ThemeProvider";
-import {
-    asDataUri,
-    isModelSupportedImageType,
-    MAX_CHAT_ATTACHMENTS,
-    MAX_CHAT_ATTACHMENT_BYTES,
-    normalizePickerAsset,
-} from "@/lib/chat-attachments";
 import { getMessagePreviewText } from "@/lib/chat-content-parts";
-import { createIdempotencyKey, createSequenceGuard } from "@/lib/concurrency";
+import { createIdempotencyKey } from "@/lib/concurrency";
 import { DEFAULT_CHAT_TITLE, getChatTitleForDisplay } from "@/lib/chat-title";
-import type { ChatAttachment, ChatSendInput } from "@/types/chat.types";
-import { ProviderId } from "@/types/provider.types";
-import {
-    failPersistenceOperation,
-    startPersistenceOperation,
-    succeedPersistenceOperation,
-} from "@/lib/persistence-telemetry";
+import type { ChatSendInput } from "@/types/chat.types";
 
 const AUTO_TITLE_MAX_ATTEMPTS = 3;
 
@@ -68,25 +49,15 @@ export default function Chat() {
     
     // Use unified chat state management
     const { clearOverride, syncFromDatabase } = useChatState(chatIdParam);
-    
-    // Local state only for database ID (not provider/model)
-    const [chatID, setChatID] = useState(0);
-    const [isInitializing, setIsInitializing] = useState(false);
-    const [hydrationError, setHydrationError] = useState<string | null>(null);
-    const [hydrationAttempt, setHydrationAttempt] = useState(0);
-    const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+
     const [composerHeight, setComposerHeight] = useState(0);
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
     const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
     const [renameTitleDraft, setRenameTitleDraft] = useState("");
-    const hydrationGuardRef = useRef(createSequenceGuard("chat-hydration"));
-    const lastHydratedSignatureRef = useRef<string | null>(null);
-    const currentChatIdRef = useRef<string | null>(null);
     const autoTitleAttemptCountRef = useRef(0);
     const isAutoTitleGenerationInFlightRef = useRef(false);
     const autoTitleSucceededRef = useRef(false);
     const lastAutoTitleTriggerSignatureRef = useRef<string | null>(null);
-    const backfilledChatIdsRef = useRef<Set<number>>(new Set());
     
     // Initialize useChat with chatId for unified state management
     const {
@@ -125,6 +96,48 @@ export default function Chat() {
 
     const isInputLocked = streamState === "streaming" || streamState === "completing";
     const messageListBottomInset = isIos && isKeyboardVisible ? composerHeight : 0;
+
+    const resetAutoTitleState = useCallback(() => {
+        autoTitleAttemptCountRef.current = 0;
+        isAutoTitleGenerationInFlightRef.current = false;
+        autoTitleSucceededRef.current = false;
+        lastAutoTitleTriggerSignatureRef.current = null;
+    }, []);
+
+    const syncAutoTitleState = useCallback((nextTitle: string) => {
+        resetAutoTitleState();
+        autoTitleSucceededRef.current = nextTitle !== DEFAULT_CHAT_TITLE;
+    }, [resetAutoTitleState]);
+
+    const {
+        pendingAttachments,
+        clearPendingAttachments,
+        handleRemoveAttachment,
+        handleTakePhoto,
+        handleChooseFromLibrary,
+    } = useChatMediaPicker({
+        isInputLocked,
+    });
+
+    const {
+        chatID,
+        setChatID,
+        isInitializing,
+        hydrationError,
+        retryHydration,
+    } = useChatHydration({
+        chatIdParam,
+        db,
+        clearOverride,
+        syncFromDatabase,
+        setMessages,
+        setThinkingOutput,
+        setTitle,
+        setText,
+        clearPendingAttachments,
+        resetAutoTitleState,
+        syncAutoTitleState,
+    });
 
     useEffect(() => {
         const showSubscription = Keyboard.addListener(
@@ -219,16 +232,12 @@ export default function Chat() {
 
     const handleReset = useCallback(() => {
         reset();
-        setPendingAttachments([]);
+        clearPendingAttachments();
         setIsRenameModalVisible(false);
         setRenameTitleDraft("");
-        // Clear any chat-specific overrides
         clearOverride();
-        autoTitleAttemptCountRef.current = 0;
-        isAutoTitleGenerationInFlightRef.current = false;
-        autoTitleSucceededRef.current = false;
-        lastAutoTitleTriggerSignatureRef.current = null;
-    }, [reset, clearOverride]);
+        resetAutoTitleState();
+    }, [clearOverride, clearPendingAttachments, reset, resetAutoTitleState]);
 
     const handleOpenRenameModal = useCallback(() => {
         const currentTitle = title.trim() === DEFAULT_CHAT_TITLE ? "" : title.trim();
@@ -256,17 +265,14 @@ export default function Chat() {
 
         setTitle(nextTitle);
         autoTitleSucceededRef.current = true;
+        lastAutoTitleTriggerSignatureRef.current = null;
         handleCloseRenameModal();
     }, [handleCloseRenameModal, renameTitleDraft, setTitle, title]);
 
     const sendChatMessages = useCallback(async (input?: ChatSendInput) => {
         await sendMessage(input);
-        setPendingAttachments([]);
-    }, [sendMessage]);
-
-    const handleRemoveAttachment = useCallback((attachmentId: string) => {
-        setPendingAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
-    }, []);
+        clearPendingAttachments();
+    }, [clearPendingAttachments, sendMessage]);
 
     const handleComposerLayout = useCallback((event: LayoutChangeEvent) => {
         const nextComposerHeight = Math.ceil(event.nativeEvent.layout.height);
@@ -275,323 +281,12 @@ export default function Chat() {
         ));
     }, []);
 
-    const processSelectedAssets = useCallback((assets: ImagePicker.ImagePickerAsset[]) => {
-        const skippedUnsupportedImages: string[] = [];
-        const normalized = assets.flatMap((asset, index) => {
-            const nextAttachment = normalizePickerAsset(asset, index);
-
-            if (nextAttachment.kind === "image") {
-                if (typeof asset.base64 === "string" && asset.base64.length > 0) {
-                    return [{
-                        ...nextAttachment,
-                        uri: asDataUri(asset.base64, "image/jpeg"),
-                        mediaType: "image/jpeg",
-                    }];
-                }
-
-                if (!isModelSupportedImageType(nextAttachment.mediaType)) {
-                    skippedUnsupportedImages.push(nextAttachment.fileName ?? "image");
-                    return [];
-                }
-            }
-
-            return [nextAttachment];
-        });
-
-        if (skippedUnsupportedImages.length > 0) {
-            Alert.alert(
-                "Unsupported image format",
-                "Some images were skipped. Supported formats are JPEG, PNG, GIF, and WEBP.",
-            );
-        }
-
-        const acceptedAttachments = normalized.filter((attachment) => {
-            return typeof attachment.fileSize !== "number"
-                || attachment.fileSize <= MAX_CHAT_ATTACHMENT_BYTES;
-        });
-
-        if (acceptedAttachments.length < normalized.length) {
-            Alert.alert(
-                "File too large",
-                "Each attachment must be 30 MB or smaller.",
-            );
-        }
-
-        if (acceptedAttachments.length === 0) {
-            return;
-        }
-
-        setPendingAttachments((current) => [
-            ...current,
-            ...acceptedAttachments,
-        ].slice(0, MAX_CHAT_ATTACHMENTS));
-    }, []);
-
-    const openAppSettings = useCallback(() => {
-        void Linking.openSettings().catch((error) => {
-            console.warn("[Chat] Failed to open app settings:", error);
-        });
-    }, []);
-
-    const ensureCameraPermission = useCallback(async () => {
-        let permission = await ImagePicker.getCameraPermissionsAsync();
-
-        if (!permission.granted && permission.canAskAgain) {
-            permission = await ImagePicker.requestCameraPermissionsAsync();
-        }
-
-        return permission;
-    }, []);
-
-    const mapCameraLaunchError = useCallback((error: unknown) => {
-        const message = error instanceof Error ? error.message : "";
-        const normalized = message.toLowerCase();
-
-        if (
-            normalized.includes("camera not available on simulator")
-            || normalized.includes("camera unavailable")
-            || normalized.includes("no camera")
-        ) {
-            return {
-                title: "Camera unavailable",
-                message: "This device does not have an available camera. Choose from Library instead.",
-                allowLibraryFallback: true,
-                allowOpenSettings: false,
-            };
-        }
-
-        if (
-            normalized.includes("missing camera")
-            || normalized.includes("camera permission")
-            || normalized.includes("camera roll permission")
-            || normalized.includes("user rejected permissions")
-            || normalized.includes("permission")
-        ) {
-            return {
-                title: "Camera permission required",
-                message: "Allow camera access in Settings to take photos.",
-                allowLibraryFallback: false,
-                allowOpenSettings: true,
-            };
-        }
-
-        return {
-            title: "Unable to open camera",
-            message: "Could not open the camera right now. Please try again.",
-            allowLibraryFallback: false,
-            allowOpenSettings: false,
-        };
-    }, []);
-
-    const launchLibraryPicker = useCallback(async (remainingSlots: number) => {
-        let result: ImagePicker.ImagePickerResult;
-
-        try {
-            result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ["images", "videos"] as ImagePicker.MediaType[],
-                allowsMultipleSelection: true,
-                selectionLimit: remainingSlots,
-                base64: true,
-                quality: 1,
-            });
-        } catch (error) {
-            const message = error instanceof Error
-                ? error.message
-                : "Could not open your media library.";
-
-            Alert.alert("Unable to open media library", message);
-            return;
-        }
-
-        if (result.canceled || result.assets.length === 0) {
-            return;
-        }
-
-        processSelectedAssets(result.assets);
-    }, [processSelectedAssets]);
-
-    const launchCameraPicker = useCallback(async (remainingSlots: number) => {
-        let permission: Awaited<ReturnType<typeof ImagePicker.getCameraPermissionsAsync>>;
-
-        try {
-            permission = await ensureCameraPermission();
-        } catch (error) {
-            console.warn("[Chat] Failed to check camera permission:", error);
-            Alert.alert(
-                "Unable to access camera",
-                "Could not verify camera permissions right now. Please try again.",
-            );
-            return;
-        }
-
-        if (!permission.granted) {
-            if (permission.canAskAgain) {
-                Alert.alert(
-                    "Camera permission required",
-                    "Allow camera access to take photos in chat.",
-                );
-                return;
-            }
-
-            Alert.alert(
-                "Camera permission required",
-                "Camera access is disabled. Enable it in Settings to take photos in chat.",
-                [
-                    {
-                        text: "Not now",
-                        style: "cancel",
-                    },
-                    {
-                        text: "Open Settings",
-                        onPress: openAppSettings,
-                    },
-                ],
-            );
-            return;
-        }
-
-        let result: ImagePicker.ImagePickerResult;
-
-        try {
-            result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ["images"] as ImagePicker.MediaType[],
-                allowsEditing: false,
-                base64: true,
-                quality: 1,
-            });
-        } catch (error) {
-            console.warn("[Chat] launchCameraAsync failed:", error);
-            const resolution = mapCameraLaunchError(error);
-            const actions = [] as {
-                text: string;
-                style?: "default" | "cancel" | "destructive";
-                onPress?: () => void;
-            }[];
-
-            if (resolution.allowLibraryFallback && remainingSlots > 0) {
-                actions.push({
-                    text: "Choose from Library",
-                    onPress: () => {
-                        void launchLibraryPicker(remainingSlots);
-                    },
-                });
-            }
-
-            if (resolution.allowOpenSettings) {
-                actions.push({
-                    text: "Open Settings",
-                    onPress: openAppSettings,
-                });
-            }
-
-            actions.push({
-                text: "OK",
-                style: "cancel",
-            });
-
-            Alert.alert(resolution.title, resolution.message, actions);
-            return;
-        }
-
-        if (result.canceled || result.assets.length === 0) {
-            return;
-        }
-
-        processSelectedAssets(result.assets);
-    }, [ensureCameraPermission, launchLibraryPicker, mapCameraLaunchError, openAppSettings, processSelectedAssets]);
-
-    const handleTakePhoto = useCallback(async () => {
-        if (isInputLocked) return;
-        if (pendingAttachments.length >= MAX_CHAT_ATTACHMENTS) {
-            Alert.alert(
-                "Attachment limit reached",
-                `You can attach up to ${MAX_CHAT_ATTACHMENTS} items per message.`,
-            );
-            return;
-        }
-        const remainingSlots = MAX_CHAT_ATTACHMENTS - pendingAttachments.length;
-        await launchCameraPicker(remainingSlots);
-    }, [isInputLocked, launchCameraPicker, pendingAttachments.length]);
-
-    const handleChooseFromLibrary = useCallback(async () => {
-        if (isInputLocked) return;
-        if (pendingAttachments.length >= MAX_CHAT_ATTACHMENTS) {
-            Alert.alert(
-                "Attachment limit reached",
-                `You can attach up to ${MAX_CHAT_ATTACHMENTS} items per message.`,
-            );
-            return;
-        }
-        const remainingSlots = MAX_CHAT_ATTACHMENTS - pendingAttachments.length;
-        await launchLibraryPicker(remainingSlots);
-    }, [isInputLocked, launchLibraryPicker, pendingAttachments.length]);
-
-    const retryHydration = useCallback(() => {
-        if (isInitializing) {
-            return;
-        }
-
-        setIsInitializing(true);
-        setHydrationAttempt((attempt) => attempt + 1);
-    }, [isInitializing]);
-
-    const resetHydratedState = useCallback((nextChatScope: string | null) => {
-        unstable_batchedUpdates(() => {
-            setMessages([]);
-            setThinkingOutput([]);
-            setTitle(DEFAULT_CHAT_TITLE);
-            setText("");
-            setChatID(0);
-            setPendingAttachments([]);
-        });
-        clearOverride();
-        currentChatIdRef.current = nextChatScope;
-        lastHydratedSignatureRef.current = null;
-        autoTitleAttemptCountRef.current = 0;
-        isAutoTitleGenerationInFlightRef.current = false;
-        autoTitleSucceededRef.current = false;
-        lastAutoTitleTriggerSignatureRef.current = null;
-    }, [setMessages, setThinkingOutput, setTitle, setText, clearOverride]);
-
-    const applyHydrationSnapshot = useCallback((snapshot: {
-        signature: string;
-        chatScope: string;
-        chatId: number;
-        messages: ModelMessage[];
-        thinkingOutput: string[];
-        title: string;
-        providerId: ProviderId | null;
-        modelId: string | null;
-    }) => {
-        if (snapshot.signature === lastHydratedSignatureRef.current) {
-            return;
-        }
-
-        unstable_batchedUpdates(() => {
-            setMessages(snapshot.messages);
-            setThinkingOutput(snapshot.thinkingOutput);
-            setTitle(snapshot.title);
-            setChatID(snapshot.chatId);
-            setHydrationError(null);
-        });
-        currentChatIdRef.current = snapshot.chatScope;
-        lastHydratedSignatureRef.current = snapshot.signature;
-        autoTitleAttemptCountRef.current = 0;
-        isAutoTitleGenerationInFlightRef.current = false;
-        autoTitleSucceededRef.current = snapshot.title !== DEFAULT_CHAT_TITLE;
-        lastAutoTitleTriggerSignatureRef.current = null;
-
-        if (snapshot.providerId && snapshot.modelId) {
-            syncFromDatabase(snapshot.providerId, snapshot.modelId);
-        }
-    }, [setMessages, setThinkingOutput, setTitle, syncFromDatabase]);
-
     // Sync chatID with lastSavedChatId when persistence succeeds for new chats
     useEffect(() => {
         if (lastSavedChatId && chatID === 0) {
             setChatID(lastSavedChatId);
         }
-    }, [lastSavedChatId, chatID]);
+    }, [chatID, lastSavedChatId, setChatID]);
 
     useEffect(() => {
         if (isInitializing) {
@@ -625,159 +320,6 @@ export default function Chat() {
         isInitializing,
         title,
     ]);
-
-    // Reset state immediately on chat change
-    useEffect(() => {
-        if (currentChatIdRef.current === chatIdParam) {
-            return;
-        }
-        setIsInitializing(true);
-        setHydrationError(null);
-        resetHydratedState(null);
-    }, [chatIdParam, resetHydratedState]);
-
-    // Load existing chat data
-    useEffect(() => {
-        const token = hydrationGuardRef.current.next();
-
-        const normalizeThinkingOutput = (value: unknown): string[] => {
-            if (!Array.isArray(value)) {
-                return [];
-            }
-
-            return value.filter((entry): entry is string => typeof entry === "string");
-        };
-
-        const setupChat = async () => {
-            if (chatIdParam !== "new") {
-                const loadOperation = startPersistenceOperation("load", {
-                    chatScope: chatIdParam,
-                    hydrationAttempt,
-                });
-                const id = Number(chatIdParam);
-                if (Number.isNaN(id)) {
-                    if (!hydrationGuardRef.current.isCurrent(token)) {
-                        return;
-                    }
-
-                    failPersistenceOperation(loadOperation, new Error(`Invalid chat id: ${chatIdParam}`), {
-                        chatScope: chatIdParam,
-                    });
-                    setHydrationError("Invalid chat id. Please reopen from chat history.");
-                    resetHydratedState(null);
-                    setIsInitializing(false);
-                    return;
-                }
-
-                try {
-                    const data = await db
-                        .select()
-                        .from(chat)
-                        .where(eq(chat.id, id))
-                        .get();
-
-                    if (!hydrationGuardRef.current.isCurrent(token)) return;
-
-                    if (data) {
-                        const {
-                            messages,
-                            didCoerceContent,
-                            droppedMessages,
-                        } = normalizePersistedMessages(data.messages);
-                        const thinkingOutput = normalizeThinkingOutput(data.thinkingOutput);
-                        const title = typeof data.title === "string" && data.title.trim().length > 0
-                            ? data.title
-                            : DEFAULT_CHAT_TITLE;
-
-                        const signature = createIdempotencyKey("chat-hydration", [
-                            chatIdParam,
-                            String(data.updatedAt?.toISOString?.() ?? ""),
-                            JSON.stringify(messages),
-                            JSON.stringify(thinkingOutput),
-                            title,
-                            String(data.providerId ?? ""),
-                            String(data.modelId ?? ""),
-                        ]);
-
-                        applyHydrationSnapshot({
-                            signature,
-                            chatScope: chatIdParam,
-                            chatId: id,
-                            messages,
-                            thinkingOutput,
-                            title,
-                            providerId: (data.providerId as ProviderId | null) ?? null,
-                            modelId: data.modelId,
-                        });
-                        succeedPersistenceOperation(loadOperation, {
-                            chatId: id,
-                            chatFound: true,
-                            messageCount: messages.length,
-                            thinkingOutputCount: thinkingOutput.length,
-                        });
-
-                        const shouldBackfillLegacyPayload = (didCoerceContent || droppedMessages > 0)
-                            && !backfilledChatIdsRef.current.has(id);
-
-                        if (shouldBackfillLegacyPayload) {
-                            backfilledChatIdsRef.current.add(id);
-
-                            void runChatOperation(String(id), async () => {
-                                if (isChatDeleteLocked(id)) {
-                                    backfilledChatIdsRef.current.delete(id);
-                                    return;
-                                }
-
-                                await db
-                                    .update(chat)
-                                    .set({
-                                        messages,
-                                        thinkingOutput,
-                                    })
-                                    .where(eq(chat.id, id));
-                            }).catch((error) => {
-                                backfilledChatIdsRef.current.delete(id);
-                                console.warn("[Chat] Failed to backfill legacy chat payload:", error);
-                            });
-                        }
-                    } else {
-                        resetHydratedState(null);
-                        succeedPersistenceOperation(loadOperation, {
-                            chatId: id,
-                            chatFound: false,
-                        });
-                    }
-                } catch (error) {
-                    if (!hydrationGuardRef.current.isCurrent(token)) {
-                        return;
-                    }
-
-                    failPersistenceOperation(loadOperation, error, {
-                        chatId: id,
-                    });
-                    resetHydratedState(null);
-                    setHydrationError("Unable to hydrate this chat right now. You can keep using a new chat and try reopening this conversation.");
-                } finally {
-                    if (hydrationGuardRef.current.isCurrent(token)) {
-                        setIsInitializing(false);
-                    }
-                }
-            } else {
-                if (!hydrationGuardRef.current.isCurrent(token)) {
-                    return;
-                }
-
-                currentChatIdRef.current = "new";
-                setHydrationError(null);
-                lastHydratedSignatureRef.current = null;
-                setThinkingOutput([]);
-                setPendingAttachments([]);
-                setIsInitializing(false);
-            }
-        };
-        setupChat();
-        // Only run when params.id changes to load a different chat
-    }, [chatIdParam, db, setThinkingOutput, applyHydrationSnapshot, hydrationAttempt, resetHydratedState]);
 
      return (
          <>
@@ -905,121 +447,13 @@ export default function Chat() {
                      </Animated.View>
                  )}
 
-                 <Modal
-                     animationType="fade"
-                     transparent
+                 <RenameChatModal
                      visible={isRenameModalVisible}
-                     onRequestClose={handleCloseRenameModal}
-                 >
-                     <KeyboardAvoidingView
-                         behavior={isIos ? "translate-with-padding" : "padding"}
-                         keyboardVerticalOffset={isIos ? -10 : 0}
-                         className="flex-1"
-                     >
-                         <View
-                             className="flex-1 justify-center px-6"
-                             style={{ backgroundColor: "rgba(0, 0, 0, 0.35)" }}
-                         >
-                             <Pressable
-                                 style={{
-                                     position: "absolute",
-                                     top: 0,
-                                     left: 0,
-                                     right: 0,
-                                     bottom: 0,
-                                 }}
-                                 onPress={handleCloseRenameModal}
-                             />
-
-                             <View
-                                 style={{
-                                     backgroundColor: theme.colors.surface,
-                                     borderColor: theme.colors.border,
-                                     borderWidth: 1,
-                                     borderRadius: 16,
-                                     padding: 16,
-                                 }}
-                             >
-                                 <Text
-                                     style={{
-                                         color: theme.colors.text,
-                                         fontSize: 18,
-                                         fontWeight: "600",
-                                     }}
-                                 >
-                                     Rename Chat
-                                 </Text>
-
-                                 <Text
-                                     style={{
-                                         color: theme.colors.textSecondary,
-                                         fontSize: 14,
-                                         marginTop: 6,
-                                         marginBottom: 12,
-                                     }}
-                                 >
-                                     Choose a new title for this thread.
-                                 </Text>
-
-                                 <TextInput
-                                     value={renameTitleDraft}
-                                     onChangeText={setRenameTitleDraft}
-                                     placeholder="Enter chat title"
-                                     placeholderTextColor={theme.colors.textSecondary}
-                                     autoFocus
-                                     returnKeyType="done"
-                                     onSubmitEditing={handleRenameSubmit}
-                                     style={{
-                                         borderColor: theme.colors.border,
-                                         borderWidth: 1,
-                                         borderRadius: 12,
-                                         paddingHorizontal: 12,
-                                         paddingVertical: isIos ? 10 : 8,
-                                         color: theme.colors.text,
-                                         backgroundColor: theme.colors.background,
-                                     }}
-                                     maxLength={120}
-                                 />
-
-                                 <View
-                                     style={{
-                                         flexDirection: "row",
-                                         justifyContent: "flex-end",
-                                         marginTop: 14,
-                                     }}
-                                 >
-                                     <Pressable
-                                         onPress={handleCloseRenameModal}
-                                         style={{
-                                             borderColor: theme.colors.border,
-                                             borderWidth: 1,
-                                             borderRadius: 10,
-                                             paddingHorizontal: 12,
-                                             paddingVertical: 8,
-                                         }}
-                                     >
-                                         <Text style={{ color: theme.colors.text }}>Cancel</Text>
-                                     </Pressable>
-
-                                     <Pressable
-                                         onPress={handleRenameSubmit}
-                                         style={{
-                                             marginLeft: 10,
-                                             borderColor: theme.colors.accent,
-                                             backgroundColor: theme.colors.accent,
-                                             borderWidth: 1,
-                                             borderRadius: 10,
-                                             paddingHorizontal: 12,
-                                             paddingVertical: 8,
-                                         }}
-                                     >
-                                         <Text style={{ color: theme.colors.surface }}>Save</Text>
-                                     </Pressable>
-                                 </View>
-                             </View>
-                         </View>
-                     </KeyboardAvoidingView>
-                 </Modal>
+                     value={renameTitleDraft}
+                     onChangeText={setRenameTitleDraft}
+                     onClose={handleCloseRenameModal}
+                     onSubmit={handleRenameSubmit}
+                 />
              </View>
          </>
      );

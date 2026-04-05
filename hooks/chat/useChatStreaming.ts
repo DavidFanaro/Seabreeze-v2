@@ -103,10 +103,8 @@
 import { useCallback } from "react";
 // AI SDK for text generation and type definitions
 import { generateText, stepCountIs, streamText, type ModelMessage, type Tool } from "ai";
-import { fetch as expoFetch } from "expo/fetch";
 // Provider type definitions for the fallback system
 import { isThinkingCapableModel, type ProviderId } from "@/types/provider.types";
-import type { ThinkingLevel } from "@/types/chat.types";
 // Fallback chain utilities for provider switching and error classification
 import { getNextFallbackProvider, classifyError, type FallbackResult } from "@/providers/fallback-chain";
 // Error message formatting utilities for user-friendly error display
@@ -114,12 +112,16 @@ import { formatErrorForChat, getErrorFixes, getProviderErrorHint } from "@/lib/e
 // Retry mechanism with exponential backoff for handling transient errors
 import { executeWithRetry, DEFAULT_RETRY_CONFIG, type RetryConfig } from "@/hooks/useErrorRecovery";
 import { getProviderAuth } from "@/stores";
-import { isDataUri, isVideoMediaType } from "@/lib/chat-attachments";
+import { getStreamingProviderOptions } from "@/lib/chat-stream-provider-options";
 import {
     createErrorAnnotation,
     withErrorAnnotation,
 } from "@/lib/chat-error-annotations";
-import type { ChatErrorAnnotation } from "@/types/chat.types";
+import {
+    hasOpenRouterVideoMessageContent,
+    streamOpenRouterVideoMessages,
+} from "@/lib/openrouter-chat-transport";
+import type { ChatErrorAnnotation, ThinkingLevel } from "@/types/chat.types";
 
 /**
  * Configuration options for the streaming operation
@@ -182,243 +184,6 @@ export interface StreamingResult {
     /** Model selected for the next fallback attempt, if any */
     nextModel?: string;
 }
-
-type OpenRouterChatRole = "system" | "user" | "assistant";
-
-type OpenRouterChatContentPart =
-    | { type: "text"; text: string }
-    | { type: "image_url"; image_url: { url: string } }
-    | { type: "video_url"; video_url: { url: string } }
-    | { type: "file"; file: { filename: string; file_data: string } };
-
-interface OpenRouterChatMessage {
-    role: OpenRouterChatRole;
-    content: string | OpenRouterChatContentPart[];
-}
-
-const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-const isHttpUrl = (value: string): boolean => {
-    return /^https?:\/\//i.test(value);
-};
-
-const isSupportedOpenRouterRole = (role: ModelMessage["role"]): role is OpenRouterChatRole => {
-    return role === "system" || role === "user" || role === "assistant";
-};
-
-const asDataUrlIfNeeded = (value: string, mediaType: string): string => {
-    if (isDataUri(value) || isHttpUrl(value)) {
-        return value;
-    }
-
-    return `data:${mediaType};base64,${value}`;
-};
-
-const contentHasVideoFilePart = (content: ModelMessage["content"]): boolean => {
-    if (!Array.isArray(content)) {
-        return false;
-    }
-
-    return content.some((part) => {
-        if (!part || typeof part !== "object") {
-            return false;
-        }
-
-        const partRecord = part as Record<string, unknown>;
-        return partRecord.type === "file"
-            && typeof partRecord.mediaType === "string"
-            && isVideoMediaType(partRecord.mediaType);
-    });
-};
-
-const hasVideoMessageContent = (messages: ModelMessage[]): boolean => {
-    return messages.some((message) => (
-        message.role === "user" && contentHasVideoFilePart(message.content)
-    ));
-};
-
-const toOpenRouterChatContent = (content: ModelMessage["content"]): string | OpenRouterChatContentPart[] => {
-    if (typeof content === "string") {
-        return content;
-    }
-
-    if (!Array.isArray(content)) {
-        return "";
-    }
-
-    const parts: OpenRouterChatContentPart[] = [];
-
-    content.forEach((part) => {
-        if (!part || typeof part !== "object") {
-            return;
-        }
-
-        const partRecord = part as Record<string, unknown>;
-
-        if (partRecord.type === "text" && typeof partRecord.text === "string") {
-            parts.push({
-                type: "text",
-                text: partRecord.text,
-            });
-            return;
-        }
-
-        if (partRecord.type === "image" && typeof partRecord.image === "string") {
-            const mediaType = typeof partRecord.mediaType === "string"
-                ? partRecord.mediaType
-                : "image/jpeg";
-
-            parts.push({
-                type: "image_url",
-                image_url: {
-                    url: asDataUrlIfNeeded(partRecord.image, mediaType),
-                },
-            });
-            return;
-        }
-
-        if (partRecord.type === "file") {
-            const mediaType = typeof partRecord.mediaType === "string"
-                ? partRecord.mediaType
-                : "application/octet-stream";
-            const fileName = typeof partRecord.filename === "string" && partRecord.filename.length > 0
-                ? partRecord.filename
-                : "attachment";
-            const fileDataSource = typeof partRecord.data === "string"
-                ? partRecord.data
-                : typeof partRecord.url === "string"
-                    ? partRecord.url
-                    : null;
-
-            if (!fileDataSource) {
-                return;
-            }
-
-            const resolvedSource = asDataUrlIfNeeded(fileDataSource, mediaType);
-
-            if (isVideoMediaType(mediaType)) {
-                parts.push({
-                    type: "video_url",
-                    video_url: {
-                        url: resolvedSource,
-                    },
-                });
-                return;
-            }
-
-            if (mediaType.startsWith("image/")) {
-                parts.push({
-                    type: "image_url",
-                    image_url: {
-                        url: resolvedSource,
-                    },
-                });
-                return;
-            }
-
-            parts.push({
-                type: "file",
-                file: {
-                    filename: fileName,
-                    file_data: resolvedSource,
-                },
-            });
-        }
-    });
-
-    return parts;
-};
-
-const toOpenRouterChatMessages = (messages: ModelMessage[]): OpenRouterChatMessage[] => {
-    return messages
-        .filter((message): message is ModelMessage & { role: OpenRouterChatRole } => (
-            isSupportedOpenRouterRole(message.role)
-        ))
-        .map((message) => ({
-            role: message.role,
-            content: toOpenRouterChatContent(message.content),
-        }));
-};
-
-const getOpenRouterChunkTextDelta = (payload: Record<string, unknown>): string => {
-    const choices = Array.isArray(payload.choices) ? payload.choices : [];
-    const firstChoice = choices[0] as Record<string, unknown> | undefined;
-    const delta = firstChoice && typeof firstChoice.delta === "object"
-        ? firstChoice.delta as Record<string, unknown>
-        : null;
-
-    if (!delta) {
-        return "";
-    }
-
-    if (typeof delta.content === "string") {
-        return delta.content;
-    }
-
-    if (!Array.isArray(delta.content)) {
-        return "";
-    }
-
-    return delta.content
-        .map((item) => {
-            if (!item || typeof item !== "object") {
-                return "";
-            }
-
-            const itemRecord = item as Record<string, unknown>;
-            return typeof itemRecord.text === "string" ? itemRecord.text : "";
-        })
-        .join("");
-};
-
-const getOpenRouterChunkReasoningDelta = (payload: Record<string, unknown>): string => {
-    const choices = Array.isArray(payload.choices) ? payload.choices : [];
-    const firstChoice = choices[0] as Record<string, unknown> | undefined;
-    const delta = firstChoice && typeof firstChoice.delta === "object"
-        ? firstChoice.delta as Record<string, unknown>
-        : null;
-
-    if (!delta) {
-        return "";
-    }
-
-    return typeof delta.reasoning === "string" ? delta.reasoning : "";
-};
-
-const getOpenRouterFinishReason = (payload: Record<string, unknown>): string | null => {
-    const choices = Array.isArray(payload.choices) ? payload.choices : [];
-    const firstChoice = choices[0] as Record<string, unknown> | undefined;
-    const finishReason = firstChoice?.finish_reason;
-
-    return typeof finishReason === "string" && finishReason.length > 0
-        ? finishReason
-        : null;
-};
-
-const getOpenRouterErrorMessage = (payload: Record<string, unknown>): string | null => {
-    if (!payload.error || typeof payload.error !== "object") {
-        return null;
-    }
-
-    const errorRecord = payload.error as Record<string, unknown>;
-    return typeof errorRecord.message === "string"
-        ? errorRecord.message
-        : null;
-};
-
-const parseOpenRouterErrorBody = (bodyText: string): string => {
-    if (!bodyText) {
-        return "";
-    }
-
-    try {
-        const parsed = JSON.parse(bodyText) as Record<string, unknown>;
-        const message = getOpenRouterErrorMessage(parsed);
-        return message ?? bodyText;
-    } catch {
-        return bodyText;
-    }
-};
 
 const getErrorMessageText = (error: unknown): string => {
     if (error instanceof Error) {
@@ -654,36 +419,16 @@ export function useChatStreaming() {
             const thinkingChunkHandler = canModelThink ? onThinkingChunk : undefined;
             const shouldRequestThinking = Boolean(thinkingChunkHandler);
             const effectiveThinkingLevel: ThinkingLevel = thinkingLevel ?? "medium";
-            let providerOptions: Parameters<typeof streamText>[0]["providerOptions"];
-
-            if (shouldRequestThinking && currentModel.provider === "openai") {
-                providerOptions = {
-                    openai: {
-                        reasoningEffort: effectiveThinkingLevel,
-                        reasoningSummary: "auto",
-                    },
-                };
-            } else if (shouldRequestThinking && currentModel.provider === "openrouter") {
-                providerOptions = {
-                    openrouter: {
-                        includeReasoning: true,
-                        reasoning: {
-                            effort: effectiveThinkingLevel,
-                        },
-                    },
-                };
-            } else if (shouldRequestThinking && currentModel.provider === "ollama") {
-                providerOptions = {
-                    ollama: {
-                        think: true,
-                    },
-                };
-            }
+            const providerOptions = getStreamingProviderOptions(
+                currentModel.provider,
+                shouldRequestThinking,
+                effectiveThinkingLevel,
+            );
 
             const shouldUseOpenRouterVideoTransport = currentModel.provider === "openrouter"
-                && hasVideoMessageContent(messages);
+                && hasOpenRouterVideoMessageContent(messages);
 
-            const streamViaOpenRouterVideoTransport = async (): Promise<void> => {
+            if (shouldUseOpenRouterVideoTransport) {
                 const { apiKey } = getProviderAuth("openrouter");
                 if (!apiKey) {
                     throw new Error("OpenRouter API key is required for video messages.");
@@ -693,151 +438,25 @@ export function useChatStreaming() {
                     throw new Error("OpenRouter model is required for video messages.");
                 }
 
-                const requestBody: Record<string, unknown> = {
-                    model: currentModel.modelId,
-                    stream: true,
-                    messages: toOpenRouterChatMessages(messages),
-                };
-
-                if (shouldRequestThinking) {
-                    requestBody.reasoning = {
-                        effort: effectiveThinkingLevel,
-                    };
-                    requestBody.include_reasoning = true;
-                }
-
-                const response = await expoFetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${apiKey}`,
-                        "Content-Type": "application/json",
-                        Accept: "text/event-stream",
-                    },
-                    body: JSON.stringify(requestBody),
-                    signal: abortSignal,
+                await streamOpenRouterVideoMessages({
+                    apiKey,
+                    modelId: currentModel.modelId,
+                    messages,
+                    thinkingLevel: effectiveThinkingLevel,
+                    shouldRequestThinking,
+                    onChunkReceived,
+                    onTextDelta: applyTextDeltaToUi,
+                    onReasoningDelta: thinkingChunkHandler
+                        ? (reasoningDelta) => {
+                            reasoningAccumulated += reasoningDelta;
+                            if (canCommit()) {
+                                thinkingChunkHandler(reasoningDelta, reasoningAccumulated);
+                            }
+                        }
+                        : undefined,
+                    onDone: signalCompletion,
+                    abortSignal,
                 });
-
-                if (!response.ok) {
-                    let errorBody = "";
-
-                    try {
-                        errorBody = await response.text();
-                    } catch {
-                        errorBody = "";
-                    }
-
-                    const parsedError = parseOpenRouterErrorBody(errorBody);
-                    const suffix = parsedError ? `: ${parsedError}` : "";
-                    throw new Error(`OpenRouter video request failed (${response.status})${suffix}`);
-                }
-
-                if (!response.body) {
-                    throw new Error("OpenRouter returned an empty streaming body.");
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = "";
-
-                const handleDataPayload = (rawPayload: string): void => {
-                    const payload = rawPayload.trim();
-
-                    if (!payload) {
-                        return;
-                    }
-
-                    if (payload === "[DONE]") {
-                        signalCompletion();
-                        return;
-                    }
-
-                    let parsedPayload: Record<string, unknown>;
-                    try {
-                        parsedPayload = JSON.parse(payload) as Record<string, unknown>;
-                    } catch {
-                        return;
-                    }
-
-                    const upstreamError = getOpenRouterErrorMessage(parsedPayload);
-                    if (upstreamError) {
-                        throw new Error(upstreamError);
-                    }
-
-                    const reasoningDelta = getOpenRouterChunkReasoningDelta(parsedPayload);
-                    if (reasoningDelta && thinkingChunkHandler) {
-                        onChunkReceived?.();
-                        reasoningAccumulated += reasoningDelta;
-                        if (canCommit()) {
-                            thinkingChunkHandler(reasoningDelta, reasoningAccumulated);
-                        }
-                    }
-
-                    const textDelta = getOpenRouterChunkTextDelta(parsedPayload);
-                    if (textDelta) {
-                        onChunkReceived?.();
-                        applyTextDeltaToUi(textDelta);
-                    }
-
-                    if (getOpenRouterFinishReason(parsedPayload)) {
-                        signalCompletion();
-                    }
-                };
-
-                const processSseEvent = (eventBlock: string): void => {
-                    const dataPayload = eventBlock
-                        .split("\n")
-                        .filter((line) => line.startsWith("data:"))
-                        .map((line) => line.slice(5).trimStart())
-                        .join("\n")
-                        .trim();
-
-                    if (!dataPayload) {
-                        return;
-                    }
-
-                    handleDataPayload(dataPayload);
-                };
-
-                while (true) {
-                    if (abortSignal?.aborted) {
-                        return;
-                    }
-
-                    const { done, value } = await reader.read();
-                    if (done) {
-                        buffer += decoder.decode();
-                        break;
-                    }
-
-                    if (!value) {
-                        continue;
-                    }
-
-                    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-
-                    let separatorIndex = buffer.indexOf("\n\n");
-                    while (separatorIndex !== -1) {
-                        const rawEvent = buffer.slice(0, separatorIndex).trim();
-                        buffer = buffer.slice(separatorIndex + 2);
-
-                        if (rawEvent) {
-                            processSseEvent(rawEvent);
-                        }
-
-                        separatorIndex = buffer.indexOf("\n\n");
-                    }
-                }
-
-                const trailingEvent = buffer.trim();
-                if (trailingEvent) {
-                    processSseEvent(trailingEvent);
-                }
-
-                signalCompletion();
-            };
-
-            if (shouldUseOpenRouterVideoTransport) {
-                await streamViaOpenRouterVideoTransport();
                 return;
             }
 

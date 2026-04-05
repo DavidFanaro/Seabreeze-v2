@@ -40,20 +40,17 @@
 
 import { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import type { LanguageModel, ModelMessage } from "ai";
-import * as FileSystem from "expo-file-system/legacy";
 
-import { type ProviderId, isVideoCapableModel } from "@/types/provider.types";
-import { createAppleModel } from "@/providers/apple-provider";
+import { type ProviderId } from "@/types/provider.types";
 import { getProviderModel } from "@/providers/provider-factory";
 import { getCachedModel } from "@/providers/provider-cache";
-import { type FallbackResult } from "@/providers/fallback-chain";
-import { executeWithRetry, DEFAULT_RETRY_CONFIG, type RetryConfig } from "@/hooks/useErrorRecovery";
+import { DEFAULT_RETRY_CONFIG, type RetryConfig } from "@/hooks/useErrorRecovery";
 import { useChatState } from "@/hooks/useChatState";
 import { useTitleGeneration } from "./useTitleGeneration";
-import { useChatStreaming, type StreamingResult } from "./useChatStreaming";
+import { useChatStreaming } from "./useChatStreaming";
 import { useStreamLifecycle } from "./useStreamLifecycle";
+import { useChatSendFlow } from "./useChatSendFlow";
 import type {
-    ChatAttachment,
     ChatActiveWebSearchState,
     ChatSendInput,
     ChatSendPayload,
@@ -65,256 +62,16 @@ import {
     createIdempotencyRegistry,
     createSequenceGuard,
 } from "@/lib/concurrency";
-import { isDataUri, isLocalAssetUri, isVideoMediaType } from "@/lib/chat-attachments";
 import { coerceMessageContentToString } from "@/lib/chat-message-normalization";
-import { getErrorFixes } from "@/lib/error-messages";
-import {
-    createErrorAnnotation,
-    withErrorAnnotation,
-} from "@/lib/chat-error-annotations";
 import { withWebSearchAnnotation } from "@/lib/chat-web-search-annotations";
 import {
-    createSearxngToolRuntime,
-    WEB_SEARCH_SYSTEM_PROMPT,
-} from "@/lib/searxng-tool";
-
-type ChunkHandler = (chunk: string, accumulated: string) => void;
-
-interface RetryableOperation {
-    operationKey: string;
-    payload: ChatSendPayload;
-    messageSignature: string;
-}
-
-type UserMessage = Extract<ModelMessage, { role: "user" }>;
-type UserMessageContent = UserMessage["content"];
+    buildMessageSignature,
+    createUserMessageContent,
+    normalizeAttachments,
+    type RetryableOperation,
+} from "./chatSendUtils";
 
 const DEFAULT_PLACEHOLDER_TEXT = "...";
-
-const normalizePossibleFixes = (fixes: string[]): string[] => {
-    return fixes
-        .map((fix) => fix.trim())
-        .filter((fix) => fix.length > 0)
-        .slice(0, 3);
-};
-
-const getErrorMessageText = (error: unknown): string => {
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    if (typeof error === "object" && error !== null && "message" in error) {
-        const message = (error as { message?: unknown }).message;
-        if (typeof message === "string" && message.length > 0) {
-            return message;
-        }
-    }
-
-    return String(error);
-};
-
-const formatAnnotatedErrorContent = (
-    title: string,
-    errorMessage: string,
-    fixes: string[],
-): string => {
-    const normalizedFixes = normalizePossibleFixes(fixes);
-    const lines = [`**${title}**`, "", errorMessage.trim()];
-
-    if (normalizedFixes.length > 0) {
-        lines.push(
-            "",
-            "**Possible fixes:**",
-            ...normalizedFixes.map((fix) => `- ${fix}`),
-        );
-    }
-
-    return lines.join("\n");
-};
-
-interface ResolvedSendPayload {
-    text: string;
-    attachments: ChatAttachment[];
-    usedOverrideText: boolean;
-}
-
-const serializeContentForSignature = (content: ModelMessage["content"]): string => {
-    if (typeof content === "string") {
-        return content;
-    }
-
-    try {
-        return JSON.stringify(content);
-    } catch {
-        return String(content);
-    }
-};
-
-const buildMessageSignature = (content: ModelMessage["content"]): string => {
-    return createIdempotencyKey("chat-message-signature", [
-        serializeContentForSignature(content),
-    ]);
-};
-
-const isSameMessageContent = (
-    left: ModelMessage["content"],
-    right: ModelMessage["content"],
-): boolean => {
-    return buildMessageSignature(left) === buildMessageSignature(right);
-};
-
-const normalizeAttachments = (attachments: ChatSendPayload["attachments"]): ChatAttachment[] => {
-    if (!Array.isArray(attachments)) {
-        return [];
-    }
-
-    return attachments.filter((attachment) => (
-        typeof attachment?.uri === "string"
-        && attachment.uri.length > 0
-        && typeof attachment.mediaType === "string"
-        && attachment.mediaType.length > 0
-    ));
-};
-
-const resolveSendPayload = (
-    input: ChatSendInput | undefined,
-    currentText: string,
-): ResolvedSendPayload => {
-    if (typeof input === "string") {
-        return {
-            text: input.trim(),
-            attachments: [],
-            usedOverrideText: true,
-        };
-    }
-
-    if (input && typeof input === "object") {
-        const rawText = typeof input.text === "string" ? input.text : currentText;
-        return {
-            text: rawText.trim(),
-            attachments: normalizeAttachments(input.attachments),
-            usedOverrideText: false,
-        };
-    }
-
-    return {
-        text: currentText.trim(),
-        attachments: [],
-        usedOverrideText: false,
-    };
-};
-
-const createUserMessageContent = (
-    payload: Pick<ResolvedSendPayload, "text" | "attachments">,
-): UserMessageContent => {
-    if (payload.attachments.length === 0) {
-        return payload.text;
-    }
-
-    const parts: Array<Record<string, unknown>> = [];
-
-    if (payload.text.length > 0) {
-        parts.push({
-            type: "text",
-            text: payload.text,
-        });
-    }
-
-    payload.attachments.forEach((attachment) => {
-        if (attachment.kind === "image") {
-            parts.push({
-                type: "image",
-                image: attachment.uri,
-                mediaType: attachment.mediaType,
-            });
-            return;
-        }
-
-        parts.push({
-            type: "file",
-            data: attachment.uri,
-            mediaType: attachment.mediaType,
-            filename: attachment.fileName,
-        });
-    });
-
-    return parts as unknown as UserMessageContent;
-};
-
-const hasSendableContent = (
-    payload: Pick<ResolvedSendPayload, "text" | "attachments">,
-): boolean => {
-    return payload.text.length > 0 || payload.attachments.length > 0;
-};
-
-const hasVideoAttachment = (attachments: ChatAttachment[]): boolean => {
-    return attachments.some((attachment) => (
-        attachment.kind === "video"
-        || isVideoMediaType(attachment.mediaType)
-    ));
-};
-
-const contentHasVideoPart = (content: ModelMessage["content"]): boolean => {
-    if (!Array.isArray(content)) {
-        return false;
-    }
-
-    return content.some((part) => {
-        if (!part || typeof part !== "object") {
-            return false;
-        }
-
-        const partRecord = part as Record<string, unknown>;
-        return partRecord.type === "file"
-            && typeof partRecord.mediaType === "string"
-            && isVideoMediaType(partRecord.mediaType);
-    });
-};
-
-const conversationHasVideoContent = (messages: ModelMessage[]): boolean => {
-    return messages.some((message) => (
-        message.role === "user" && contentHasVideoPart(message.content)
-    ));
-};
-
-const stripDataUriPrefix = (value: string): string => {
-    const marker = ";base64,";
-    const markerIndex = value.indexOf(marker);
-
-    if (markerIndex === -1) {
-        return value;
-    }
-
-    return value.slice(markerIndex + marker.length);
-};
-
-const messageNeedsPreparation = (message: ModelMessage): boolean => {
-    if (message.role !== "user" || !Array.isArray(message.content)) {
-        return false;
-    }
-
-    return message.content.some((part) => {
-        if (!part || typeof part !== "object") {
-            return false;
-        }
-
-        const partRecord = part as unknown as Record<string, unknown>;
-
-        if (partRecord.type === "image" && typeof partRecord.image === "string") {
-            return isDataUri(partRecord.image) || isLocalAssetUri(partRecord.image);
-        }
-
-        if (partRecord.type === "file" && typeof partRecord.data === "string") {
-            return isDataUri(partRecord.data) || isLocalAssetUri(partRecord.data);
-        }
-
-        return false;
-    });
-};
-
-const needsProviderMessagePreparation = (messages: ModelMessage[]): boolean => {
-    return messages.some(messageNeedsPreparation);
-};
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -578,8 +335,6 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
     
     const {
         streamState,
-        isStreaming: isStreamLifecycleStreaming,
-        abortController,
         initializeStream,
         markChunkReceived,
         markDoneSignalReceived,
@@ -726,585 +481,55 @@ export default function useChat(options: UseChatOptions = {}): UseChatReturn {
         cancelStream(); // Use stream lifecycle cancel for comprehensive cancellation
     }, [cancelStream]);
 
-    const prepareMessagesForProvider = useCallback(async (
-        sourceMessages: ModelMessage[],
-    ): Promise<ModelMessage[]> => {
-        const readAttachmentAsBase64 = async (uri: string): Promise<string> => {
-            const cached = attachmentDataCacheRef.current.get(uri);
-            if (cached) {
-                return cached;
-            }
-
-            const base64 = await FileSystem.readAsStringAsync(uri, {
-                encoding: FileSystem.EncodingType.Base64,
-            });
-
-            attachmentDataCacheRef.current.set(uri, base64);
-            return base64;
-        };
-
-        const preparePart = async (part: unknown): Promise<unknown> => {
-            if (!part || typeof part !== "object") {
-                return part;
-            }
-
-            const partRecord = part as Record<string, unknown>;
-
-            if (partRecord.type === "image" && typeof partRecord.image === "string") {
-                if (isDataUri(partRecord.image)) {
-                    return {
-                        ...partRecord,
-                        image: stripDataUriPrefix(partRecord.image),
-                    };
-                }
-
-                if (isLocalAssetUri(partRecord.image)) {
-                    return {
-                        ...partRecord,
-                        image: await readAttachmentAsBase64(partRecord.image),
-                    };
-                }
-            }
-
-            if (partRecord.type === "file" && typeof partRecord.data === "string") {
-                if (isDataUri(partRecord.data)) {
-                    return {
-                        ...partRecord,
-                        data: stripDataUriPrefix(partRecord.data),
-                    };
-                }
-
-                if (isLocalAssetUri(partRecord.data)) {
-                    return {
-                        ...partRecord,
-                        data: await readAttachmentAsBase64(partRecord.data),
-                    };
-                }
-            }
-
-            return part;
-        };
-
-        return Promise.all(sourceMessages.map(async (message): Promise<ModelMessage> => {
-            if (message.role !== "user" || !Array.isArray(message.content)) {
-                return message;
-            }
-
-            const preparedContent = await Promise.all(message.content.map(preparePart));
-            return {
-                ...message,
-                content: preparedContent as unknown as UserMessageContent,
-            };
-        }));
-    }, []);
-
-        // =============================================================================
-    // CORE MESSAGE SENDING LOGIC
-    // =============================================================================
-    // 
-    // This is the heart of the chat functionality. The sendMessage function:
-    // 1. Validates and prepares the user message
-    // 2. Updates the message history
-    // 3. Initiates streaming with the AI provider
-    // 4. Handles fallback and retry logic
-    // 5. Manages the complete message flow lifecycle
-
-    /**
-     * Send a message to the AI and initiate streaming response
-     * 
-     * @param overrideText - Optional text to send instead of current input
-     * 
-     * This function orchestrates the complete message sending flow:
-     * 1. Input validation and preprocessing
-     * 2. Message history updates
-     * 3. AI provider streaming initiation
-     * 4. Error handling with fallback mechanisms
-     * 5. Completion callbacks
-     */
-    const sendMessage = useCallback(
-        async (input?: ChatSendInput) => {
-            // ────────────────────────────────────────────────────────────────
-            // INPUT VALIDATION AND PREPARATION
-            // ────────────────────────────────────────────────────────────────
-            const resolvedPayload = resolveSendPayload(input, text);
-            
-            // Exit early if no valid content to send
-            if (!hasSendableContent(resolvedPayload)) {
-                return;
-            }
-
-            const requestIncludesVideo = hasVideoAttachment(resolvedPayload.attachments)
-                || conversationHasVideoContent(messagesRef.current);
-
-            if (requestIncludesVideo && !isVideoCapableModel(activeProvider, activeModel)) {
-                const compatibilityError = new Error(
-                    "Video messages require OpenRouter with a video-capable model (for example google/gemini-2.5-flash or google/gemini-2.5-pro). Switch the model in Settings and resend.",
-                );
-                const compatibilityFixes = [
-                    "Switch to OpenRouter with a video-capable model such as google/gemini-2.5-flash.",
-                    "Open Settings and confirm the selected model supports video input.",
-                    "Remove the video attachment and resend as text-only.",
-                ];
-                const compatibilityMessage = withErrorAnnotation(
-                    {
-                        role: "assistant",
-                        content: formatAnnotatedErrorContent(
-                            "Video Not Supported",
-                            compatibilityError.message,
-                            compatibilityFixes,
-                        ),
-                    },
-                    createErrorAnnotation({
-                        error: compatibilityError.message,
-                        fixes: compatibilityFixes,
-                        source: "compatibility",
-                        provider: activeProvider,
-                    }),
-                );
-
-                setMessages((prev) => [...prev, compatibilityMessage]);
-                setThinkingOutput((prev) => [...prev, ""]);
-
-                setErrorMessage(compatibilityError.message);
-                setCanRetry(false);
-                onError?.(compatibilityError);
-                return;
-            }
-
-            const userMessageContent = createUserMessageContent(resolvedPayload);
-            const messageSignature = buildMessageSignature(userMessageContent);
-
-            const sendToken = sendSequenceGuardRef.current.next();
-            const sendOperationKey = createIdempotencyKey("chat-send", [
-                chatId ?? "default",
-                sendToken.sequence,
-                messageSignature,
-            ]);
-
-            const finalizeCurrentSendState = (): void => {
-                if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
-                    return;
-                }
-
-                setIsStreaming(false);
-                setIsThinking(false);
-            };
-
-            // ────────────────────────────────────────────────────────────────
-            // STATE INITIALIZATION
-            // ────────────────────────────────────────────────────────────────
-            setIsStreaming(true);                    // Start streaming state
-            setIsThinking(false);                    // Reset thinking state
-            setActiveWebSearchState(null);           // Reset live web search state
-            canceledRef.current = false;            // Clear cancellation flag
-            setCanRetry(false);                     // Disable retry until needed
-            lastRetryableOperationRef.current = null;
-            const retryPayload: ChatSendPayload = {
-                text: resolvedPayload.text,
-                attachments: [...resolvedPayload.attachments],
-            };
-            lastUserMessageRef.current = retryPayload; // Store for retry capability
-            
-            // Initialize stream lifecycle management
-            const streamController = initializeStream();
-            const abortSignal = streamController.signal;
-            const canMutateForCurrentSend = (): boolean => (
-                sendSequenceGuardRef.current.isCurrent(sendToken)
-                && !canceledRef.current
-                && !abortSignal.aborted
-            );
-
-            // ────────────────────────────────────────────────────────────────
-            // MESSAGE HISTORY MANAGEMENT
-            // ────────────────────────────────────────────────────────────────
-            const userMessage: ModelMessage = {
-                role: "user",
-                content: userMessageContent,
-            };
-            const updatedMessages = [...messagesRef.current, userMessage];
-            setMessages(updatedMessages);
-            setThinkingOutput((prev) => [...prev, ""]);
-
-            // Clear input field if we're using the current text (not override)
-            if (!resolvedPayload.usedOverrideText) {
-                setText("");
-            }
-
-            // Add placeholder for assistant response
-            const assistantIndex = updatedMessages.length;
-            setMessages((prev) => [
-                ...prev,
-                {
-                    role: "assistant",
-                    content: placeholderText,
-                },
-            ]);
-            setThinkingOutput((prev) => [...prev, ""]);
-
-            const webSearchRuntime = enableWebSearch
-                && !requestIncludesVideo
-                && typeof searxngUrl === "string"
-                && searxngUrl.trim().length > 0
-                ? createSearxngToolRuntime({
-                    enabled: true,
-                    searxngUrl: searxngUrl.trim(),
-                    onAnnotationChange: (annotation) => {
-                        if (!annotation || !canMutateForCurrentSend()) {
-                            return;
-                        }
-
-                        markChunkReceived();
-                        setActiveWebSearchState({
-                            messageIndex: assistantIndex,
-                            annotation,
-                        });
-                    },
-                })
-                : null;
-
-            let attemptProvider = activeProvider;
-            let attemptModel = activeModel;
-            let attemptResolvedModel = resolveModelForSelection(attemptProvider, attemptModel);
-            let providerMessages = updatedMessages;
-
-            try {
-                if (needsProviderMessagePreparation(updatedMessages)) {
-                    providerMessages = await prepareMessagesForProvider(updatedMessages);
-                }
-            } catch (error) {
-                const attachmentError = error instanceof Error
-                    ? error
-                    : new Error("Failed to prepare one or more attachments.");
-                const attachmentErrorMessage = getErrorMessageText(attachmentError);
-                const attachmentFixes = normalizePossibleFixes([
-                    ...getErrorFixes(attachmentError, attemptProvider),
-                    "Try selecting the attachment again.",
-                    "Make sure the file is still available on this device.",
-                ]);
-
-                markError(attachmentError);
-                setErrorMessage(attachmentError.message);
-                setCanRetry(true);
-                lastRetryableOperationRef.current = {
-                    operationKey: sendOperationKey,
-                    payload: retryPayload,
-                    messageSignature,
-                };
-                setMessages((prev) => {
-                    const next = [...prev];
-                    next[assistantIndex] = withErrorAnnotation(
-                        {
-                            role: "assistant",
-                            content: formatAnnotatedErrorContent(
-                                "Attachment Error",
-                                attachmentErrorMessage,
-                                attachmentFixes,
-                            ),
-                        },
-                        createErrorAnnotation({
-                            error: attachmentErrorMessage,
-                            fixes: attachmentFixes,
-                            source: "attachment",
-                            provider: attemptProvider,
-                        }),
-                    );
-                    return next;
-                });
-                onError?.(attachmentError);
-                finalizeCurrentSendState();
-                return;
-            }
-
-            if (!canMutateForCurrentSend()) {
-                return;
-            }
-
-            // ────────────────────────────────────────────────────────────────
-            // MODEL VALIDATION
-            // ────────────────────────────────────────────────────────────────
-            if (!attemptResolvedModel) {
-                // Show helpful error message when no provider is configured
-                setMessages((prev) => {
-                    const next = [...prev];
-                    next[assistantIndex] = {
-                        role: "assistant",
-                        content: "**Setup Required**\n\nNo AI provider configured. Please set up a provider in settings.\n\n*Go to Settings to configure an AI provider.*",
-                    };
-                    return next;
-                });
-                
-                onError?.(new Error("No AI provider configured"));
-                finalizeCurrentSendState();
-                onComplete?.();
-                return;
-            }
-
-            // ────────────────────────────────────────────────────────────────
-            // STREAMING CONFIGURATION
-            // ────────────────────────────────────────────────────────────────
-            const handleThinkingChunk = enableThinking
-                ? (chunk: string, accumulated: string) => {
-                    if (!canMutateForCurrentSend()) {
-                        return;
-                    }
-
-                    setIsThinking(true);
-                    setThinkingOutput((prev) => {
-                        const next = [...prev];
-                        next[assistantIndex] = accumulated;
-                        return next;
-                    });
-                    onThinkingChunk?.(chunk, accumulated);
-                }
-                : undefined;
-
-            // ────────────────────────────────────────────────────────────────
-            // STREAMING EXECUTION
-            // ────────────────────────────────────────────────────────────────
-            while (true) {
-                const attemptTools = webSearchRuntime?.createTools(attemptProvider);
-                const attemptStreamingModel = attemptProvider === "apple" && attemptTools
-                    ? createAppleModel(attemptTools) as LanguageModel
-                    : attemptResolvedModel;
-
-                const streamingOptions = {
-                    model: {
-                        model: attemptStreamingModel,
-                        provider: attemptProvider,
-                        modelId: attemptModel,
-                        isOriginal: attemptProvider === effectiveProviderId && !isUsingFallback,
-                        attemptedProviders: failedProvidersRef.current,
-                    } as FallbackResult,
-                    enableRetry,
-                    retryConfig: mergedRetryConfig,
-                    enableFallback: requestIncludesVideo ? false : enableFallback,
-                    activeProvider: attemptProvider,
-                    effectiveProviderId: attemptProvider,
-                    thinkingLevel,
-                    systemPrompt: attemptTools ? WEB_SEARCH_SYSTEM_PROMPT : undefined,
-                    tools: attemptTools,
-                    abortSignal,
-                    onChunk,
-                    onThinkingChunk: handleThinkingChunk,
-                    onChunkReceived: () => {
-                        if (!canMutateForCurrentSend()) {
-                            return;
-                        }
-
-                        markChunkReceived();
-                    },
-                    onDoneSignalReceived: () => {
-                        if (!canMutateForCurrentSend()) {
-                            return;
-                        }
-
-                        markDoneSignalReceived();
-                    },
-                    onStreamCompleted: () => {
-                        if (!canMutateForCurrentSend()) {
-                            return;
-                        }
-
-                        markCompleting();
-                        markCompleted();
-                    },
-                    canMutateState: canMutateForCurrentSend,
-                    onError: (error: unknown) => {
-                        if (!canMutateForCurrentSend()) {
-                            return;
-                        }
-
-                        if (error instanceof Error) {
-                            markError(error);
-                            setErrorMessage(error.message);
-                            setCanRetry(true);
-                            lastRetryableOperationRef.current = {
-                                operationKey: sendOperationKey,
-                                payload: retryPayload,
-                                messageSignature,
-                            };
-                            onError?.(error);
-                        } else {
-                            const wrappedError = new Error(String(error));
-                            markError(wrappedError);
-                            setErrorMessage(wrappedError.message);
-                            setCanRetry(true);
-                            lastRetryableOperationRef.current = {
-                                operationKey: sendOperationKey,
-                                payload: retryPayload,
-                                messageSignature,
-                            };
-                            onError?.(wrappedError);
-                        }
-                    },
-                    onFallback,
-                    onProviderChange: (provider: ProviderId, model: string, isFallback: boolean) => {
-                        if (!canMutateForCurrentSend()) {
-                            return;
-                        }
-
-                        setActiveProvider(provider);
-                        setActiveModel(model);
-                        setIsUsingFallback(isFallback);
-                    },
-                };
-
-                // Timeout / stall detection is handled entirely by the
-                // stream lifecycle hook (inactivity timeout + max duration).
-                // When the lifecycle fires, it aborts the signal and
-                // transitions to "error", which propagates to the UI via the
-                // lifecycle onError callback above.
-                const result: StreamingResult = await executeStreaming(
-                    streamingOptions,
-                    providerMessages,
-                    setMessages,
-                    assistantIndex,
-                    failedProvidersRef
-                );
-
-                if (!sendSequenceGuardRef.current.isCurrent(sendToken)) {
-                    return;
-                }
-
-                if (
-                    !requestIncludesVideo
-                    && result.shouldRetryWithFallback
-                    && result.nextProvider
-                    && result.nextModel
-                    && !canceledRef.current
-                ) {
-                    const fallbackModel = resolveModelForSelection(result.nextProvider, result.nextModel);
-                    if (!fallbackModel) {
-                        break;
-                    }
-
-                    attemptProvider = result.nextProvider;
-                    attemptModel = result.nextModel;
-                    attemptResolvedModel = fallbackModel;
-                    continue;
-                }
-
-                break;
-            }
-
-            if (canMutateForCurrentSend()) {
-                commitWebSearchAnnotation(
-                    assistantIndex,
-                    webSearchRuntime?.getAnnotationSnapshot() ?? null,
-                );
-            }
-
-            // ────────────────────────────────────────────────────────────────
-            // COMPLETION
-            // ────────────────────────────────────────────────────────────────
-            if (
-                sendSequenceGuardRef.current.isCurrent(sendToken)
-                && !canceledRef.current
-                && !abortSignal.aborted
-            ) {
-                onComplete?.();
-            }
-
-            finalizeCurrentSendState();
-        },
-        [
-            text, 
-            placeholderText, 
-            activeProvider, 
-            activeModel, 
-            isUsingFallback,
-            enableRetry, 
-            mergedRetryConfig,
-            executeStreaming,
-            onChunk, 
-            onComplete, 
-            onError, 
-            onFallback,
-            chatId,
-            enableFallback,
-            effectiveProviderId,
-            initializeStream,
-            markChunkReceived,
-            markDoneSignalReceived,
-            markCompleting,
-            markCompleted,
-            markError,
-            enableThinking,
-            enableWebSearch,
-            thinkingLevel,
-            searxngUrl,
-            onThinkingChunk,
-            resolveModelForSelection,
-            prepareMessagesForProvider,
-            commitWebSearchAnnotation,
-        ],
-    );
-
-        // =============================================================================
-    // RETRY FUNCTIONALITY
-    // =============================================================================
-    // 
-    // Retry functionality allows users to resend their last message when the
-    // AI response failed or was incomplete. This involves:
-    // 1. Removing the failed assistant response
-    // 2. Optionally removing the user message (if they want to edit)
-    // 3. Resending the original message with fresh state
-
-    /**
-     * Retry the last failed message
-     * 
-     * This function enables users to retry their last message when the AI
-     * response failed or was cut off. It cleans up the conversation history
-     * and resends the original message with fresh streaming state.
-     */
-    const retryLastMessage = useCallback(async () => {
-        const retryableOperation = lastRetryableOperationRef.current;
-
-        // Guard against invalid retry attempts
-        if (!lastUserMessageRef.current || !canRetry || !retryableOperation) return;
-
-        const retryUserContent = createUserMessageContent({
-            text: retryableOperation.payload.text?.trim() ?? "",
-            attachments: normalizeAttachments(retryableOperation.payload.attachments),
-        });
-
-        const retryOperationKey = createIdempotencyKey("chat-retry", [
-            retryableOperation.operationKey,
-            retryableOperation.messageSignature,
-        ]);
-
-        await retryOperationRegistryRef.current.run(retryOperationKey, async () => {
-            const currentMessages = messagesRef.current;
-            let nextMessages = [...currentMessages];
-            let removedCount = 0;
-
-            if (nextMessages.length > 0 && nextMessages[nextMessages.length - 1].role === "assistant") {
-                nextMessages = nextMessages.slice(0, -1);
-                removedCount += 1;
-            }
-
-            const lastMessage = nextMessages[nextMessages.length - 1];
-            if (
-                lastMessage
-                && lastMessage.role === "user"
-                && isSameMessageContent(lastMessage.content, retryUserContent)
-            ) {
-                nextMessages = nextMessages.slice(0, -1);
-                removedCount += 1;
-            }
-
-            messagesRef.current = nextMessages;
-            setMessages(nextMessages);
-            setThinkingOutput((prev) => prev.slice(0, Math.max(0, prev.length - removedCount)));
-
-            // Reset retry state and clear error message
-            setCanRetry(false);
-            setErrorMessage(null);
-            lastRetryableOperationRef.current = null;
-
-            await sendMessage(retryableOperation.payload);
-        });
-    }, [canRetry, sendMessage]);
+    const { sendMessage, retryLastMessage } = useChatSendFlow({
+        text,
+        chatId,
+        placeholderText,
+        activeProvider,
+        activeModel,
+        isUsingFallback,
+        effectiveProviderId,
+        enableRetry,
+        mergedRetryConfig,
+        enableFallback,
+        enableThinking,
+        enableWebSearch,
+        thinkingLevel,
+        searxngUrl,
+        onChunk,
+        onThinkingChunk,
+        onComplete,
+        onError,
+        onFallback,
+        setText,
+        setMessages,
+        setThinkingOutput,
+        setActiveWebSearchState,
+        setIsThinking,
+        setIsStreaming,
+        setCanRetry,
+        setErrorMessage,
+        setActiveProvider,
+        setActiveModel,
+        setIsUsingFallback,
+        messagesRef,
+        failedProvidersRef,
+        lastUserMessageRef,
+        attachmentDataCacheRef,
+        sendSequenceGuardRef,
+        retryOperationRegistryRef,
+        lastRetryableOperationRef,
+        canceledRef,
+        initializeStream,
+        markChunkReceived,
+        markDoneSignalReceived,
+        markCompleting,
+        markCompleted,
+        markError,
+        commitWebSearchAnnotation,
+        resolveModelForSelection,
+        executeStreaming,
+    });
 
     // =============================================================================
     // PUBLIC INTERFACE

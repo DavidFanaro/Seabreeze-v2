@@ -4,7 +4,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 
+import type { SettingsStatus } from "@/components/settings/SettingsStatusBanner";
 import { ProviderSettingsScreen } from "@/components/settings/ProviderSettingsScreen";
 import { useProviderStore, useAuthStore } from "@/stores";
 import { testProviderConnection } from "@/providers/provider-factory";
@@ -15,31 +17,40 @@ export default function OpenRouterSettings() {
   const { openrouterApiKey, setOpenRouterApiKey } = useAuthStore();
 
   const [apiKey, setApiKeyState] = useState(openrouterApiKey || "");
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [status, setStatus] = useState<SettingsStatus | null>(null);
 
   useEffect(() => {
     setApiKeyState(openrouterApiKey || "");
   }, [openrouterApiKey]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setTestResult(null);
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (): Promise<SettingsStatus | null> => {
+      setOpenRouterApiKey(apiKey || null);
 
-    await setOpenRouterApiKey(apiKey || null);
+      if (!apiKey) {
+        return null;
+      }
 
-    if (apiKey) {
-      setIsTesting(true);
       const success = await testProviderConnection("openrouter", { apiKey });
-      setTestResult({
+      return {
         success,
         message: success ? "Connected successfully!" : "Connection failed. Check your API key.",
+      };
+    },
+    onSuccess: (nextStatus) => {
+      setStatus(nextStatus);
+    },
+    onError: (error) => {
+      setStatus({
+        success: false,
+        message: error instanceof Error ? error.message : "Could not save OpenRouter settings.",
       });
-      setIsTesting(false);
-    }
+    },
+  });
 
-    setIsSaving(false);
+  const handleSave = () => {
+    setStatus(null);
+    saveSettingsMutation.mutate();
   };
 
   return (
@@ -54,12 +65,12 @@ export default function OpenRouterSettings() {
       predefinedModels={OPENROUTER_MODELS}
       selectedModel={selectedModel}
       onModelSelect={setSelectedModel}
-      status={testResult}
+      status={status}
       actions={[
         {
           title: "Save Settings",
           onPress: handleSave,
-          loading: isSaving || isTesting,
+          loading: saveSettingsMutation.isPending,
         },
       ]}
     />
