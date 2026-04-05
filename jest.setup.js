@@ -73,9 +73,42 @@ jest.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: ({ children }) => children,
 }));
 
-jest.mock('react-native-gesture-handler', () => ({
-  GestureHandlerRootView: ({ children }) => children,
-}));
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const noop = () => {};
+  const chainable = () => {
+    const handler = {
+      activeOffsetY: () => handler,
+      failOffsetX: () => handler,
+      onBegin: () => handler,
+      onUpdate: () => handler,
+      onEnd: () => handler,
+      onFinalize: () => handler,
+      simultaneousWithExternalGesture: () => handler,
+      runOnJS: () => handler,
+    };
+    return handler;
+  };
+  return {
+    GestureHandlerRootView: ({ children, style }) =>
+      React.createElement(View, { style }, children),
+    GestureDetector: ({ children }) => children,
+    Gesture: {
+      Pan: chainable,
+      Tap: chainable,
+      LongPress: chainable,
+      Simultaneous: chainable,
+      Race: chainable,
+    },
+    State: { ACTIVE: 'ACTIVE', BEGAN: 'BEGAN', END: 'END' },
+    Directions: { RIGHT: 1, LEFT: 2, UP: 4, DOWN: 8 },
+    PanGestureHandler: ({ children, onGestureEvent }) => children,
+    TapGestureHandler: ({ children }) => children,
+    gestureHandlerRootHOC: (Component) => Component,
+    withHandlers: noop,
+  };
+});
 
 jest.mock('react-native-worklets', () => ({}));
 
@@ -145,8 +178,9 @@ jest.mock('react-native-reanimated', () => {
       duration: () => ({}),
     },
     Keyframe: KeyframeMock,
-    runOnJS: identity,
-    runOnUI: identity,
+    runOnJS: (fn) => fn,
+    runOnUI: (fn) => fn,
+    Extrapolation: { CLAMP: 'clamp', EXTEND: 'extend', IDENTITY: 'identity' },
   };
 });
 

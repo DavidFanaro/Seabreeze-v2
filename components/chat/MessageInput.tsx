@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     Text,
     View,
     TextInput,
     TouchableOpacity,
     Keyboard,
+    Modal,
+    Pressable,
+    Dimensions,
     ViewStyle,
     type LayoutChangeEvent,
     type NativeSyntheticEvent,
@@ -53,6 +56,7 @@ interface MessageInputProps {
     onCancel?: () => void;
     onLayout?: (event: LayoutChangeEvent) => void;
     style?: ViewStyle;
+    toolbar?: React.ReactNode;
 }
 
 // ============================================================================
@@ -83,6 +87,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     onCancel,
     onLayout,
     style,
+    toolbar,
 }) => {
     // ============================================================================
     // SECTION: Hooks & State
@@ -94,6 +99,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     // Media menu popover state
     const [showMediaMenu, setShowMediaMenu] = useState(false);
     const hasMediaCallbacks = !!(onTakePhoto || onChooseFromLibrary);
+
+    // Anchor position for the popover modal
+    const addButtonRef = useRef<View>(null);
+    const pendingMediaActionRef = useRef<(() => void) | null>(null);
+    const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number } | null>(null);
+
+    const measureAnchor = useCallback((onMeasured?: () => void) => {
+        if (!addButtonRef.current?.measureInWindow) {
+            onMeasured?.();
+            return;
+        }
+
+        addButtonRef.current.measureInWindow((x, y) => {
+            setPopoverAnchor({ x, y });
+            onMeasured?.();
+        });
+    }, []);
 
     // Animated rotation for the "+" icon (rotates 45deg to become "x" when open)
     const menuRotation = useSharedValue(0);
@@ -108,9 +130,28 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     // Close the popover when the input becomes disabled
     useEffect(() => {
         if (disabled) {
+            pendingMediaActionRef.current = null;
             setShowMediaMenu(false);
         }
     }, [disabled]);
+
+    const flushPendingMediaAction = useCallback(() => {
+        const action = pendingMediaActionRef.current;
+        pendingMediaActionRef.current = null;
+        action?.();
+    }, []);
+
+    useEffect(() => {
+        if (showMediaMenu || !pendingMediaActionRef.current) {
+            return;
+        }
+
+        const timeout = setTimeout(() => {
+            flushPendingMediaAction();
+        }, 0);
+
+        return () => clearTimeout(timeout);
+    }, [flushPendingMediaAction, showMediaMenu]);
 
     const iconAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ rotate: `${menuRotation.value * 45}deg` }],
@@ -162,21 +203,28 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             triggerPress("light");
             if (!showMediaMenu) {
                 Keyboard.dismiss();
+                setShowMediaMenu(true);
+                measureAnchor();
+                return;
             }
-            setShowMediaMenu((prev) => !prev);
+
+            setShowMediaMenu(false);
         }
+    };
+
+    const closeMediaMenuAndRun = (action?: () => void) => {
+        pendingMediaActionRef.current = action ?? null;
+        setShowMediaMenu(false);
     };
 
     const handleTakePhotoPress = () => {
         triggerPress("light");
-        setShowMediaMenu(false);
-        onTakePhoto?.();
+        closeMediaMenuAndRun(onTakePhoto);
     };
 
     const handleChooseFromLibraryPress = () => {
         triggerPress("light");
-        setShowMediaMenu(false);
-        onChooseFromLibrary?.();
+        closeMediaMenuAndRun(onChooseFromLibrary);
     };
 
     const handleRemoveAttachment = (attachmentId: string) => {
@@ -193,6 +241,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             onLayout={onLayout}
             className="w-full px-4 my-2"
         >
+            {/* Toolbar slot – rendered above input row when provided */}
+            {toolbar ? (
+                <View className="mb-1">
+                    {toolbar}
+                </View>
+            ) : null}
+
             {/* Attachment chips */}
             {attachments.length > 0 ? (
                 <View testID="message-input-attachments" className="flex-row flex-wrap mb-2">
@@ -240,7 +295,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             {/* Input row */}
             <View className="flex-row items-end w-full">
                 {/* "+" / "x" button with popover */}
-                <View className="mr-2" style={{ overflow: "visible", zIndex: 10 }}>
+                <View ref={addButtonRef} className="mr-2">
                     <TouchableOpacity
                         testID="message-input-add"
                         onPress={toggleMediaMenu}
@@ -262,30 +317,48 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                             />
                         </Animated.View>
                     </TouchableOpacity>
+                </View>
 
-                    {/* Media picker popover */}
-                    {showMediaMenu && hasMediaCallbacks ? (
-                        <Animated.View
-                            testID="media-menu-popover"
-                            entering={FadeIn.duration(150)}
-                            exiting={FadeOut.duration(100)}
-                            style={{
-                                position: "absolute",
-                                bottom: 52,
-                                left: 0,
-                                minWidth: 220,
-                                backgroundColor: theme.colors.surface,
-                                borderRadius: 14,
-                                borderWidth: 1,
-                                borderColor: theme.colors.border ?? theme.colors.surface,
-                                paddingVertical: 4,
-                                shadowColor: "#000",
-                                shadowOffset: { width: 0, height: -4 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 12,
-                                elevation: 8,
-                            }}
-                        >
+                {/* Media picker popover — rendered in a transparent modal so taps outside dismiss it */}
+                <Modal
+                    visible={showMediaMenu && hasMediaCallbacks}
+                    transparent
+                    animationType="none"
+                    onDismiss={flushPendingMediaAction}
+                    onRequestClose={() => setShowMediaMenu(false)}
+                >
+                    {/* Full-screen dismiss layer */}
+                    <Pressable
+                        testID="media-menu-backdrop"
+                        style={{ flex: 1 }}
+                        onPress={() => setShowMediaMenu(false)}
+                    />
+
+                    {/* Popover anchored above the + button */}
+                    <Animated.View
+                        testID="media-menu-popover"
+                        entering={FadeIn.duration(150)}
+                        exiting={FadeOut.duration(100)}
+                        style={{
+                            position: "absolute",
+                            // Fall back to a stable bottom-left placement if measurement is unavailable.
+                            bottom: popoverAnchor
+                                ? Dimensions.get("window").height - popoverAnchor.y + 8
+                                : 116,
+                            left: popoverAnchor?.x ?? 16,
+                            minWidth: 220,
+                            backgroundColor: theme.colors.surface,
+                            borderRadius: 14,
+                            borderWidth: 1,
+                            borderColor: theme.colors.border ?? theme.colors.surface,
+                            paddingVertical: 4,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: -4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 12,
+                            elevation: 8,
+                        }}
+                    >
                             {onTakePhoto ? (
                                 <TouchableOpacity
                                     testID="media-menu-take-photo"
@@ -337,9 +410,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                                     </Text>
                                 </TouchableOpacity>
                             ) : null}
-                        </Animated.View>
-                    ) : null}
-                </View>
+                    </Animated.View>
+                </Modal>
 
                 {/* Text input */}
                 <View

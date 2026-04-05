@@ -140,192 +140,150 @@ export const MessageBubble: React.FC<MessageBubbleProps> = memo(
       <View className="my-1 px-4" style={style}>
         {hasWebSearch && webSearch ? (
           <View className="mb-2">
+            {/* Compact header row — no card */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
                 isWebSearchExpanded ? "Hide web search details" : "Show web search details"
               }
               onPress={toggleWebSearch}
-              className="rounded-2xl px-3 py-3"
-              style={{
-                backgroundColor: theme.colors.glass ?? theme.colors.surface,
-                borderColor: webSearch.status === "error"
-                  ? errorColor
-                  : theme.colors.border ?? theme.colors.textSecondary ?? theme.colors.text,
-                borderWidth: 1,
-              }}
+              className="flex-row items-center py-1"
               testID="web-search-card-toggle"
             >
-              <View className="flex-row items-center justify-between">
-                <View className="mr-3 flex-1">
-                  <View className="flex-row items-center">
-                    {isSearchRunning ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={theme.colors.accent}
-                        testID="web-search-card-spinner"
-                      />
-                    ) : (
+              <View style={{ width: 18, alignItems: "center", justifyContent: "center", marginRight: 6 }}>
+                {isSearchRunning ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.accent}
+                    testID="web-search-card-spinner"
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: webSearch.status === "error" ? errorColor : theme.colors.accent,
+                    }}
+                  />
+                )}
+              </View>
+              <Text
+                style={{
+                  color: webSearch.status === "error" ? errorColor : theme.colors.accent,
+                  fontSize: 12,
+                  fontWeight: "700",
+                  letterSpacing: 0.3,
+                  textTransform: "uppercase",
+                }}
+              >
+                Web Search
+              </Text>
+              <Text
+                className="ml-2 flex-1"
+                style={{
+                  color: theme.colors.textSecondary ?? theme.colors.text,
+                  fontSize: 12,
+                }}
+                numberOfLines={1}
+              >
+                {isSearchRunning
+                  ? (latestSearchQuery ? `· ${latestSearchQuery.query}` : "· Searching...")
+                  : `· ${formatSearchSummary(webSearch)}`}
+              </Text>
+              <Text
+                style={{
+                  color: theme.colors.textSecondary ?? theme.colors.text,
+                  fontSize: 11,
+                  fontWeight: "600",
+                }}
+              >
+                {isWebSearchExpanded ? "▲" : "▼"}
+              </Text>
+            </Pressable>
+
+            {/* Flat expanded source list */}
+            {isWebSearchExpanded ? (
+              <View className="mt-1" testID="web-search-card-content">
+                {webSearch.queries.map((queryRun, queryIndex) => (
+                  <View key={`${queryRun.query}-${queryIndex}`} className="mb-3">
+                    {/* Query section header */}
+                    <View
+                      className="flex-row items-center justify-between pb-1 mb-1"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.colors.border ?? theme.colors.textSecondary ?? theme.colors.text,
+                      }}
+                    >
                       <Text
-                        style={{
-                          color: webSearch.status === "error" ? errorColor : theme.colors.accent,
-                          fontSize: 12,
-                          fontWeight: "700",
-                          letterSpacing: 0.5,
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Web Search
-                      </Text>
-                    )}
-                    {!isSearchRunning ? (
-                      <Text
-                        className="ml-2"
+                        className="flex-1 mr-2"
                         style={{
                           color: theme.colors.textSecondary ?? theme.colors.text,
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: "600",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.3,
                         }}
+                        numberOfLines={1}
                       >
-                        {formatSearchSummary(webSearch)}
+                        {queryRun.query}
                       </Text>
-                    ) : null}
-                  </View>
-                  <Text
-                    className="mt-1"
-                    style={{
-                      color: theme.colors.text,
-                      fontSize: 14,
-                      fontWeight: "600",
-                    }}
-                  >
-                    {isSearchRunning ? "Searching the web..." : formatSearchSummary(webSearch)}
-                  </Text>
-                  {latestSearchQuery ? (
-                    <Text
-                      className="mt-1"
-                      style={{
-                        color: theme.colors.textSecondary ?? theme.colors.text,
-                        fontSize: 12,
-                      }}
-                    >
-                      Query: {latestSearchQuery.query}
-                    </Text>
-                  ) : null}
-                </View>
-
-                <Text
-                  style={{
-                    color: theme.colors.textSecondary ?? theme.colors.text,
-                    fontSize: 12,
-                    fontWeight: "600",
-                  }}
-                >
-                  {isWebSearchExpanded ? "Hide" : "Show"}
-                </Text>
-              </View>
-
-              {isWebSearchExpanded ? (
-                <View className="mt-3 gap-3" testID="web-search-card-content">
-                  {webSearch.queries.map((queryRun, queryIndex) => (
-                    <View
-                      key={`${queryRun.query}-${queryIndex}`}
-                      className="rounded-2xl px-3 py-3"
-                      style={{
-                        backgroundColor: theme.colors.surface,
-                        borderColor: theme.colors.border ?? theme.colors.textSecondary ?? theme.colors.text,
-                        borderWidth: 1,
-                      }}
-                    >
-                      <View className="flex-row items-center justify-between">
-                        <Text
-                          className="mr-2 flex-1"
-                          style={{
-                            color: theme.colors.text,
-                            fontSize: 13,
-                            fontWeight: "700",
-                          }}
-                        >
-                          {queryRun.query}
-                        </Text>
+                      {queryRun.status === "error" ? (
                         <Text
                           style={{
-                            color: queryRun.status === "error"
-                              ? errorColor
-                              : theme.colors.textSecondary ?? theme.colors.text,
-                            fontSize: 11,
+                            color: errorColor,
+                            fontSize: 10,
                             fontWeight: "600",
                             textTransform: "uppercase",
                           }}
                         >
-                          {queryRun.status}
+                          Error
                         </Text>
-                      </View>
-                      {queryRun.error ? (
-                        <Text
-                          className="mt-2"
-                          style={{
-                            color: errorColor,
-                            fontSize: 12,
-                          }}
-                        >
-                          {queryRun.error}
-                        </Text>
-                      ) : null}
-
-                      {queryRun.sources.length > 0 ? (
-                        <View className="mt-2 gap-2">
-                          {queryRun.sources.map((source, sourceIndex) => (
-                            <Pressable
-                              key={`${source.url}-${sourceIndex}`}
-                              onPress={() => handleOpenSource(source.url)}
-                              className="rounded-xl px-3 py-2"
-                              style={{
-                                backgroundColor: theme.colors.background,
-                              }}
-                              accessibilityRole="link"
-                            >
-                              <Text
-                                style={{
-                                  color: theme.colors.accent,
-                                  fontSize: 12,
-                                  fontWeight: "700",
-                                }}
-                                numberOfLines={2}
-                              >
-                                {source.title}
-                              </Text>
-                              {source.snippet ? (
-                                <Text
-                                  className="mt-1"
-                                  style={{
-                                    color: theme.colors.textSecondary ?? theme.colors.text,
-                                    fontSize: 11,
-                                  }}
-                                  numberOfLines={3}
-                                >
-                                  {source.snippet}
-                                </Text>
-                              ) : null}
-                              <Text
-                                className="mt-1"
-                                style={{
-                                  color: theme.colors.textSecondary ?? theme.colors.text,
-                                  fontSize: 10,
-                                }}
-                                numberOfLines={1}
-                              >
-                                {source.engine ? `${source.engine} · ` : ""}{source.url}
-                              </Text>
-                            </Pressable>
-                          ))}
-                        </View>
                       ) : null}
                     </View>
-                  ))}
-                </View>
-              ) : null}
-            </Pressable>
+
+                    {queryRun.error ? (
+                      <Text
+                        className="mb-1"
+                        style={{ color: errorColor, fontSize: 12 }}
+                      >
+                        {queryRun.error}
+                      </Text>
+                    ) : null}
+
+                    {/* Source rows — flat, no cards */}
+                    {queryRun.sources.map((source, sourceIndex) => (
+                      <Pressable
+                        key={`${source.url}-${sourceIndex}`}
+                        onPress={() => handleOpenSource(source.url)}
+                        className="py-1.5 pl-3"
+                        accessibilityRole="link"
+                      >
+                        <Text
+                          style={{
+                            color: theme.colors.accent,
+                            fontSize: 13,
+                            fontWeight: "600",
+                          }}
+                          numberOfLines={1}
+                        >
+                          {source.title}
+                        </Text>
+                        <Text
+                          style={{
+                            color: theme.colors.textSecondary ?? theme.colors.text,
+                            fontSize: 11,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {source.url}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : null}
         {hasThinkingOutput && (

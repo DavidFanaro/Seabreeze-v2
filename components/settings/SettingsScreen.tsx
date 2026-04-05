@@ -13,8 +13,6 @@ interface SettingsScreenProps {
   keyboardShouldPersistTaps?: "always" | "never" | "handled";
 }
 
-const CLOSE_BUTTON_STYLE = { marginLeft: 6 };
-
 export function SettingsScreen({
   title,
   children,
@@ -24,16 +22,14 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const { theme } = useTheme();
   const headerCloseButton = () => (
-    <IconButton
-      icon="xmark"
-      onPress={() => router.dismiss()}
-      size={24}
-      style={CLOSE_BUTTON_STYLE}
-    />
+    <IconButton icon="xmark" onPress={() => router.dismiss()} size={24} />
   );
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: theme.colors.background }}
+    >
       <Stack.Screen
         options={{
           headerTitle: title,

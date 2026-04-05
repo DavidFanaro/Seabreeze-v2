@@ -32,7 +32,9 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
   const { theme } = useTheme();
 
   // Accent when configured, muted when not (except PNG icons which are always full-color)
-  const iconColor = isConfigured ? theme.colors.accent : theme.colors.textSecondary;
+  const iconColor = isConfigured
+    ? theme.colors.accent
+    : theme.colors.textSecondary;
 
   return (
     <Pressable
@@ -56,14 +58,23 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
 
         {/* Name, description, active model */}
         <View className="flex-1">
-          <Text className="text-[16px] font-semibold mb-0.5" style={{ color: theme.colors.text }}>
+          <Text
+            className="text-[16px] font-semibold mb-0.5"
+            style={{ color: theme.colors.text }}
+          >
             {name}
           </Text>
-          <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
+          <Text
+            className="text-[13px]"
+            style={{ color: theme.colors.textSecondary }}
+          >
             {description}
           </Text>
           {selectedModel && (
-            <Text className="text-[12px] mt-0.5" style={{ color: theme.colors.accent }}>
+            <Text
+              className="text-[12px] mt-0.5"
+              style={{ color: theme.colors.accent }}
+            >
               {selectedModel}
             </Text>
           )}
@@ -72,7 +83,11 @@ const ProviderListItem: React.FC<ProviderListItemProps> = ({
 
       {/* Chevron */}
       <View className="ml-2">
-        <SymbolView name="chevron.right" size={18} tintColor={theme.colors.textSecondary} />
+        <SymbolView
+          name="chevron.right"
+          size={18}
+          tintColor={theme.colors.textSecondary}
+        />
       </View>
     </Pressable>
   );
@@ -98,9 +113,21 @@ export default function SettingsIndex() {
   };
 
   const providers: { id: ProviderId; name: string; description: string }[] = [
-    { id: "apple", name: "Apple Intelligence", description: "On-device AI powered by Apple Silicon" },
-    { id: "openai", name: "OpenAI", description: "ChatGPT and other OpenAI models" },
-    { id: "openrouter", name: "OpenRouter", description: "Access to multiple AI providers" },
+    {
+      id: "apple",
+      name: "Apple Intelligence",
+      description: "On-device AI powered by Apple Silicon",
+    },
+    {
+      id: "openai",
+      name: "OpenAI",
+      description: "ChatGPT and other OpenAI models",
+    },
+    {
+      id: "openrouter",
+      name: "OpenRouter",
+      description: "Access to multiple AI providers",
+    },
     { id: "ollama", name: "Ollama", description: "Local AI models via Ollama" },
   ];
 
@@ -121,7 +148,9 @@ export default function SettingsIndex() {
           onPress={navigateToAppearance}
           className="flex-row items-center justify-between px-4 py-3.5"
           style={({ pressed }) => ({
-            backgroundColor: pressed ? theme.colors.border : theme.colors.surface,
+            backgroundColor: pressed
+              ? theme.colors.border
+              : theme.colors.surface,
           })}
         >
           <View className="flex-1 flex-row items-center">
@@ -129,19 +158,33 @@ export default function SettingsIndex() {
               className="mr-3 h-[40px] w-[40px] items-center justify-center rounded-xl"
               style={{ backgroundColor: theme.colors.background }}
             >
-              <SymbolView name="paintbrush" size={22} tintColor={theme.colors.accent} />
+              <SymbolView
+                name="paintbrush"
+                size={22}
+                tintColor={theme.colors.accent}
+              />
             </View>
             <View className="flex-1">
-              <Text className="mb-0.5 text-[16px] font-semibold" style={{ color: theme.colors.text }}>
+              <Text
+                className="mb-0.5 text-[16px] font-semibold"
+                style={{ color: theme.colors.text }}
+              >
                 Appearance
               </Text>
-              <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
+              <Text
+                className="text-[13px]"
+                style={{ color: theme.colors.textSecondary }}
+              >
                 Theme and display settings
               </Text>
             </View>
           </View>
           <View className="ml-2">
-            <SymbolView name="chevron.right" size={18} tintColor={theme.colors.textSecondary} />
+            <SymbolView
+              name="chevron.right"
+              size={18}
+              tintColor={theme.colors.textSecondary}
+            />
           </View>
         </Pressable>
 
@@ -149,7 +192,9 @@ export default function SettingsIndex() {
           onPress={navigateToSearch}
           className="flex-row items-center justify-between px-4 py-3.5"
           style={({ pressed }) => ({
-            backgroundColor: pressed ? theme.colors.border : theme.colors.surface,
+            backgroundColor: pressed
+              ? theme.colors.border
+              : theme.colors.surface,
             borderTopWidth: StyleSheet.hairlineWidth,
             borderTopColor: theme.colors.border,
           })}
@@ -162,22 +207,38 @@ export default function SettingsIndex() {
               <SymbolView
                 name="magnifyingglass.circle"
                 size={22}
-                tintColor={webSearchEnabled ? theme.colors.accent : theme.colors.textSecondary}
+                tintColor={
+                  webSearchEnabled
+                    ? theme.colors.accent
+                    : theme.colors.textSecondary
+                }
               />
             </View>
             <View className="flex-1">
-              <Text className="mb-0.5 text-[16px] font-semibold" style={{ color: theme.colors.text }}>
+              <Text
+                className="mb-0.5 text-[16px] font-semibold"
+                style={{ color: theme.colors.text }}
+              >
                 Web Search
               </Text>
-              <Text className="text-[13px]" style={{ color: theme.colors.textSecondary }}>
+              <Text
+                className="text-[13px]"
+                style={{ color: theme.colors.textSecondary }}
+              >
                 {webSearchEnabled
-                  ? (searxngUrl ? "Enabled app-wide with your SearXNG instance" : "Enabled app-wide, but SearXNG is not configured yet")
+                  ? searxngUrl
+                    ? "Enabled app-wide with your SearXNG instance"
+                    : "Enabled app-wide, but SearXNG is not configured yet"
                   : "Configure SearXNG and app-wide search behavior"}
               </Text>
             </View>
           </View>
           <View className="ml-2">
-            <SymbolView name="chevron.right" size={18} tintColor={theme.colors.textSecondary} />
+            <SymbolView
+              name="chevron.right"
+              size={18}
+              tintColor={theme.colors.textSecondary}
+            />
           </View>
         </Pressable>
       </View>
@@ -201,19 +262,32 @@ export default function SettingsIndex() {
             description={provider.description}
             isConfigured={isProviderConfigured(provider.id)}
             isLast={index === providers.length - 1}
-            selectedModel={provider.id === selectedProvider ? selectedModel ?? undefined : undefined}
+            selectedModel={
+              provider.id === selectedProvider
+                ? (selectedModel ?? undefined)
+                : undefined
+            }
             onPress={() => navigateToProvider(provider.id)}
           />
         ))}
       </View>
 
-      <View className="rounded-xl p-4" style={{ backgroundColor: theme.colors.surface }}>
-        <Text className="mb-1.5 text-[15px] font-semibold" style={{ color: theme.colors.text }}>
+      <View
+        className="rounded-xl p-4"
+        style={{ backgroundColor: theme.colors.surface }}
+      >
+        <Text
+          className="mb-1.5 text-[15px] font-semibold"
+          style={{ color: theme.colors.text }}
+        >
           About
         </Text>
-        <Text className="text-[13px] leading-[19px]" style={{ color: theme.colors.textSecondary }}>
-          Seabreeze v1.0.0{"\n"}
-          A modern AI chat interface powered by React Native and Expo.{"\n\n"}
+        <Text
+          className="text-[13px] leading-[19px]"
+          style={{ color: theme.colors.textSecondary }}
+        >
+          Seabreeze v1.0.0{"\n"}A modern AI chat interface powered by React
+          Native and Expo.{"\n\n"}
           Built with ❤️ for iOS, Android, and Web.
         </Text>
       </View>

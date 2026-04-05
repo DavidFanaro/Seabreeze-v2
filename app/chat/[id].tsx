@@ -787,19 +787,9 @@ export default function Chat() {
              {/* ============================================================================ */}
              <Stack.Screen
                   options={{
-                      /* Display the current chat title in the header */
                       headerTitle: getChatTitleForDisplay(title),
-                     /* Use transparent header to blend with app background */
-                     headerTransparent: true,
-                     /* Apply theme color to header text and back button */
-                     headerTintColor: theme.colors.text,
-                     /* Right header button: context menu with reset functionality */
-                      headerRight: () => (
-                          <ChatContextMenu 
-                              onReset={handleReset}
-                              onRename={handleOpenRenameModal}
-                          />
-                      ),
+                      headerTransparent: true,
+                      headerTintColor: theme.colors.text,
                   }}
               />
              
@@ -882,6 +872,12 @@ export default function Chat() {
                                 disabled={isInputLocked}
                                 isStreaming={isStreaming}
                                 onCancel={cancel}
+                                toolbar={
+                                    <ChatContextMenu
+                                        onReset={handleReset}
+                                        onRename={handleOpenRenameModal}
+                                    />
+                                }
                             />
                         </Animated.View>
                     </KeyboardStickyView>
@@ -899,6 +895,12 @@ export default function Chat() {
                             disabled={isInputLocked}
                             isStreaming={isStreaming}
                             onCancel={cancel}
+                            toolbar={
+                                <ChatContextMenu
+                                    onReset={handleReset}
+                                    onRename={handleOpenRenameModal}
+                                />
+                            }
                          />
                      </Animated.View>
                  )}

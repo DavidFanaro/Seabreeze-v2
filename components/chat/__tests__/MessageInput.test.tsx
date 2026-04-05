@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import { MessageInput } from "../MessageInput";
 import type { ChatAttachment } from "@/types/chat.types";
@@ -159,7 +159,7 @@ describe("MessageInput", () => {
     expect(mockOnSend).toHaveBeenCalledWith("Submitted");
   });
 
-  it("opens popover on plus button press and calls onTakePhoto", () => {
+  it("opens popover on plus button press and calls onTakePhoto", async () => {
     const { getByTestId, queryByTestId } = render(
       <MessageInput
         value=""
@@ -179,10 +179,13 @@ describe("MessageInput", () => {
 
     // Press "Take Photo"
     fireEvent.press(getByTestId("media-menu-take-photo"));
-    expect(mockOnTakePhoto).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => {
+      expect(mockOnTakePhoto).toHaveBeenCalledTimes(1);
+    });
   });
 
-  it("opens popover and calls onChooseFromLibrary", () => {
+  it("opens popover and calls onChooseFromLibrary", async () => {
     const { getByTestId } = render(
       <MessageInput
         value=""
@@ -195,7 +198,10 @@ describe("MessageInput", () => {
 
     fireEvent.press(getByTestId("message-input-add"));
     fireEvent.press(getByTestId("media-menu-choose-library"));
-    expect(mockOnChooseFromLibrary).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => {
+      expect(mockOnChooseFromLibrary).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("toggles popover closed on second plus button press", () => {

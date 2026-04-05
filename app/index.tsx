@@ -33,7 +33,8 @@ interface ChatListRow {
   timestamp: Date | null;
 }
 
-const REFRESH_ERROR_MESSAGE = "Couldn't refresh chats right now. Pull to retry.";
+const REFRESH_ERROR_MESSAGE =
+  "Couldn't refresh chats right now. Pull to retry.";
 const PARTIAL_ROW_MESSAGE = "Some chats could not be displayed.";
 
 export const getPreview = (messages: unknown): string | null => {
@@ -83,7 +84,10 @@ const normalizeChatRow = (row: unknown): ChatListRow | null => {
 
   return {
     id,
-    title: typeof record.title === "string" ? normalizeTitleForPersistence(record.title) : null,
+    title:
+      typeof record.title === "string"
+        ? normalizeTitleForPersistence(record.title)
+        : null,
     preview: getPreview(record.messages),
     timestamp: coerceTimestamp(record.updatedAt),
   };
@@ -162,58 +166,66 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [refreshError, setRefreshError] = React.useState<string | null>(null);
   const [deletingIds, setDeletingIds] = React.useState<Set<number>>(new Set());
-  const listQueryOperationRef = React.useRef<PersistenceOperationContext | null>(null);
+  const listQueryOperationRef =
+    React.useRef<PersistenceOperationContext | null>(null);
 
   // Live query: Fetches all chats ordered by most recently updated
   // Automatically re-renders when chat data changes
   const chatsQuery = useLiveQuery(
-    db
-      .select()
-      .from(chat)
-      .orderBy(desc(chat.updatedAt)),
+    db.select().from(chat).orderBy(desc(chat.updatedAt)),
     [refreshNonce],
   );
 
   // Delete handler: Removes a chat from database by ID
-  const deleteChat = React.useCallback(async (id: number) => {
-    await runListOperation(async () => {
+  const deleteChat = React.useCallback(
+    async (id: number) => {
+      await runListOperation(async () => {
+        if (isChatDeleteLocked(id)) {
+          return;
+        }
+
+        const releaseDeleteLock = acquireChatDeleteLock(id);
+        setDeletingIds((current) => {
+          const next = new Set(current);
+          next.add(id);
+          return next;
+        });
+
+        try {
+          await runChatOperation(
+            String(id),
+            async () => {
+              await db.delete(chat).where(eq(chat.id, id));
+            },
+            "list",
+          );
+        } finally {
+          releaseDeleteLock();
+          setDeletingIds((current) => {
+            if (!current.has(id)) {
+              return current;
+            }
+
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+        }
+      });
+    },
+    [db],
+  );
+
+  const openChat = React.useCallback(
+    (id: number) => {
       if (isChatDeleteLocked(id)) {
         return;
       }
 
-      const releaseDeleteLock = acquireChatDeleteLock(id);
-      setDeletingIds((current) => {
-        const next = new Set(current);
-        next.add(id);
-        return next;
-      });
-
-      try {
-        await runChatOperation(String(id), async () => {
-          await db.delete(chat).where(eq(chat.id, id));
-        }, "list");
-      } finally {
-        releaseDeleteLock();
-        setDeletingIds((current) => {
-          if (!current.has(id)) {
-            return current;
-          }
-
-          const next = new Set(current);
-          next.delete(id);
-          return next;
-        });
-      }
-    });
-  }, [db]);
-
-  const openChat = React.useCallback((id: number) => {
-    if (isChatDeleteLocked(id)) {
-      return;
-    }
-
-    router.push(`/chat/${id}`);
-  }, [router]);
+      router.push(`/chat/${id}`);
+    },
+    [router],
+  );
 
   const openNewChat = React.useCallback(() => {
     router.push("/chat/new");
@@ -267,7 +279,13 @@ export default function Home() {
       });
       listQueryOperationRef.current = null;
     }
-  }, [chatRows.length, chatsQuery.data, chatsQuery.error, droppedRowCount, refreshNonce]);
+  }, [
+    chatRows.length,
+    chatsQuery.data,
+    chatsQuery.error,
+    droppedRowCount,
+    refreshNonce,
+  ]);
 
   const handleRefresh = React.useCallback(async () => {
     setIsRefreshing(true);
@@ -276,10 +294,7 @@ export default function Home() {
     try {
       await runListOperation(async () => {
         setRefreshNonce((current) => current + 1);
-        await db
-          .select()
-          .from(chat)
-          .orderBy(desc(chat.updatedAt));
+        await db.select().from(chat).orderBy(desc(chat.updatedAt));
       });
     } catch {
       setRefreshError(REFRESH_ERROR_MESSAGE);
@@ -312,7 +327,6 @@ export default function Home() {
               onPress={openNewChat}
               testID="chat-list-new-chat-button"
               accessibilityLabel="Start new chat"
-              style={{ marginLeft: 6 }}
             />
           ),
           // Left button: Settings gear icon to access settings
@@ -322,7 +336,6 @@ export default function Home() {
               onPress={() => router.push("/settings")}
               testID="chat-list-settings-button"
               accessibilityLabel="Open settings"
-              style={{ marginLeft: 6 }}
             />
           ),
         }}
