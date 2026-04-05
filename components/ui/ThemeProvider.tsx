@@ -47,7 +47,8 @@ export function ThemeProvider({
   children,
   defaultTheme = DEFAULT_THEME_MODE,
 }: ThemeProviderProps) {
-  const systemColorScheme = useColorScheme();
+  const rawSystemColorScheme = useColorScheme();
+  const systemColorScheme = rawSystemColorScheme === "unspecified" ? null : rawSystemColorScheme;
   const storedThemeMode = useSettingsStore((state) => state.theme);
   const setTheme = useSettingsStore((state) => state.setTheme);
   const [hasHydrated, setHasHydrated] = useState(useSettingsStore.persist.hasHydrated());

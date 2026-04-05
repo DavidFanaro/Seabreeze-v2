@@ -30,14 +30,17 @@ jest.mock("expo-symbols", () => ({
 }));
 
 jest.mock("react-native-reanimated", () => {
-  const React = require("react");
-  const { View } = require("react-native");
+  const React = jest.requireActual("react");
+  const { View } = jest.requireActual("react-native");
+  const AnimatedView = React.forwardRef((props: any, ref: any) =>
+    React.createElement(View, { ...props, ref }),
+  );
+  AnimatedView.displayName = "AnimatedViewMock";
+
   return {
     __esModule: true,
     default: {
-      View: React.forwardRef((props: any, ref: any) =>
-        React.createElement(View, { ...props, ref }),
-      ),
+      View: AnimatedView,
     },
     FadeIn: { duration: () => ({ springify: () => ({}) }) },
     FadeOut: { duration: () => ({}) },

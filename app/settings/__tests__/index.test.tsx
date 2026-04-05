@@ -40,10 +40,17 @@ jest.mock("@/components/ui/ProviderIcons", () => ({
 
 jest.mock("@/stores", () => ({
   isProviderConfigured: jest.fn((providerId: string) => providerId === "apple" || providerId === "openai"),
+  useAuthStore: (selector: (state: { searxngUrl: string | null }) => unknown) =>
+    selector({ searxngUrl: "https://search.example.com" }),
   useProviderStore: () => ({
     selectedProvider: "openai",
     selectedModel: "gpt-4o",
   }),
+}));
+
+jest.mock("@/stores/useSettingsStore", () => ({
+  useSettingsStore: (selector: (state: { webSearchEnabled: boolean }) => unknown) =>
+    selector({ webSearchEnabled: true }),
 }));
 
 describe("SettingsIndex", () => {

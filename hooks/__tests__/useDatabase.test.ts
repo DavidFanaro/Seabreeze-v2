@@ -47,14 +47,14 @@ beforeEach(() => {
 describe('useDatabase', () => {
   describe('database name configuration', () => {
     it('should export correct database name', () => {
-      expect(dbname).toBe('seabreeze');
+      expect(dbname).toBe('seabreeze-v2');
     });
 
     it('should use consistent database name across calls', () => {
       const name1 = dbname;
       const name2 = dbname;
       expect(name1).toBe(name2);
-      expect(name1).toBe('seabreeze');
+      expect(name1).toBe('seabreeze-v2');
     });
   });
 
@@ -112,7 +112,7 @@ describe('useDatabase', () => {
 
     it('should have imported all dependencies successfully', () => {
       // If we get to this point, all imports were successful
-      expect(dbname).toBe('seabreeze');
+      expect(dbname).toBe('seabreeze-v2');
       expect(typeof useDatabase).toBe('function');
     });
   });

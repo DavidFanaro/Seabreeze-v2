@@ -7,14 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "seabreeze",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.davidfanaro.seabreeze.v1",
       "infoPlist": {
         "NSCameraUsageDescription": "The app uses your camera so you can take photos to share with the AI Chat.",
         "NSPhotoLibraryUsageDescription": "The app accesses your photos to let you share them with the AI Chat.",
-        "NSPhotoLibraryAddUsageDescription": "The app saves selected media metadata while composing AI messages."
+        "NSPhotoLibraryAddUsageDescription": "The app saves selected media metadata while composing AI messages.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -22,8 +22,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.davidfanaro.seabreeze.v1"
+      "package": "com.davidfanaro.seabreeze.v1",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -59,7 +62,8 @@
       "expo-sqlite",
       "expo-font",
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true

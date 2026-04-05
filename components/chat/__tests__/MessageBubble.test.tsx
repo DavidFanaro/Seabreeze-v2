@@ -49,39 +49,30 @@ describe("MessageBubble Component", () => {
    * Test: Component renders with content
    */
   it("renders message content correctly", () => {
-    render(
+    const { getByText } = render(
       <MessageBubble
         content="Hello, world!"
         isUser={true}
       />
     );
 
-    // Verify CustomMarkdown was called with the correct content
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content: "Hello, world!",
-      })
-    );
+    expect(getByText("Hello, world!")).toBeTruthy();
+    expect(mockCustomMarkdown).not.toHaveBeenCalled();
   });
 
   /**
    * Test: User message receives background color styling
    */
   it("applies background color to user messages", () => {
-    render(
+    const { getByText } = render(
       <MessageBubble
         content="User message"
         isUser={true}
       />
     );
 
-    // Verify CustomMarkdown was called with isUser=true
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content: "User message",
-        isUser: true,
-      })
-    );
+    expect(getByText("User message")).toBeTruthy();
+    expect(mockCustomMarkdown).not.toHaveBeenCalled();
   });
 
   /**
@@ -149,7 +140,7 @@ describe("MessageBubble Component", () => {
    */
   it("accepts and applies custom styles", () => {
     const customStyle = { marginTop: 10, marginBottom: 10 };
-    render(
+    const { getByText } = render(
       <MessageBubble
         content="Styled message"
         isUser={true}
@@ -157,12 +148,8 @@ describe("MessageBubble Component", () => {
       />
     );
 
-    // Verify component renders without errors when custom styles are applied
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content: "Styled message",
-      })
-    );
+    expect(getByText("Styled message")).toBeTruthy();
+    expect(mockCustomMarkdown).not.toHaveBeenCalled();
   });
 
   /**
@@ -170,18 +157,15 @@ describe("MessageBubble Component", () => {
    */
   it("renders long message content without truncation", () => {
     const longContent = "This is a very long message that should be rendered fully without any truncation or cutting off.";
-    render(
+    const { getByText } = render(
       <MessageBubble
         content={longContent}
         isUser={true}
       />
     );
 
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content: longContent,
-      })
-    );
+    expect(getByText(longContent)).toBeTruthy();
+    expect(mockCustomMarkdown).not.toHaveBeenCalled();
   });
 
   /**
@@ -210,7 +194,7 @@ describe("MessageBubble Component", () => {
     const { rerender } = render(
       <MessageBubble
         content="Initial content"
-        isUser={true}
+        isUser={false}
       />
     );
 
@@ -223,7 +207,7 @@ describe("MessageBubble Component", () => {
     rerender(
       <MessageBubble
         content="Initial content"
-        isUser={true}
+        isUser={false}
       />
     );
 
@@ -236,20 +220,15 @@ describe("MessageBubble Component", () => {
    * Test: Empty content is handled gracefully
    */
   it("renders with empty content", () => {
-    render(
+    const { queryByTestId } = render(
       <MessageBubble
         content=""
         isUser={true}
       />
     );
 
-    // Even with empty content, CustomMarkdown renders
-    expect(mockCustomMarkdown).toHaveBeenCalled();
-    expect(mockCustomMarkdown).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content: "",
-      })
-    );
+    expect(queryByTestId("message-bubble-container")).toBeTruthy();
+    expect(mockCustomMarkdown).not.toHaveBeenCalled();
   });
 
   /**
@@ -284,17 +263,9 @@ describe("MessageBubble Component", () => {
       </>
     );
 
-    // Verify both messages were rendered with correct props
-    expect(mockCustomMarkdown).toHaveBeenCalledTimes(2);
+    expect(mockCustomMarkdown).toHaveBeenCalledTimes(1);
     expect(mockCustomMarkdown).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({
-        content: "User message",
-        isUser: true,
-      })
-    );
-    expect(mockCustomMarkdown).toHaveBeenNthCalledWith(
-      2,
       expect.objectContaining({
         content: "AI message",
         isUser: false,
@@ -309,7 +280,7 @@ describe("MessageBubble Component", () => {
     render(
       <MessageBubble
         content="Test content"
-        isUser={true}
+        isUser={false}
         isStreaming={false}
       />
     );
@@ -317,7 +288,7 @@ describe("MessageBubble Component", () => {
     expect(mockCustomMarkdown).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "Test content",
-        isUser: true,
+        isUser: false,
       })
     );
   });
@@ -462,22 +433,13 @@ describe("MessageBubble Component", () => {
       </>
     );
 
-    // Verify all messages rendered
-    expect(mockCustomMarkdown).toHaveBeenCalledTimes(4);
+    expect(mockCustomMarkdown).toHaveBeenCalledTimes(2);
     expect(mockCustomMarkdown).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ content: "First user message", isUser: true })
-    );
-    expect(mockCustomMarkdown).toHaveBeenNthCalledWith(
-      2,
       expect.objectContaining({ content: "First AI response", isUser: false })
     );
     expect(mockCustomMarkdown).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({ content: "Second user message", isUser: true })
-    );
-    expect(mockCustomMarkdown).toHaveBeenNthCalledWith(
-      4,
+      2,
       expect.objectContaining({ content: "Second AI response", isUser: false })
     );
   });

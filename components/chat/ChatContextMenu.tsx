@@ -5,7 +5,7 @@
 
 import React, { useMemo } from "react";
 import { View } from "react-native";
-import { ContextMenu, Submenu, Host, Button } from "@expo/ui/swift-ui";
+import { ContextMenu, Host, Button } from "@expo/ui/swift-ui";
 import { SymbolView } from "expo-symbols";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { useProviderStore, isProviderConfigured } from "@/stores";
@@ -261,48 +261,46 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
               RESET BUTTON SECTION
               ==================================================================== */}
 
-          <Button systemImage="pencil" onPress={handleRename}>
-            Rename Chat
-          </Button>
+          <Button label="Rename Chat" systemImage="pencil" onPress={handleRename} />
 
           {/* Button to reset the current chat session */}
-          <Button systemImage="arrow.clockwise" onPress={handleReset}>
-            Reset Chat
-          </Button>
+          <Button label="Reset Chat" systemImage="arrow.clockwise" onPress={handleReset} />
 
           {/* Button to toggle model thinking output capture */}
           <Button
+            label="Thinking Output"
             systemImage={thinkingEnabled ? "checkmark" : undefined}
             onPress={handleThinkingToggle}
-          >
-            Thinking Output
-          </Button>
+          />
 
           <Button
+            label="Web Search"
             systemImage={webSearchEnabled ? "checkmark" : undefined}
             onPress={handleWebSearchToggle}
-          >
-            Web Search
-          </Button>
+          />
 
           {isThinkingLevelAvailable && (
-            <Submenu button={<Button>Thinking Level</Button>}>
-              {thinkingLevels.map((level) => (
-                <Button
-                  key={level.value}
-                  systemImage={
-                    thinkingLevel === level.value ? "checkmark" : undefined
-                  }
-                  onPress={() => handleThinkingLevelSelect(level.value)}
-                >
-                  {level.label}
-                </Button>
-              ))}
-            </Submenu>
+            <ContextMenu>
+              <ContextMenu.Trigger>
+                <Button label="Thinking Level" />
+              </ContextMenu.Trigger>
+              <ContextMenu.Items>
+                {thinkingLevels.map((level) => (
+                  <Button
+                    key={level.value}
+                    label={level.label}
+                    systemImage={
+                      thinkingLevel === level.value ? "checkmark" : undefined
+                    }
+                    onPress={() => handleThinkingLevelSelect(level.value)}
+                  />
+                ))}
+              </ContextMenu.Items>
+            </ContextMenu>
           )}
 
           {showOllamaThinkingHint && (
-            <Button>Ollama Thinking Model Managed</Button>
+            <Button label="Ollama Thinking Model Managed" />
           )}
 
           {/* ====================================================================
@@ -321,32 +319,30 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
 
             return (
               // Submenu for each provider with a checkmark on active selection
-              <Submenu
-                key={providerId}
-                button={
+              <ContextMenu key={providerId}>
+                <ContextMenu.Trigger>
                   <Button
+                    label={providerLabel}
                     systemImage={isCurrentProvider ? "checkmark" : undefined}
-                  >
-                    {providerLabel}
-                  </Button>
-                }
-              >
-                {/* List of models for the current provider */}
-                {models.map((model) => (
-                  // Each model as a selectable button with checkmark indicator
-                  <Button
-                    key={model}
-                    systemImage={
-                      isModelSelected(providerId, model)
-                        ? "checkmark"
-                        : undefined
-                    }
-                    onPress={() => handleModelSelect(providerId, model)}
-                  >
-                    {model}
-                  </Button>
-                ))}
-              </Submenu>
+                  />
+                </ContextMenu.Trigger>
+                <ContextMenu.Items>
+                  {/* List of models for the current provider */}
+                  {models.map((model) => (
+                    // Each model as a selectable button with checkmark indicator
+                    <Button
+                      key={model}
+                      label={model}
+                      systemImage={
+                        isModelSelected(providerId, model)
+                          ? "checkmark"
+                          : undefined
+                      }
+                      onPress={() => handleModelSelect(providerId, model)}
+                    />
+                  ))}
+                </ContextMenu.Items>
+              </ContextMenu>
             );
           })}
         </ContextMenu.Items>

@@ -1,5 +1,23 @@
-import { Platform, NativeModules } from "react-native";
-import {
+const mockPlatform = {
+    OS: "ios",
+    select: jest.fn(),
+};
+
+const mockNativeModules = {
+    Constants: {
+        DeviceId: "iPhone17,1",
+        Model: "iPhone 16 Pro",
+        systemVersion: "18.0",
+    },
+};
+
+jest.mock("react-native", () => ({
+    Platform: mockPlatform,
+    NativeModules: mockNativeModules,
+}));
+
+const { Platform, NativeModules } = require("react-native");
+const {
     getDevicePlatform,
     isIOS,
     isIPhone,
@@ -11,29 +29,12 @@ import {
     isIpadCompatible,
     isAppleIntelligenceCompatible,
     getDeviceInfo,
-} from "@/lib/deviceCapabilities";
-
-jest.mock("react-native", () => {
-    const actual = jest.requireActual("react-native");
-    return {
-        ...actual,
-        Platform: {
-            OS: "ios",
-            select: jest.fn(),
-        },
-        NativeModules: {
-            Constants: {
-                DeviceId: "iPhone17,1",
-                Model: "iPhone 16 Pro",
-                systemVersion: "18.0",
-            },
-        },
-    };
-});
+} = require("@/lib/deviceCapabilities");
 
 describe("deviceCapabilities", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        (Platform.OS as any) = "ios";
         NativeModules.Constants.DeviceId = "iPhone17,1";
         NativeModules.Constants.Model = "iPhone 16 Pro";
         NativeModules.Constants.systemVersion = "18.0";

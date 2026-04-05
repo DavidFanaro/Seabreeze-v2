@@ -1,5 +1,5 @@
 import React from "react";
-import { TextField as HeroUITextField } from "heroui-native";
+import { Input as HeroUIInput, TextArea as HeroUITextArea, TextField as HeroUITextField } from "heroui-native";
 
 import { useTheme } from "@/components/ui/ThemeProvider";
 
@@ -130,10 +130,12 @@ export const GlassInput: React.FC<GlassInputProps> = ({
      * Applies disabled state and passes all configured props to Input
      */
     return (
-        <HeroUITextField
-            isDisabled={disabled}
-        >
-            <HeroUITextField.Input {...inputProps} style={inputStyle} />
+        <HeroUITextField isDisabled={disabled}>
+            {multiline ? (
+                <HeroUITextArea {...inputProps} style={inputStyle} />
+            ) : (
+                <HeroUIInput {...inputProps} style={inputStyle} />
+            )}
         </HeroUITextField>
     );
 };

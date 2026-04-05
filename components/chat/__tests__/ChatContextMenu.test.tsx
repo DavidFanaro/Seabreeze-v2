@@ -41,13 +41,17 @@ jest.mock("@expo/ui/swift-ui", () => {
   const React = jest.requireActual("react");
   const { Pressable, View, Text } = jest.requireActual("react-native");
 
-  const Button = ({ children, onPress, systemImage, ...props }: any) => {
-    const label = typeof children === "string" ? children : "button";
+  const Button = ({ children, label, onPress, systemImage, ...props }: any) => {
+    const text = typeof label === "string"
+      ? label
+      : typeof children === "string"
+        ? children
+        : "button";
 
     return (
-      <Pressable testID={`button-${label}`} onPress={onPress} {...props}>
+      <Pressable testID={`button-${text}`} onPress={onPress} {...props}>
         {systemImage && <Text testID={`icon-${systemImage}`}>{systemImage}</Text>}
-        <Text>{children}</Text>
+        <Text>{text}</Text>
       </Pressable>
     );
   };
@@ -61,12 +65,6 @@ jest.mock("@expo/ui/swift-ui", () => {
 
   return {
     ContextMenu: ContextMenuComponent,
-    Submenu: ({ button, children }: any) => (
-      <View>
-        {button}
-        {children}
-      </View>
-    ),
     Button,
     Host: ({ children }: any) => <View>{children}</View>,
   };

@@ -58,7 +58,9 @@ type AppleToolSet = Record<string, Tool<any, any>>;
  */
 export function createAppleModel(availableTools?: AppleToolSet): AppleLanguageModel {
     if (availableTools && Object.keys(availableTools).length > 0) {
-        const provider = createAppleProvider({ availableTools });
+        const provider = createAppleProvider({
+            availableTools: availableTools as unknown as NonNullable<Parameters<typeof createAppleProvider>[0]>["availableTools"],
+        });
         return provider();
     }
 
