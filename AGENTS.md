@@ -1,5 +1,8 @@
+## Important Notes
+- this is using a development build.
+
 ## Important Rules
-- when building any UI use the `frontend-design` skill 
+- when building any UI use the `frontend-design` and `building-native-ui` skill 
 - when interacting with ai sdk use the `ai-sdk` skill
 - When using the in-app chat feature, use the Apple provider/model only unless explicitly instructed otherwise.
 - check if there is a currently opened dev server if not then start one. BUT ONLY IF ONE IS NOT ALREADY RUNNING
