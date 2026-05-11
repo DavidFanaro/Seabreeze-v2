@@ -223,6 +223,23 @@ describe("MessageInput", () => {
     expect(queryByTestId("media-menu-popover")).toBeNull();
   });
 
+  it("closes popover when tapping outside", () => {
+    const { getByTestId, queryByTestId } = render(
+      <MessageInput
+        value=""
+        onChangeText={mockOnChangeText}
+        onSend={mockOnSend}
+        onTakePhoto={mockOnTakePhoto}
+      />,
+    );
+
+    fireEvent.press(getByTestId("message-input-add"));
+    expect(getByTestId("media-menu-popover")).toBeTruthy();
+
+    fireEvent.press(getByTestId("media-menu-backdrop"));
+    expect(queryByTestId("media-menu-popover")).toBeNull();
+  });
+
   it("renders attachment chips and removes an attachment", () => {
     const { getByTestId, getByText } = render(
       <MessageInput

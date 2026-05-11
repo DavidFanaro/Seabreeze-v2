@@ -5,9 +5,7 @@ import {
     TextInput,
     TouchableOpacity,
     Keyboard,
-    Modal,
     Pressable,
-    Dimensions,
     ViewStyle,
     type LayoutChangeEvent,
     type NativeSyntheticEvent,
@@ -100,22 +98,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const [showMediaMenu, setShowMediaMenu] = useState(false);
     const hasMediaCallbacks = !!(onTakePhoto || onChooseFromLibrary);
 
-    // Anchor position for the popover modal
-    const addButtonRef = useRef<View>(null);
     const pendingMediaActionRef = useRef<(() => void) | null>(null);
-    const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number } | null>(null);
-
-    const measureAnchor = useCallback((onMeasured?: () => void) => {
-        if (!addButtonRef.current?.measureInWindow) {
-            onMeasured?.();
-            return;
-        }
-
-        addButtonRef.current.measureInWindow((x, y) => {
-            setPopoverAnchor({ x, y });
-            onMeasured?.();
-        });
-    }, []);
 
     // Animated rotation for the "+" icon (rotates 45deg to become "x" when open)
     const menuRotation = useSharedValue(0);
@@ -204,7 +187,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             if (!showMediaMenu) {
                 Keyboard.dismiss();
                 setShowMediaMenu(true);
-                measureAnchor();
                 return;
             }
 
@@ -240,6 +222,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             testID="message-input-wrapper"
             onLayout={onLayout}
             className="w-full px-4 my-2"
+            style={{ position: "relative" }}
         >
             {/* Toolbar slot – rendered above input row when provided */}
             {toolbar ? (
@@ -292,10 +275,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 </View>
             ) : null}
 
+            {showMediaMenu && hasMediaCallbacks ? (
+                <Pressable
+                    testID="media-menu-backdrop"
+                    onPress={() => setShowMediaMenu(false)}
+                    style={{
+                        position: "absolute",
+                        top: -1000,
+                        right: 0,
+                        bottom: 0,
+                        left: 0,
+                        zIndex: 10,
+                    }}
+                />
+            ) : null}
+
             {/* Input row */}
-            <View className="flex-row items-end w-full">
+            <View className="flex-row items-end w-full" style={{ zIndex: showMediaMenu ? 20 : 0 }}>
                 {/* "+" / "x" button with popover */}
-                <View ref={addButtonRef} className="mr-2">
+                <View className="mr-2">
                     <TouchableOpacity
                         testID="message-input-add"
                         onPress={toggleMediaMenu}
@@ -317,48 +315,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                             />
                         </Animated.View>
                     </TouchableOpacity>
-                </View>
 
-                {/* Media picker popover — rendered in a transparent modal so taps outside dismiss it */}
-                <Modal
-                    visible={showMediaMenu && hasMediaCallbacks}
-                    transparent
-                    animationType="none"
-                    onDismiss={flushPendingMediaAction}
-                    onRequestClose={() => setShowMediaMenu(false)}
-                >
-                    {/* Full-screen dismiss layer */}
-                    <Pressable
-                        testID="media-menu-backdrop"
-                        style={{ flex: 1 }}
-                        onPress={() => setShowMediaMenu(false)}
-                    />
-
-                    {/* Popover anchored above the + button */}
-                    <Animated.View
-                        testID="media-menu-popover"
-                        entering={FadeIn.duration(150)}
-                        exiting={FadeOut.duration(100)}
-                        style={{
-                            position: "absolute",
-                            // Fall back to a stable bottom-left placement if measurement is unavailable.
-                            bottom: popoverAnchor
-                                ? Dimensions.get("window").height - popoverAnchor.y + 8
-                                : 116,
-                            left: popoverAnchor?.x ?? 16,
-                            minWidth: 220,
-                            backgroundColor: theme.colors.surface,
-                            borderRadius: 14,
-                            borderWidth: 1,
-                            borderColor: theme.colors.border ?? theme.colors.surface,
-                            paddingVertical: 4,
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: -4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 12,
-                            elevation: 8,
-                        }}
-                    >
+                    {/* Media picker popover, anchored to the add button so it follows the composer. */}
+                    {showMediaMenu && hasMediaCallbacks ? (
+                        <Animated.View
+                            testID="media-menu-popover"
+                            entering={FadeIn.duration(150)}
+                            exiting={FadeOut.duration(100)}
+                            style={{
+                                position: "absolute",
+                                bottom: 52,
+                                left: 0,
+                                minWidth: 220,
+                                backgroundColor: theme.colors.surface,
+                                borderRadius: 14,
+                                borderWidth: 1,
+                                borderColor: theme.colors.border ?? theme.colors.surface,
+                                paddingVertical: 4,
+                                shadowColor: "#000",
+                                shadowOffset: { width: 0, height: -4 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 12,
+                                elevation: 8,
+                                zIndex: 20,
+                            }}
+                        >
                             {onTakePhoto ? (
                                 <TouchableOpacity
                                     testID="media-menu-take-photo"
@@ -410,8 +391,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                                     </Text>
                                 </TouchableOpacity>
                             ) : null}
-                    </Animated.View>
-                </Modal>
+                        </Animated.View>
+                    ) : null}
+                </View>
 
                 {/* Text input */}
                 <View
