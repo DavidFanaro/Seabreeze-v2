@@ -9,7 +9,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react-native";
 import { ChatContextMenu } from "../ChatContextMenu";
 import { useProviderStore, isProviderConfigured } from "@/stores";
@@ -166,16 +165,15 @@ describe("ChatContextMenu", () => {
     expect(mockSetSelectedModel).toHaveBeenCalledWith("system-default");
   });
 
-  it("shows Apple in the model sheet while keeping Apple Intelligence in the chip", () => {
+  it("uses provider icons in the model sheet while keeping Apple Intelligence in the chip", () => {
     render(<ChatContextMenu onReset={mockOnReset} />);
 
     expect(screen.getByText("Apple Intelligence")).toBeTruthy();
 
     fireEvent.press(screen.getByTestId("chat-toolbar-model-trigger"));
 
-    expect(
-      within(screen.getByTestId("chat-toolbar-provider-apple")).getByText("Apple"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("chat-toolbar-provider-apple")).toBeTruthy();
+    expect(screen.getAllByText("Apple Intelligence").length).toBeGreaterThan(0);
   });
 
   it("shows an empty-state message when a provider has no available models", () => {

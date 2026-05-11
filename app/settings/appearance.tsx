@@ -39,19 +39,25 @@ export default function AppearanceSettings() {
               className="flex-row items-center"
               style={({ pressed }) => ({
                 minHeight: 52,
-                backgroundColor: pressed ? theme.colors.border : theme.colors.surface,
+                backgroundColor: isSelected
+                  ? `${theme.colors.accent}18`
+                  : pressed
+                    ? theme.colors.border
+                    : theme.colors.surface,
                 borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
                 borderBottomColor: theme.colors.border,
-                borderLeftWidth: isSelected ? 3 : 0,
-                borderLeftColor: theme.colors.accent,
-                paddingLeft: isSelected ? 13 : 16,
+                borderWidth: isSelected ? StyleSheet.hairlineWidth : 0,
+                borderColor: isSelected ? `${theme.colors.accent}66` : "transparent",
+                paddingLeft: 16,
                 paddingRight: 16,
               })}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
             >
               <Text
                 className="flex-1 text-[16px]"
                 style={{
-                  color: isSelected ? theme.colors.accent : theme.colors.text,
+                  color: isSelected ? theme.colors.text : theme.colors.text,
                   fontWeight: isSelected ? "600" : "400",
                 }}
               >

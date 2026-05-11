@@ -303,7 +303,7 @@ export const MessageList: React.FC<MessageListProps> = ({
      */
     const isGenerating = isStreaming && !isThinking;
     const listEmptyComponent = useCallback(() => (
-        <View className="flex-1 items-center justify-center" testID="message-list-empty">
+        <View className="flex-1 items-center justify-center px-8" testID="message-list-empty">
             {(isThinking || isGenerating) ? (
                 <View className="flex-row items-center">
                     <ActivityIndicator color={emptyStateColor} testID="message-list-loading" />
@@ -320,9 +320,45 @@ export const MessageList: React.FC<MessageListProps> = ({
                         </Text>
                     )}
                 </View>
-            ) : null}
+            ) : (
+                <View
+                    style={{
+                        alignItems: "center",
+                        maxWidth: 320,
+                        paddingHorizontal: 18,
+                        paddingVertical: 16,
+                        borderRadius: theme.borderRadius.lg,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                    }}
+                >
+                    <Text
+                        style={{
+                            color: theme.colors.text,
+                            fontSize: 17,
+                            fontWeight: "700",
+                            letterSpacing: -0.2,
+                            textAlign: "center",
+                        }}
+                    >
+                        Start from a known model
+                    </Text>
+                    <Text
+                        style={{
+                            color: theme.colors.textSecondary,
+                            fontSize: 14,
+                            lineHeight: 20,
+                            marginTop: 8,
+                            textAlign: "center",
+                        }}
+                    >
+                        The active provider, model, web search, and attachments stay close to the composer before you send.
+                    </Text>
+                </View>
+            )}
         </View>
-    ), [emptyStateColor, isThinking, isGenerating, theme.spacing.sm]);
+    ), [emptyStateColor, isThinking, isGenerating, theme]);
 
     // ============================================================================
     // LIST CONTAINER SECTION

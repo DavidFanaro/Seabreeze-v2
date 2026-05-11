@@ -1,14 +1,10 @@
 import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ProviderIcon } from "@/components/ui/ProviderIcons";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { SymbolView } from "expo-symbols";
 
-import { SheetDivider } from "./ChatToolbarSheet";
-import {
-  PROVIDER_IDS,
-  getProviderSheetLabel,
-  toTestIdFragment,
-} from "./utils";
+import { PROVIDER_IDS, toTestIdFragment } from "./utils";
 import { PROVIDERS, type ProviderId } from "@/types/provider.types";
 
 interface ModelSelectionSheetProps {
@@ -19,7 +15,6 @@ interface ModelSelectionSheetProps {
   onModelSelect: (providerId: ProviderId, model: string) => void;
   isModelSelected: (providerId: ProviderId, model: string) => boolean;
   dividerColor: string;
-  cardBg: string;
 }
 
 export function ModelSelectionSheet({
@@ -30,7 +25,6 @@ export function ModelSelectionSheet({
   onModelSelect,
   isModelSelected,
   dividerColor,
-  cardBg,
 }: ModelSelectionSheetProps) {
   const { theme } = useTheme();
   const visibleProvider = PROVIDERS[sheetProvider];
@@ -42,7 +36,7 @@ export function ModelSelectionSheet({
 
   return (
     <>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
+      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
         <Text
           style={{
             color: theme.colors.text,
@@ -53,18 +47,24 @@ export function ModelSelectionSheet({
         >
           Choose Model
         </Text>
+      </View>
 
+      <View style={{ flexDirection: "row", minHeight: 344 }}>
         <View
           style={{
-            flexDirection: "row",
-            marginTop: 14,
-            borderRadius: 12,
-            backgroundColor: `${theme.colors.text}0a`,
-            padding: 3,
+            width: 64,
+            paddingLeft: 12,
+            paddingRight: 8,
+            paddingTop: 2,
+            paddingBottom: 8,
+            gap: 10,
+            borderRightWidth: 0.5,
+            borderRightColor: dividerColor,
           }}
         >
           {PROVIDER_IDS.map((providerId) => {
             const isSelected = sheetProvider === providerId;
+            const provider = PROVIDERS[providerId];
             return (
               <TouchableOpacity
                 key={providerId}
@@ -72,124 +72,152 @@ export function ModelSelectionSheet({
                 onPress={() => onProviderBrowse(providerId)}
                 activeOpacity={0.7}
                 accessibilityRole="button"
+                accessibilityLabel={provider.name}
                 accessibilityState={{ selected: isSelected }}
                 style={{
-                  flex: 1,
-                  paddingVertical: 7,
-                  borderRadius: 10,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
                   alignItems: "center",
-                  backgroundColor: isSelected ? cardBg : "transparent",
-                  ...(isSelected
-                    ? {
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.08,
-                        shadowRadius: 2,
-                        elevation: 1,
-                      }
-                    : {}),
+                  justifyContent: "center",
+                  backgroundColor: isSelected
+                    ? `${theme.colors.accent}18`
+                    : `${theme.colors.text}08`,
+                  borderWidth: 0.5,
+                  borderColor: isSelected
+                    ? `${theme.colors.accent}66`
+                    : "transparent",
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: isSelected ? "600" : "400",
-                    color: isSelected
-                      ? theme.colors.text
-                      : theme.colors.textSecondary,
-                    letterSpacing: -0.1,
-                  }}
-                  numberOfLines={1}
-                >
-                  {getProviderSheetLabel(providerId)}
-                </Text>
+                <ProviderIcon
+                  providerId={providerId}
+                  size={22}
+                  color={
+                    isSelected ? theme.colors.accent : theme.colors.textSecondary
+                  }
+                />
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {!providerConfigured ? (
-          <Text
+        <View style={{ flex: 1 }}>
+          <View
             style={{
-              color: theme.colors.accent,
-              fontSize: 12,
-              marginTop: 8,
-            }}
-          >
-            {unconfiguredMessage}
-          </Text>
-        ) : null}
-      </View>
-
-      <SheetDivider color={dividerColor} />
-
-      <ScrollView
-        style={{ marginTop: 0 }}
-        contentContainerStyle={{ paddingBottom: 4 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {visibleModels.length > 0 ? (
-          visibleModels.map((model, index) => {
-            const selected = isModelSelected(sheetProvider, model);
-            return (
-              <React.Fragment key={model}>
-                {index > 0 && <SheetDivider color={dividerColor} />}
-                <TouchableOpacity
-                  testID={`chat-model-option-${toTestIdFragment(model)}`}
-                  onPress={() => onModelSelect(sheetProvider, model)}
-                  activeOpacity={0.6}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    backgroundColor: selected
-                      ? `${theme.colors.accent}12`
-                      : "transparent",
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                >
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontSize: 15.5,
-                      fontWeight: selected ? "600" : "400",
-                      color: selected
-                        ? theme.colors.accent
-                        : theme.colors.text,
-                      letterSpacing: -0.2,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {model}
-                  </Text>
-                  {selected ? (
-                    <SymbolView
-                      name="checkmark"
-                      size={13}
-                      tintColor={theme.colors.accent}
-                    />
-                  ) : null}
-                </TouchableOpacity>
-              </React.Fragment>
-            );
-          })
-        ) : (
-          <Text
-            testID="chat-model-empty-state"
-            style={{
-              color: theme.colors.textSecondary,
-              fontSize: 14,
               paddingHorizontal: 16,
-              paddingVertical: 20,
+              paddingBottom: providerConfigured ? 12 : 10,
+              gap: 5,
             }}
           >
-            No models available for this provider.
-          </Text>
-        )}
-      </ScrollView>
+            <Text
+              style={{
+                color: theme.colors.text,
+                fontSize: 15,
+                fontWeight: "600",
+                letterSpacing: -0.2,
+              }}
+              numberOfLines={1}
+            >
+              {visibleProvider?.name ?? "Provider"}
+            </Text>
+
+            {!providerConfigured ? (
+              <Text
+                style={{
+                  color: theme.colors.accent,
+                  fontSize: 12,
+                  lineHeight: 16,
+                }}
+              >
+                {unconfiguredMessage}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={{ height: 0.5, backgroundColor: dividerColor }} />
+
+          <ScrollView
+            style={{ marginTop: 0 }}
+            contentContainerStyle={{ paddingBottom: 4 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {visibleModels.length > 0 ? (
+              visibleModels.map((model, index) => {
+                const selected = isModelSelected(sheetProvider, model);
+                return (
+                  <React.Fragment key={model}>
+                    {index > 0 && (
+                      <View style={{ height: 0.5, backgroundColor: dividerColor }} />
+                    )}
+                    <TouchableOpacity
+                      testID={`chat-model-option-${toTestIdFragment(model)}`}
+                      onPress={() => onModelSelect(sheetProvider, model)}
+                      activeOpacity={0.6}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        minHeight: 56,
+                        paddingLeft: 16,
+                        paddingRight: 14,
+                        paddingVertical: 12,
+                        backgroundColor: selected
+                          ? `${theme.colors.accent}12`
+                          : "transparent",
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontSize: 15.5,
+                          fontWeight: selected ? "600" : "400",
+                          color: selected
+                            ? theme.colors.accent
+                            : theme.colors.text,
+                          letterSpacing: -0.2,
+                          paddingRight: 12,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {model}
+                      </Text>
+                      <View
+                        style={{
+                          width: 22,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {selected ? (
+                          <SymbolView
+                            name="checkmark"
+                            size={13}
+                            tintColor={theme.colors.accent}
+                          />
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              <Text
+                testID="chat-model-empty-state"
+                style={{
+                  color: theme.colors.textSecondary,
+                  fontSize: 14,
+                  paddingHorizontal: 16,
+                  paddingVertical: 20,
+                }}
+              >
+                No models available for this provider.
+              </Text>
+            )}
+          </ScrollView>
+        </View>
+      </View>
     </>
   );
 }

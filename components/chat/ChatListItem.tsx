@@ -272,12 +272,12 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                         },
                     ]}
                 >
-                    {/* CARD BACKGROUND - Rounded container with border and glass effect */}
+                    {/* ROW BACKGROUND - Rounded tonal container with a quiet border */}
                     <View
                         className="rounded-lg min-h-[75px] justify-center border"
                         style={{
                             borderColor: theme.colors.border,
-                            backgroundColor: theme.colors.glass, // Semi-transparent glass background
+                            backgroundColor: theme.colors.surface,
                             paddingHorizontal: 20,
                             paddingVertical: 14,
                         }}
@@ -305,7 +305,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                                     className="text-[11px] font-medium px-1.5 py-0.5 rounded overflow-hidden"
                                     style={{
                                         color: theme.colors.textSecondary,
-                                        backgroundColor: theme.colors.glass,
+                                        backgroundColor: theme.colors.background,
                                     }}
                                 >
                                     {displayTime}

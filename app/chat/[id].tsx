@@ -96,7 +96,6 @@ export default function Chat() {
 
     const isInputLocked = streamState === "streaming" || streamState === "completing";
     const messageListBottomInset = isIos && isKeyboardVisible ? composerHeight : 0;
-
     const resetAutoTitleState = useCallback(() => {
         autoTitleAttemptCountRef.current = 0;
         isAutoTitleGenerationInFlightRef.current = false;
@@ -340,7 +339,7 @@ export default function Chat() {
              {/* Root view that fills the screen with themed background color */}
              {/* ============================================================================ */}
              <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-                 {/* ====================================================================== */}
+                  {/* ====================================================================== */}
                  {/* KEYBOARD AVOIDING VIEW */}
                  {/* Handles keyboard presentation on iOS, adjusts content to prevent overlap */}
                  {/* ====================================================================== */}

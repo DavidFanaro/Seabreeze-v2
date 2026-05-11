@@ -34,6 +34,7 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { ThinkingLevel } from "@/types/chat.types";
 import {
   ProviderId,
+  PROVIDERS,
   isOllamaThinkingHintModel,
   isThinkingCapableModel,
 } from "@/types/provider.types";
@@ -244,6 +245,10 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
   };
 
   const modelLabel = getModelLabel(selectedProvider, selectedModel);
+  const providerLabel = PROVIDERS[selectedProvider]?.name ?? selectedProvider;
+  const activeModelLabel = providerLabel === modelLabel
+    ? providerLabel
+    : `${providerLabel} · ${modelLabel}`;
   const visibleModels = getModelsForProvider(sheetProvider);
   const providerConfigured = isProviderConfigured(sheetProvider);
   const isThinkingLevelAvailable = isThinkingCapableModel(
@@ -305,7 +310,7 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
           activeOpacity={0.65}
           style={[inactiveChip, { flex: 1 }]}
           accessibilityRole="button"
-          accessibilityLabel="Choose chat model"
+          accessibilityLabel={`Choose chat model. Active model: ${activeModelLabel}`}
         >
           <SymbolView
             name="cpu"
@@ -316,7 +321,7 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
             style={[chipLabel, { color: theme.colors.text, flex: 1 }]}
             numberOfLines={1}
           >
-            {modelLabel}
+            {activeModelLabel}
           </Text>
           <SymbolView
             name="chevron.down"
@@ -418,7 +423,6 @@ export function ChatContextMenu({ onReset, onRename }: ChatContextMenuProps) {
               onModelSelect={handleModelSelect}
               isModelSelected={isModelSelected}
               dividerColor={dividerColor}
-              cardBg={cardBg}
             />
           ) : (
             <OptionsSheet

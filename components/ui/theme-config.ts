@@ -79,31 +79,31 @@ const createTheme = (colors: Theme["colors"], isDark: boolean): Theme => ({
 export const THEMES: Record<ResolvedThemeMode, Theme> = {
   light: createTheme(
     {
-      background: "#f2f2f7",
-      surface: "#ffffff",
-      text: "#000000",
-      textSecondary: "#8e8e93",
+      background: "#f3f5f8",
+      surface: "#fbfcff",
+      text: "#111820",
+      textSecondary: "#66717d",
       accent: "#007AFF",
-      glass: "rgba(255,255,255,0.7)",
-      border: "rgba(0,0,0,0.12)",
+      glass: "rgba(251,252,255,0.78)",
+      border: "rgba(17,24,32,0.12)",
       error: "#ff3b30",
-      overlay: "#ffffff",
-      overlayForeground: "#000000",
+      overlay: "#fbfcff",
+      overlayForeground: "#111820",
     },
     false,
   ),
   dark: createTheme(
     {
-      background: "#000000",
-      surface: "#1a1a1a",
-      text: "#ffffff",
-      textSecondary: "#adb5bd",
+      background: "#080c12",
+      surface: "#151b23",
+      text: "#f4f8fb",
+      textSecondary: "#aab5c0",
       accent: "#0567d1",
-      glass: "rgba(0,0,0,0.8)",
-      border: "rgba(255,255,255,0.1)",
+      glass: "rgba(21,27,35,0.82)",
+      border: "rgba(244,248,251,0.11)",
       error: "#ff4757",
-      overlay: "rgba(28,28,30,0.95)",
-      overlayForeground: "#ffffff",
+      overlay: "rgba(18,24,32,0.96)",
+      overlayForeground: "#f4f8fb",
     },
     true,
   ),
@@ -278,8 +278,8 @@ export const THEME_OPTIONS: readonly { id: ThemeMode; name: string }[] = [
 ] as const;
 
 export const THEME_PALETTE: Record<ThemeMode, readonly [string, string, string]> = {
-  light: ["#f2f2f7", "#ffffff", "#007AFF"],
-  dark: ["#000000", "#1a1a1a", "#0567d1"],
+  light: ["#f3f5f8", "#fbfcff", "#007AFF"],
+  dark: ["#080c12", "#151b23", "#0567d1"],
   nord: ["#2E3440", "#3B4252", "#88C0D0"],
   catppuccin: ["#1E1E2E", "#313244", "#89B4FA"],
   "tokyo-night": ["#1a1b26", "#24283b", "#7aa2f7"],
@@ -290,7 +290,7 @@ export const THEME_PALETTE: Record<ThemeMode, readonly [string, string, string]>
   "gruvbox-dark-medium": ["#282828", "#3c3836", "#83a598"],
   "gruvbox-dark-soft": ["#32302f", "#3c3836", "#83a598"],
   darcula: ["#2b2b2b", "#323232", "#6897bb"],
-  system: ["#000000", "#1a1a1a", "#007AFF"],
+  system: ["#080c12", "#151b23", "#007AFF"],
 };
 
 export const resolveThemeMode = (

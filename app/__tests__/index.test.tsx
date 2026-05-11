@@ -124,7 +124,7 @@ describe("Home", () => {
   it("shows the empty-state copy when there are no chats", () => {
     const { getByText } = render(<Home />);
 
-    expect(getByText("No Chats Yet")).toBeTruthy();
-    expect(getByText("Start a new conversation by tapping + button above")).toBeTruthy();
+    expect(getByText("Ready for a first conversation")).toBeTruthy();
+    expect(getByText("Start chat")).toBeTruthy();
   });
 });

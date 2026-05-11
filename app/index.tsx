@@ -1,6 +1,6 @@
 import { Stack, useRouter } from "expo-router";
 import * as React from "react";
-import { FlatList, View, Text } from "react-native";
+import { FlatList, Pressable, View, Text } from "react-native";
 import { useLiveQuery } from "drizzle-orm/expo-sqlite";
 import { useIsFocused } from "@react-navigation/native";
 import useDatabase from "@/hooks/useDatabase";
@@ -101,7 +101,7 @@ const normalizeChatRow = (row: unknown): ChatListRow | null => {
  * - Centered layout with icon, title, and description
  * - Responsive to theme colors
  */
-const EmptyState = () => {
+const EmptyState = ({ onStartChat }: { onStartChat: () => void }) => {
   const { theme } = useTheme();
 
   return (
@@ -124,21 +124,33 @@ const EmptyState = () => {
         />
       </View>
 
-      {/* Title section: Main heading "No Chats Yet" */}
       <Text
         className="text-[20px] font-bold mb-2 text-center"
         style={{ color: theme.colors.text }}
       >
-        No Chats Yet
+        Ready for a first conversation
       </Text>
 
-      {/* Description section: Instructional text guiding user to create a new chat */}
       <Text
-        className="text-[15px] text-center leading-[22px]"
+        className="text-[15px] text-center leading-[22px] mb-5"
         style={{ color: theme.colors.textSecondary }}
       >
-        Start a new conversation by tapping + button above
+        Start with your configured model, then attach context or enable web search when the task needs it.
       </Text>
+      <Pressable
+        onPress={onStartChat}
+        accessibilityRole="button"
+        accessibilityLabel="Start a new chat"
+        className="rounded-full px-5 py-3"
+        style={({ pressed }) => ({
+          backgroundColor: theme.colors.accent,
+          opacity: pressed ? 0.75 : 1,
+        })}
+      >
+        <Text className="text-[15px] font-semibold" style={{ color: theme.colors.surface }}>
+          Start chat
+        </Text>
+      </Pressable>
     </Animated.View>
   );
 };
@@ -374,7 +386,7 @@ export default function Home() {
               isScreenFocused={isScreenFocused}
             />
           )}
-          ListEmptyComponent={EmptyState}
+          ListEmptyComponent={<EmptyState onStartChat={openNewChat} />}
           showsVerticalScrollIndicator={false}
         />
       </View>
