@@ -18,7 +18,9 @@ import { LanguageModel, generateText } from "ai";
 import { ProviderId, PROVIDERS, PROVIDER_CAPABILITIES } from "@/types/provider.types";
 import { createAppleModel } from "./apple-provider";
 import { getOpenAIModel } from "./openai-provider";
+import { getOpenAICodexModel } from "./openai-codex-provider";
 import { getOpenRouterModel } from "./openrouter-provider";
+import { getOpencodeModel } from "./opencode-provider";
 import { getOllamaModel } from "./ollama-provider";
 import { isProviderConfigured, getDefaultModelForProvider } from "@/stores";
 import { getCachedModel, invalidateProviderCache } from "./provider-cache";
@@ -93,6 +95,13 @@ export function getProviderModel(providerId: ProviderId, modelId?: string): Prov
                 isConfigured: isProviderConfigured("openai"),
                 error: openaiModel ? undefined : "OpenAI API key not configured",
             };
+        case "openai-codex":
+            const openaiCodexModel = getCachedModel(providerId, model, () => getOpenAICodexModel(model));
+            return {
+                model: openaiCodexModel,
+                isConfigured: isProviderConfigured("openai-codex"),
+                error: openaiCodexModel ? undefined : "OpenAI Codex OAuth not configured",
+            };
         case "openrouter":
             // OpenRouter acts as an aggregator for multiple model providers
             // Requires API key and provides access to various models through one interface
@@ -101,6 +110,13 @@ export function getProviderModel(providerId: ProviderId, modelId?: string): Prov
                 model: openrouterModel,
                 isConfigured: isProviderConfigured("openrouter"),
                 error: openrouterModel ? undefined : "OpenRouter API key not configured",
+            };
+        case "opencode":
+            const opencodeModel = getCachedModel(providerId, model, () => getOpencodeModel(model));
+            return {
+                model: opencodeModel,
+                isConfigured: isProviderConfigured("opencode"),
+                error: opencodeModel ? undefined : "Opencode API key not configured",
             };
         case "ollama":
             // Ollama provides local AI model hosting
@@ -180,8 +196,14 @@ export function getConfiguredProviders(): ProviderId[] {
     if (isProviderAvailable("openai")) {
         configured.push("openai");
     }
+    if (isProviderAvailable("openai-codex")) {
+        configured.push("openai-codex");
+    }
     if (isProviderAvailable("openrouter")) {
         configured.push("openrouter");
+    }
+    if (isProviderAvailable("opencode")) {
+        configured.push("opencode");
     }
     if (isProviderAvailable("ollama")) {
         configured.push("ollama");
@@ -198,7 +220,7 @@ export function getConfiguredProviders(): ProviderId[] {
  * @returns Array of all supported ProviderId strings
  */
 export function getAllProviders(): ProviderId[] {
-    return ["apple", "openai", "openrouter", "ollama"];
+    return ["apple", "openai", "openai-codex", "openrouter", "opencode", "ollama"];
 }
 
 // =============================================================================
@@ -223,10 +245,17 @@ export async function testProviderConnection(providerId: ProviderId, credentials
             if (!credentials.apiKey) return false;
             const { testOpenAIConnection } = await import("./openai-provider");
             return testOpenAIConnection(credentials.apiKey);
+        case "openai-codex":
+            const { testOpenAICodexConnection } = await import("./openai-codex-provider");
+            return testOpenAICodexConnection();
         case "openrouter":
             if (!credentials.apiKey) return false;
             const { testOpenRouterConnection } = await import("./openrouter-provider");
             return testOpenRouterConnection(credentials.apiKey);
+        case "opencode":
+            if (!credentials.apiKey) return false;
+            const { testOpencodeConnection } = await import("./opencode-provider");
+            return testOpencodeConnection(credentials.apiKey);
         case "ollama":
             if (!credentials.url) return false;
             const { testOllamaConnection } = await import("./ollama-provider");
@@ -277,6 +306,9 @@ export async function testProviderConnectionReal(
                     model = getOpenAIModel("gpt-4o-mini");
                 }
                 break;
+            case "openai-codex":
+                model = getOpenAICodexModel("gpt-5.5");
+                break;
             case "openrouter":
                 // Test with OpenRouter's version of gpt-4o-mini
                 if (credentials?.apiKey) {
@@ -285,6 +317,14 @@ export async function testProviderConnectionReal(
                     model = provider("openai/gpt-4o-mini") as unknown as LanguageModel;
                 } else {
                     model = getOpenRouterModel("openai/gpt-4o-mini");
+                }
+                break;
+            case "opencode":
+                if (credentials?.apiKey) {
+                    const { createOpencodeProvider } = await import("./opencode-provider");
+                    model = createOpencodeProvider(credentials.apiKey).chat("glm-5.1");
+                } else {
+                    model = getOpencodeModel("glm-5.1");
                 }
                 break;
             case "ollama":
@@ -315,8 +355,9 @@ export async function testProviderConnectionReal(
         }
 
         // Create a timeout promise to prevent hanging on unresponsive providers
-        const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("Connection test timed out")), timeoutMs);
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        const timeoutPromise = new Promise<Error>((resolve) => {
+            timeoutId = setTimeout(() => resolve(new Error("Connection test timed out")), timeoutMs);
         });
 
         // Make an actual API call with a minimal, predictable prompt
@@ -327,7 +368,15 @@ export async function testProviderConnectionReal(
         });
 
         // Race the API call against the timeout to enforce time limits
-        const result = await Promise.race([testPromise, timeoutPromise]);
+        const result = await Promise.race([testPromise, timeoutPromise]).finally(() => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        });
+
+        if (result instanceof Error) {
+            throw result;
+        }
         
         // Calculate total latency including model creation time
         const latencyMs = Date.now() - startTime;
@@ -405,7 +454,9 @@ export async function testAllProviders(): Promise<Record<ProviderId, ConnectionT
     const results: Record<ProviderId, ConnectionTestResult> = {
         apple: { success: false, error: "Not tested" },
         openai: { success: false, error: "Not tested" },
+        "openai-codex": { success: false, error: "Not tested" },
         openrouter: { success: false, error: "Not tested" },
+        opencode: { success: false, error: "Not tested" },
         ollama: { success: false, error: "Not tested" },
     };
 

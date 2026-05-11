@@ -182,7 +182,9 @@ describe('getModelWithFallback', () => {
       const models: Record<ProviderId, string> = {
         apple: 'gpt-4',
         openai: 'gpt-4',
+        'openai-codex': 'gpt-5.5',
         openrouter: 'claude-3',
+        opencode: 'glm-5.1',
         ollama: 'llama2',
       };
       return models[provider];
@@ -282,7 +284,9 @@ describe('getNextFallbackProvider', () => {
       const models: Record<ProviderId, string> = {
         apple: 'gpt-4',
         openai: 'gpt-4',
+        'openai-codex': 'gpt-5.5',
         openrouter: 'claude-3',
+        opencode: 'glm-5.1',
         ollama: 'llama2',
       };
       return models[provider];
@@ -317,7 +321,7 @@ describe('getNextFallbackProvider', () => {
 
   it('should return null when all providers failed', () => {
     const error = new Error('Error');
-    const result = getNextFallbackProvider('openai', ['openai', 'apple', 'openrouter', 'ollama'], error);
+    const result = getNextFallbackProvider('openai', ['openai', 'apple', 'openrouter', 'opencode', 'ollama'], error);
 
     expect(result).toBeNull();
   });
@@ -358,7 +362,7 @@ describe('hasFallbackAvailable', () => {
   it('should return false when all providers failed', () => {
     mockedIsProviderAvailable.mockReturnValue(false);
 
-    const result = hasFallbackAvailable('openai', ['apple', 'openrouter', 'ollama']);
+    const result = hasFallbackAvailable('openai', ['apple', 'openrouter', 'opencode', 'ollama']);
 
     expect(result).toBe(false);
   });
@@ -378,7 +382,7 @@ describe('hasFallbackAvailable', () => {
       return provider === 'apple';
     });
 
-    const result = hasFallbackAvailable('openai', ['apple', 'openrouter']);
+    const result = hasFallbackAvailable('openai', ['apple', 'openrouter', 'opencode']);
 
     expect(result).toBe(false);
   });
@@ -393,7 +397,7 @@ describe('getAvailableProviders', () => {
   it('should return all providers with configuration status', () => {
     const result = getAvailableProviders();
 
-    expect(result).toHaveLength(4);
+    expect(result).toHaveLength(5);
     expect(result.every((p) => p.provider && typeof p.isConfigured === 'boolean')).toBe(true);
   });
 
@@ -403,7 +407,8 @@ describe('getAvailableProviders', () => {
     expect(result[0].provider).toBe('apple');
     expect(result[1].provider).toBe('openai');
     expect(result[2].provider).toBe('openrouter');
-    expect(result[3].provider).toBe('ollama');
+    expect(result[3].provider).toBe('opencode');
+    expect(result[4].provider).toBe('ollama');
   });
 
   it('should reflect actual configuration status', () => {
@@ -437,7 +442,9 @@ describe('Fallback Chain Integration', () => {
       const models: Record<ProviderId, string> = {
         apple: 'gpt-4',
         openai: 'gpt-4',
+        'openai-codex': 'gpt-5.5',
         openrouter: 'claude-3',
+        opencode: 'glm-5.1',
         ollama: 'llama2',
       };
       return models[provider];
@@ -466,7 +473,7 @@ describe('Fallback Chain Integration', () => {
 
     const result = getModelWithFallback('openai', 'gpt-4');
 
-    expect(result.attemptedProviders).toEqual(['openai', 'apple', 'openrouter', 'ollama']);
+    expect(result.attemptedProviders).toEqual(['openai', 'apple', 'openrouter', 'opencode', 'ollama']);
     expect(result.provider).toBe('ollama');
     expect(result.isOriginal).toBe(false);
   });
@@ -490,7 +497,7 @@ describe('Fallback Chain Integration', () => {
     expect(result.model).toBeNull();
     expect(result.error).toContain('No configured providers');
     expect(result.isOriginal).toBe(true);
-    expect(result.attemptedProviders).toHaveLength(4);
+    expect(result.attemptedProviders).toHaveLength(5);
   });
 
   it('should skip providers that are not available', () => {

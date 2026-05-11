@@ -83,6 +83,12 @@ function NavigationContent() {
             }}
           />
           <Stack.Screen
+            name="settings/opencode"
+            options={{
+              presentation: "card",
+            }}
+          />
+          <Stack.Screen
             name="settings/ollama"
             options={{
               presentation: "card",

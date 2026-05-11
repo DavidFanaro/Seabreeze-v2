@@ -18,23 +18,29 @@ describe("useProviderStore", () => {
       availableModels: {
         apple: ["system-default"],
         openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
+        "openai-codex": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"],
         openrouter: [
           "openai/gpt-4o",
           "openai/gpt-4o-mini",
           "anthropic/claude-sonnet-4-20250514",
         ],
+        opencode: ["glm-5.1", "glm-5", "kimi-k2.5"],
         ollama: ["gpt-oss:latest", "llama3.2", "mistral", "codellama", "qwen2.5"],
       },
       customModels: {
         apple: [],
         openai: [],
+        "openai-codex": [],
         openrouter: [],
+        opencode: [],
         ollama: [],
       },
       hiddenModels: {
         apple: [],
         openai: [],
+        "openai-codex": [],
         openrouter: [],
+        opencode: [],
         ollama: [],
       },
     }));

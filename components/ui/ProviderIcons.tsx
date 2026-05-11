@@ -44,6 +44,11 @@ export const PROVIDER_ICONS: Record<ProviderId, React.FC<ProviderIconProps>> = {
     <AntDesign name="open-a-i" size={size} color={color} />
   ),
 
+  // OpenAI Codex: Use the OpenAI mark with a terminal cue for the Codex provider
+  "openai-codex": ({ size = 24, color }) => (
+    <MaterialCommunityIcons name="console-line" size={size} color={color} />
+  ),
+
   // OpenRouter: Brand PNG asset tinted with theme color for consistency
   openrouter: ({ size = 24, color }) => (
     <Image
@@ -51,6 +56,11 @@ export const PROVIDER_ICONS: Record<ProviderId, React.FC<ProviderIconProps>> = {
       style={{ width: size, height: size, tintColor: color }}
       resizeMode="contain"
     />
+  ),
+
+  // Opencode: Console-style icon for OpenCode Go models
+  opencode: ({ size = 24, color }) => (
+    <MaterialCommunityIcons name="code-braces" size={size} color={color} />
   ),
 
   // Ollama: Brand PNG asset tinted with theme color for consistency

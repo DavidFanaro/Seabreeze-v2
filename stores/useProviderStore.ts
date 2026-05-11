@@ -26,7 +26,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { ProviderId } from "@/types/provider.types";
+import { OPENCODE_MODELS, OPENAI_CODEX_MODELS, type ProviderId } from "@/types/provider.types";
 import { getVisibleModelNames, normalizeUniqueModelNames } from "@/lib/model-utils";
 import { safeSecureStore } from "@/lib/safe-secure-store";
 import {
@@ -151,11 +151,13 @@ const secureStorage = {
 const DEFAULT_MODELS: Record<ProviderId, string[]> = {
   apple: ["system-default"], // Apple Intelligence uses a single system default model
   openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"], // Main OpenAI models
+  "openai-codex": OPENAI_CODEX_MODELS,
   openrouter: [
     "openai/gpt-4o", // OpenAI models via OpenRouter
     "openai/gpt-4o-mini",
     "anthropic/claude-sonnet-4-20250514", // Anthropic models via OpenRouter
   ],
+  opencode: OPENCODE_MODELS,
   ollama: ["gpt-oss:latest", "llama3.2", "mistral", "codellama", "qwen2.5"], // Popular local models
 };
 
@@ -167,7 +169,9 @@ const DEFAULT_MODELS: Record<ProviderId, string[]> = {
 const DEFAULT_CUSTOM_MODELS: Record<ProviderId, string[]> = {
   apple: [], // Apple Intelligence doesn't support custom models
   openai: [], // Can be extended with user-defined OpenAI-compatible models
+  "openai-codex": [], // Codex OAuth provider has a fixed default model set
   openrouter: [], // Can be extended with additional OpenRouter-compatible models
+  opencode: [], // Can be extended with additional Opencode-compatible models
   ollama: [], // Often extended with locally installed models
 };
 
@@ -179,7 +183,9 @@ const DEFAULT_CUSTOM_MODELS: Record<ProviderId, string[]> = {
 const DEFAULT_HIDDEN_MODELS: Record<ProviderId, string[]> = {
   apple: [], // No models hidden initially
   openai: [], // All default OpenAI models shown initially
+  "openai-codex": [], // All default Codex models shown initially
   openrouter: [], // All default OpenRouter models shown initially
+  opencode: [], // All default Opencode models shown initially
   ollama: [], // All default Ollama models shown initially
 };
 

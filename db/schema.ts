@@ -61,7 +61,7 @@ export const chat = sqliteTable(
     thinkingOutput: text({ mode: "json" }).notNull(),
 
     /** AI provider used - Enum constraint ensures valid provider selection */
-    providerId: text({ enum: ["apple", "openai", "openrouter", "ollama"] })
+    providerId: text({ enum: ["apple", "openai", "openai-codex", "openrouter", "opencode", "ollama"] })
       .$type<ProviderId>()
       .notNull(),
 

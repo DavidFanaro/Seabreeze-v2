@@ -33,6 +33,10 @@ jest.mock('../openrouter-provider', () => ({
   getOpenRouterModel: jest.fn(() => ({})),
 }));
 
+jest.mock('../opencode-provider', () => ({
+  getOpencodeModel: jest.fn(() => ({})),
+}));
+
 jest.mock('../ollama-provider', () => ({
   getOllamaModel: jest.fn(() => ({})),
 }));
@@ -75,7 +79,9 @@ describe('getProviderModel', () => {
       const models: Record<ProviderId, string> = {
         apple: 'gpt-4',
         openai: 'gpt-4',
+        'openai-codex': 'gpt-5.5',
         openrouter: 'claude-3',
+        opencode: 'glm-5.1',
         ollama: 'llama2',
       };
       return models[provider];
@@ -99,6 +105,13 @@ describe('getProviderModel', () => {
 
   it('should return model for openrouter provider', () => {
     const result = getProviderModel('openrouter');
+
+    expect(result.model).toBeDefined();
+    expect(result.isConfigured).toBe(true);
+  });
+
+  it('should return model for opencode provider', () => {
+    const result = getProviderModel('opencode');
 
     expect(result.model).toBeDefined();
     expect(result.isConfigured).toBe(true);
@@ -143,6 +156,7 @@ describe('getConfiguredProviders', () => {
     expect(result).toContain('apple');
     expect(result).toContain('openai');
     expect(result).not.toContain('openrouter');
+    expect(result).not.toContain('opencode');
     expect(result).not.toContain('ollama');
   });
 
@@ -160,10 +174,12 @@ describe('getConfiguredProviders', () => {
 
     const result = getConfiguredProviders();
 
-    expect(result).toHaveLength(4);
+    expect(result).toHaveLength(6);
     expect(result).toContain('apple');
     expect(result).toContain('openai');
+    expect(result).toContain('openai-codex');
     expect(result).toContain('openrouter');
+    expect(result).toContain('opencode');
     expect(result).toContain('ollama');
   });
 });
@@ -172,8 +188,8 @@ describe('getAllProviders', () => {
   it('should return all provider IDs', () => {
     const result = getAllProviders();
 
-    expect(result).toHaveLength(4);
-    expect(result).toEqual(['apple', 'openai', 'openrouter', 'ollama']);
+    expect(result).toHaveLength(6);
+    expect(result).toEqual(['apple', 'openai', 'openai-codex', 'openrouter', 'opencode', 'ollama']);
   });
 });
 
@@ -235,6 +251,12 @@ describe('testProviderConnection', () => {
 
   it('should return false for openrouter without apiKey', async () => {
     const result = await testProviderConnection('openrouter', {});
+
+    expect(result).toBe(false);
+  });
+
+  it('should return false for opencode without apiKey', async () => {
+    const result = await testProviderConnection('opencode', {});
 
     expect(result).toBe(false);
   });
@@ -308,6 +330,7 @@ describe('testAllProviders', () => {
     expect(result).toHaveProperty('apple');
     expect(result).toHaveProperty('openai');
     expect(result).toHaveProperty('openrouter');
+    expect(result).toHaveProperty('opencode');
     expect(result).toHaveProperty('ollama');
   });
 
@@ -318,6 +341,7 @@ describe('testAllProviders', () => {
 
     expect(result.openai).toHaveProperty('error');
     expect(result.openrouter).toHaveProperty('error');
+    expect(result.opencode).toHaveProperty('error');
     expect(result.ollama).toHaveProperty('error');
   });
 });
@@ -359,7 +383,9 @@ describe('Provider Model Creation with Caching', () => {
       const models: Record<ProviderId, string> = {
         apple: 'gpt-4',
         openai: 'gpt-4',
+        'openai-codex': 'gpt-5.5',
         openrouter: 'claude-3',
+        opencode: 'glm-5.1',
         ollama: 'llama2',
       };
       return models[provider];
@@ -389,6 +415,15 @@ describe('Provider Model Creation with Caching', () => {
     mockedIsProviderConfigured.mockReturnValue(false);
     
     const result = getProviderModel('openrouter');
+    
+    expect(result.model).toBeDefined();
+    expect(result.isConfigured).toBe(false);
+  });
+
+  it('should handle configuration check for Opencode provider', () => {
+    mockedIsProviderConfigured.mockReturnValue(false);
+    
+    const result = getProviderModel('opencode');
     
     expect(result.model).toBeDefined();
     expect(result.isConfigured).toBe(false);
@@ -525,7 +560,7 @@ describe('Parallel Provider Testing', () => {
   it('should test all configured providers efficiently', async () => {
     const result = await testAllProviders();
 
-    expect(Object.keys(result)).toHaveLength(4);
+    expect(Object.keys(result)).toHaveLength(6);
     
     // All should have been tested (not "Not tested")
     Object.values(result).forEach(providerResult => {
@@ -541,6 +576,7 @@ describe('Parallel Provider Testing', () => {
     expect(result.apple.error).not.toBe('Not tested');
     expect(result.openai.error).toBe('Not tested');
     expect(result.openrouter.error).toBe('Not tested');
+    expect(result.opencode.error).toBe('Not tested');
     expect(result.ollama.error).toBe('Not tested');
   });
 });

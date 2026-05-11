@@ -325,7 +325,9 @@ class ProviderCache {
     const providers: Record<ProviderId, number> = {
       apple: 0,
       openai: 0,
+      "openai-codex": 0,
       openrouter: 0,
+      opencode: 0,
       ollama: 0,
     };
 

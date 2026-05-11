@@ -20,6 +20,13 @@ export const OPENAI_MODELS: string[] = [
   "gpt-3.5-turbo",
 ];
 
+export const OPENAI_CODEX_MODELS: string[] = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+];
+
 export const OPENROUTER_MODELS: string[] = [
   "openai/gpt-5.2",
   "openai/gpt-5.1",
@@ -39,6 +46,21 @@ export const OPENROUTER_MODELS: string[] = [
   "meta/llama-4-maverick",
   "mistralai/mistral-small-3.1-24-06-11",
   "mistralai/mistral-medium-3",
+];
+
+export const OPENCODE_MODELS: string[] = [
+  "glm-5.1",
+  "glm-5",
+  "kimi-k2.5",
+  "kimi-k2.6",
+  "mimo-v2.5",
+  "mimo-v2.5-pro",
+  "minimax-m2.5",
+  "minimax-m2.7",
+  "qwen3.5-plus",
+  "qwen3.6-plus",
+  "deepseek-v4-pro",
+  "deepseek-v4-flash",
 ];
 
 export const OPENROUTER_VIDEO_MODELS: string[] = [
@@ -80,7 +102,7 @@ export const OLLAMA_MODELS: string[] = [
   "starcoder2",
 ];
 
-export type ProviderId = "apple" | "openai" | "openrouter" | "ollama";
+export type ProviderId = "apple" | "openai" | "openai-codex" | "openrouter" | "opencode" | "ollama";
 
 export interface ProviderInfo {
   id: ProviderId;
@@ -108,6 +130,14 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     requiresUrl: false,
     defaultModels: OPENAI_MODELS.slice(0, 8),
   },
+  "openai-codex": {
+    id: "openai-codex",
+    name: "OpenAI Codex",
+    description: "ChatGPT subscription models through Codex OAuth",
+    requiresApiKey: false,
+    requiresUrl: false,
+    defaultModels: OPENAI_CODEX_MODELS,
+  },
   openrouter: {
     id: "openrouter",
     name: "OpenRouter",
@@ -115,6 +145,14 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     requiresApiKey: true,
     requiresUrl: false,
     defaultModels: OPENROUTER_MODELS.slice(0, 8),
+  },
+  opencode: {
+    id: "opencode",
+    name: "Opencode",
+    description: "OpenCode Go curated coding models",
+    requiresApiKey: true,
+    requiresUrl: false,
+    defaultModels: OPENCODE_MODELS,
   },
   ollama: {
     id: "ollama",
@@ -149,7 +187,16 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability> = {
     supportsSystemMessages: true,
     maxContextTokens: 128000,
   },
+  "openai-codex": {
+    supportsStreaming: true,
+    supportsSystemMessages: true,
+    maxContextTokens: 400000,
+  },
   openrouter: {
+    supportsStreaming: true,
+    supportsSystemMessages: true,
+  },
+  opencode: {
     supportsStreaming: true,
     supportsSystemMessages: true,
   },
@@ -187,6 +234,8 @@ const OPENAI_REASONING_MODEL_PREFIXES: string[] = [
 ];
 
 const OPENAI_NON_REASONING_MODEL_PREFIXES: string[] = ["gpt-5-chat"];
+
+const OPENAI_CODEX_REASONING_MODEL_PREFIXES: string[] = ["gpt-5"];
 
 const OPENROUTER_REASONING_MODEL_PREFIXES: string[] = [
   "openai/o1",
@@ -237,6 +286,8 @@ export const isThinkingCapableModel = (
       }
       return startsWithAny(normalizedModelId, OPENAI_REASONING_MODEL_PREFIXES);
     }
+    case "openai-codex":
+      return startsWithAny(normalizedModelId, OPENAI_CODEX_REASONING_MODEL_PREFIXES);
     case "openrouter": {
       if (normalizedModelId.includes(":thinking")) {
         return true;

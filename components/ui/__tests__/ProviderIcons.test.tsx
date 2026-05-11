@@ -40,15 +40,15 @@ describe('ProviderIcons Component Suite', () => {
     
     describe('PROVIDER_ICONS registry', () => {
         it('should contain all expected provider IDs', () => {
-            const expectedProviders: ProviderId[] = ['apple', 'openai', 'openrouter', 'ollama'];
+            const expectedProviders: ProviderId[] = ['apple', 'openai', 'openai-codex', 'openrouter', 'opencode', 'ollama'];
             expectedProviders.forEach(provider => {
                 expect(PROVIDER_ICONS).toHaveProperty(provider);
                 expect(typeof PROVIDER_ICONS[provider]).toBe('function');
             });
         });
         
-        it('should have exactly 4 providers registered', () => {
-            expect(Object.keys(PROVIDER_ICONS)).toHaveLength(4);
+        it('should have exactly 6 providers registered', () => {
+            expect(Object.keys(PROVIDER_ICONS)).toHaveLength(6);
         });
         
         it('should map each provider to a React component function', () => {
@@ -144,7 +144,7 @@ describe('ProviderIcons Component Suite', () => {
         });
         
         it('should accept all valid provider IDs', () => {
-            const validProviders: ProviderId[] = ['apple', 'openai', 'openrouter', 'ollama'];
+            const validProviders: ProviderId[] = ['apple', 'openai', 'openai-codex', 'openrouter', 'opencode', 'ollama'];
             
             validProviders.forEach(providerId => {
                 expect(() => {
@@ -311,7 +311,7 @@ describe('ProviderIcons Component Suite', () => {
     
     describe('integration tests', () => {
         it('should work with all providers and prop combinations', () => {
-            const providers: ProviderId[] = ['apple', 'openai', 'openrouter', 'ollama'];
+            const providers: ProviderId[] = ['apple', 'openai', 'openai-codex', 'openrouter', 'opencode', 'ollama'];
             const sizes = [16, 24, 32, 48];
             const colors = ['#000000', '#FFFFFF', '#FF6B6B'];
             
@@ -335,7 +335,7 @@ describe('ProviderIcons Component Suite', () => {
         });
         
         it('should maintain consistent component structure across providers', () => {
-            const providers: ProviderId[] = ['apple', 'openai', 'openrouter', 'ollama'];
+            const providers: ProviderId[] = ['apple', 'openai', 'openai-codex', 'openrouter', 'opencode', 'ollama'];
             
             providers.forEach(provider => {
                 const element = React.createElement(ProviderIcon, {

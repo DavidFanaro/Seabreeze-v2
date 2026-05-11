@@ -34,6 +34,11 @@ export function ModelSelectionSheet({
 }: ModelSelectionSheetProps) {
   const { theme } = useTheme();
   const visibleProvider = PROVIDERS[sheetProvider];
+  const unconfiguredMessage = visibleProvider
+    ? `${visibleProvider.name} is not configured. Go to Settings to ${
+        visibleProvider.requiresApiKey ? "add your API key" : "finish setup"
+      }.`
+    : "This provider is not available. Go to Settings and choose a provider again.";
 
   return (
     <>
@@ -111,7 +116,7 @@ export function ModelSelectionSheet({
               marginTop: 8,
             }}
           >
-            {`${visibleProvider.name} is not configured. Go to Settings to add your API key.`}
+            {unconfiguredMessage}
           </Text>
         ) : null}
       </View>

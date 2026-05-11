@@ -462,6 +462,9 @@ export function useChatStreaming() {
 
             const hasTools = Boolean(tools && Object.keys(tools).length > 0);
             const shouldUseAppleToolGeneration = currentModel.provider === "apple" && hasTools;
+            const toolChoice = currentModel.provider === "opencode" && hasTools
+                ? "required"
+                : undefined;
 
             if (shouldUseAppleToolGeneration) {
                 const generated = await generateText({
@@ -469,6 +472,7 @@ export function useChatStreaming() {
                     messages,
                     system: systemPrompt,
                     tools,
+                    toolChoice,
                     providerOptions,
                     abortSignal,
                 });
@@ -507,6 +511,7 @@ export function useChatStreaming() {
                 messages: messages,
                 system: systemPrompt,
                 tools,
+                toolChoice,
                 stopWhen: tools ? stepCountIs(4) : undefined,
                 providerOptions,
                 abortSignal,

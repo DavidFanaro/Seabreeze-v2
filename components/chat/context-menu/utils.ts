@@ -1,12 +1,14 @@
 import {
   OLLAMA_MODELS,
+  OPENCODE_MODELS,
+  OPENAI_CODEX_MODELS,
   OPENAI_MODELS,
   OPENROUTER_MODELS,
   PROVIDERS,
   type ProviderId,
 } from "@/types/provider.types";
 
-export const PROVIDER_IDS: ProviderId[] = ["apple", "openai", "openrouter", "ollama"];
+export const PROVIDER_IDS: ProviderId[] = ["apple", "openai", "openai-codex", "openrouter", "opencode", "ollama"];
 
 const getDefaultModelsForProvider = (providerId: ProviderId): string[] => {
   switch (providerId) {
@@ -14,8 +16,12 @@ const getDefaultModelsForProvider = (providerId: ProviderId): string[] => {
       return ["Apple Intelligence"];
     case "openai":
       return OPENAI_MODELS;
+    case "openai-codex":
+      return OPENAI_CODEX_MODELS;
     case "openrouter":
       return OPENROUTER_MODELS;
+    case "opencode":
+      return OPENCODE_MODELS;
     case "ollama":
       return OLLAMA_MODELS;
     default:

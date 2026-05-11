@@ -16,12 +16,14 @@ import { getDefaultModelForProvider, isProviderConfigured } from "@/stores";
  * 1. Apple Intelligence - Always available on Apple devices, no API keys needed
  * 2. OpenAI - Most reliable cloud provider with best uptime
  * 3. OpenRouter - Access to multiple models/providers, good reliability
- * 4. Ollama - Local models, requires user setup but provides offline capability
+ * 4. Opencode - Curated coding models through OpenCode Go
+ * 5. Ollama - Local models, requires user setup but provides offline capability
  */
 export const PROVIDER_FALLBACK_ORDER: ProviderId[] = [
   "apple",      // Always available on Apple devices, no configuration required
   "openai",     // Most reliable cloud provider with proven uptime
   "openrouter", // Access to multiple providers via single API
+  "opencode",   // Curated coding models through OpenCode Go
   "ollama",     // Local backup option for privacy/offline use
 ];
 

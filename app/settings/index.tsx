@@ -124,9 +124,19 @@ export default function SettingsIndex() {
       description: "ChatGPT and other OpenAI models",
     },
     {
+      id: "openai-codex",
+      name: "OpenAI Codex",
+      description: "ChatGPT subscription models through Codex OAuth",
+    },
+    {
       id: "openrouter",
       name: "OpenRouter",
       description: "Access to multiple AI providers",
+    },
+    {
+      id: "opencode",
+      name: "Opencode",
+      description: "OpenCode Go curated coding models",
     },
     { id: "ollama", name: "Ollama", description: "Local AI models via Ollama" },
   ];
